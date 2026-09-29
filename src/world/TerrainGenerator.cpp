@@ -1,6 +1,7 @@
 #include "world/TerrainGenerator.h"
 #include <cmath>
 #include <raylib.h>
+#include <raymath.h>
 
 TerrainGenerator::TerrainGenerator()
     : m_seed(12345)
@@ -42,24 +43,8 @@ Color TerrainGenerator::GenerateColor(float height, int biome) const {
     }
 }
 
-int TerrainGenerator::GenerateBiome(int worldX, int worldZ) const {
-    float height = GenerateHeight(worldX, worldZ);
-    float temperature = GenerateTemperature(worldX, worldZ);
-    float humidity = GenerateHumidity(worldX, worldZ);
-
-    // Simple biome classification based on height, temperature, and humidity
-    if (height < -1.0f) return 0;  // Ocean
-    if (height < 0.0f) return 1;   // Beach
-    if (temperature > 0.6f && humidity < 0.3f) return 6;  // Desert
-    if (height > 6.0f) return 5;   // Mountains
-    if (humidity > 0.7f && height < 1.0f) return 7;  // Swamp
-    if (temperature > 0.4f && humidity > 0.5f) return 3;  // Forest
-    if (height > 3.0f) return 4;   // Hills
-    return 2;  // Plains
-}
-
 void TerrainGenerator::GenerateChunkData(int chunkX, int chunkZ, int chunkSize, float tileSize,
-                                        float* heights, float* temperatures, float* humidity, int* biomes) const {
+                                        float* heights, float* temperatures, float* humidity) const {
     for (int z = 0; z < chunkSize; z++) {
         for (int x = 0; x < chunkSize; x++) {
             int worldX = chunkX * chunkSize + x;
@@ -69,7 +54,7 @@ void TerrainGenerator::GenerateChunkData(int chunkX, int chunkZ, int chunkSize, 
             heights[index] = GenerateHeight(worldX, worldZ);
             temperatures[index] = GenerateTemperature(worldX, worldZ);
             humidity[index] = GenerateHumidity(worldX, worldZ);
-            biomes[index] = GenerateBiome(worldX, worldZ);
+            // Biome NOT produced here — single source is BiomeManager via World/Chunk pipeline
         }
     }
 }

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include "world/BiomeManager.h"
 
 class Chunk;
 class TerrainGenerator;
@@ -73,6 +74,7 @@ private:
 
     WorldConfig m_config;
     std::unique_ptr<TerrainGenerator> m_terrainGenerator;
+    BiomeManager m_biomeManager;
     std::unordered_map<ChunkKey, std::unique_ptr<Chunk>, ChunkKeyHash> m_chunks;
 
     Vector3 m_lastPlayerPosition;

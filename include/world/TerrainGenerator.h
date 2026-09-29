@@ -13,14 +13,13 @@ public:
     float GenerateTemperature(int worldX, int worldZ) const;
     float GenerateHumidity(int worldX, int worldZ) const;
     Color GenerateColor(float height, int biome) const;
-    int GenerateBiome(int worldX, int worldZ) const;
 
     void SetSeed(unsigned int seed) { m_seed = seed; }
     unsigned int GetSeed() const { return m_seed; }
 
     // Chunk-specific generation
     void GenerateChunkData(int chunkX, int chunkZ, int chunkSize, float tileSize,
-                          float* heights, float* temperatures, float* humidity, int* biomes) const;
+                          float* heights, float* temperatures, float* humidity) const;
 
 private:
     // Multi-layer noise generation

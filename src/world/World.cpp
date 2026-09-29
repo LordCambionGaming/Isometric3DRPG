@@ -24,6 +24,7 @@ bool World::Initialize(const WorldConfig& config) {
         m_lastUpdateTime = 0.0f;
 
         GenerateInitialChunks();
+        m_biomeManager.Initialize();
 
         m_initialized = true;
         std::cout << "World initialized with seed: " << m_config.seed << std::endl;
@@ -217,8 +218,15 @@ float World::GetHeightAt(float worldX, float worldZ) const {
 int World::GetBiomeAt(float worldX, float worldZ) const {
     if (!m_terrainGenerator) return 0;
 
-    return m_terrainGenerator->GenerateBiome(static_cast<int>(worldX / m_config.tileSize),
-                                           static_cast<int>(worldZ / m_config.tileSize));
+    float height = m_terrainGenerator->GenerateHeight(static_cast<int>(worldX / m_config.tileSize),
+                                                    static_cast<int>(worldZ / m_config.tileSize));
+    float temperature = m_terrainGenerator->GenerateTemperature(static_cast<int>(worldX / m_config.tileSize),
+                                                                static_cast<int>(worldZ / m_config.tileSize));
+    float humidity = m_terrainGenerator->GenerateHumidity(static_cast<int>(worldX / m_config.tileSize),
+                                                          static_cast<int>(worldZ / m_config.tileSize));
+
+    return static_cast<int>(m_biomeManager.GetDominantBiome(
+        static_cast<int>(worldX), static_cast<int>(worldZ), height, temperature, humidity));
 }
 
 void World::UpdateChunkLoading(Vector3 playerPosition) {

@@ -71,6 +71,8 @@ bool Renderer::ShouldClose() const {
 void Renderer::RenderWorld() {
     if (m_world) {
         m_world->Render();
+        // Renderer does NOT select biome; it uses the world/chunk-rendered result
+        // which derives BiomeData from BiomeManager (single source of truth)
     }
 
     if (m_showGrid) {

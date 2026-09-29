@@ -9,6 +9,7 @@ obj/
 *.user
 *.suo
 *.vcxproj.user
+.vs/
 
 # Platform specific
 .DS_Store

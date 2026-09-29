@@ -51,8 +51,8 @@ public:
     Color GetBiomeColor(BiomeType type, float variation) const;
     Color BlendBiomeColors(BiomeType biome1, BiomeType biome2, float blend) const;
 
-    // Biome transition
-    BiomeType GetDominantBiome(int worldX, int worldZ, float* blendFactor = nullptr) const;
+    // Biome transition — now receives real terrain climate data
+    BiomeType GetDominantBiome(int worldX, int worldZ, float height, float temperature, float humidity, float* blendFactor = nullptr) const;
 
     const std::vector<BiomeData>& GetAllBiomes() const { return m_biomes; }
 

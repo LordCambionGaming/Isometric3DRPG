@@ -123,8 +123,8 @@ void Chunk::GenerateTerrain(unsigned int seed) {
             float humidNoise = (humidHash / (float)0xFFFFFFFFU) * 0.6f - 0.3f;
             tile.humidity = Clamp(0.5f + humidNoise, 0.0f, 1.0f);
 
-            // Determine biome based on height, temperature, and humidity
-            tile.biomeType = DetermineBiome(height, tile.temperature, tile.humidity);
+            // Biome from BiomeManager via World pipeline (store only — Chunk does NOT decide biome)
+            tile.biomeType = 0; // to be overwritten by World with real BiomeManager result
 
             // Set vegetation flag based on biome and randomness
             unsigned int vegHash = seed + 4000;
@@ -143,18 +143,6 @@ void Chunk::GenerateColors() {
             GenerateTileColors(tile);
         }
     }
-}
-
-int Chunk::DetermineBiome(float height, float temperature, float humidity) const {
-    // Enhanced biome determination
-    if (height < -2.0f) return 0;  // Ocean
-    if (height < 0.0f) return 1;   // Beach
-    if (temperature > 0.7f && humidity < 0.3f) return 6;  // Desert
-    if (height > 8.0f) return 5;   // Mountains
-    if (humidity > 0.8f && height < 1.0f && temperature > 0.4f) return 7;  // Swamp
-    if (temperature > 0.5f && humidity > 0.6f && height > 1.0f) return 3;  // Forest
-    if (height > 4.0f && temperature < 0.6f) return 4;   // Hills
-    return 2;  // Plains
 }
 
 bool Chunk::ShouldHaveVegetation(int biomeType, float randomValue) const {

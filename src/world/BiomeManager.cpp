@@ -61,17 +61,12 @@ Color BiomeManager::BlendBiomeColors(BiomeType biome1, BiomeType biome2, float b
     };
 }
 
-BiomeType BiomeManager::GetDominantBiome(int worldX, int worldZ, float* blendFactor) const {
-    // For now, simple implementation - future enhancement will add biome blending
-    float height = 0.0f; // Will be provided by terrain generator
-    float temperature = 0.5f; // Placeholder
-    float humidity = 0.5f; // Placeholder
-
+BiomeType BiomeManager::GetDominantBiome(int worldX, int worldZ, float height, float temperature, float humidity, float* blendFactor) const {
+    BiomeType dominant = GetBiome(height, temperature, humidity);
     if (blendFactor) {
-        *blendFactor = 1.0f; // No blending for now
+        *blendFactor = 1.0f;
     }
-
-    return GetBiome(height, temperature, humidity);
+    return dominant;
 }
 
 void BiomeManager::SetupDefaultBiomes() {

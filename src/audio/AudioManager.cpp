@@ -1,6 +1,7 @@
 #include "audio/AudioManager.h"
 #include <iostream>
 #include <filesystem>
+#include <raymath.h>
 
 AudioManager::AudioManager()
     : m_masterVolume(1.0f)

@@ -1,37 +1,46 @@
-cmake_minimum_required(VERSION 3.20)
-project(IsometricRPG VERSION 0.1.0)
+cmake_minimum_required(VERSION 3.16...3.30)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.16)
+
+project(Isometric3DRPG VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Platform-specific settings
 if(WIN32)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-# Dependencies
+# FetchContent
 include(FetchContent)
 
-# Raylib
+# Raylib 5.5 (automatic, no manual install)
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git
-    GIT_TAG 5.0
+    GIT_TAG 5.5
+    GIT_SHALLOW TRUE
 )
+
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(raylib)
 
-# nlohmann/json
+# nlohmann/json v3.11.3
 FetchContent_Declare(
-    nlohmann_json
+    json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(nlohmann_json)
 
-# Include directories
-include_directories(include)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(json)
 
-# Source files
+# Source files (preserve all existing .cpp files from the project)
 set(SOURCES
     src/main.cpp
     src/core/Game.cpp
@@ -47,20 +56,27 @@ set(SOURCES
     src/audio/AudioManager.cpp
 )
 
-# Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME} raylib nlohmann_json::nlohmann_json)
+# Target-oriented include directories
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
 
-# Platform-specific linking
+# Link libraries
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    raylib
+    nlohmann_json::nlohmann_json
+)
+
+# System dependencies (Windows / Linux)
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} winmm)
+    target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
 elseif(UNIX AND NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} GL m pthread dl rt X11)
+    target_link_libraries(${PROJECT_NAME} PRIVATE GL m pthread dl rt X11)
 endif()
 
-# Set working directory for debugging
+# Working directory for debugging (matches current runtime paths: data/, saves/)
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )

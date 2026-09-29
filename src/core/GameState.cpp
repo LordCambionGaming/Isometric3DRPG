@@ -50,12 +50,9 @@ void PlayingState::Render() {
     // Begin 3D rendering
     renderer->BeginMode3D(camera->GetCamera());
 
-    // Render world
-    if (world) {
-        world->Render();
-    }
+    // Render world (via renderer pipeline — consistent with Game::Render architecture)
+    renderer->RenderWorld();
 
-    // Render coordinate system for debugging
     renderer->EndMode3D();
 
     // Render UI
@@ -69,13 +66,7 @@ void PlayingState::HandleInput() {
     }
 
     // Camera controls are handled in Camera3DController
-    // World generation controls
-    if (IsKeyPressed(KEY_R)) {
-        if (auto* world = m_game->GetWorld()) {
-            // Regenerate world with new seed
-            unsigned int newSeed = GetRandomValue(1, 999999);
-            world->SetSeed(newSeed);
-            std::cout << "New world generated with seed: " << newSeed << std::endl;
-        }
-    }
+    // World generation controls (diagnostic only — do not reset seed on R)
+    // Key_R intentionally disabled in Phase 2.3 to avoid unstable regeneration
+    // if (IsKeyPressed(KEY_R)) { ... }
 }

@@ -46,8 +46,6 @@ private:
                  std::vector<Vector3>& normals, std::vector<Color>& colors,
                  Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color);
 
-    // Enhanced terrain generation
-    int DetermineBiome(float height, float temperature, float humidity) const;
     bool ShouldHaveVegetation(int biomeType, float randomValue) const;
     void GenerateTileColors(TerrainTile& tile) const;
 
