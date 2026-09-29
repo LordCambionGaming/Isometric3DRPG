@@ -23,25 +23,66 @@ Chunk::~Chunk() {
 
 void Chunk::Generate(unsigned int worldSeed) {
     if (m_generated) return;
-
     GenerateTerrain(worldSeed);
     GenerateColors();
-
     m_generated = true;
 }
 
 void Chunk::BuildMesh() {
     if (!m_generated || m_hasMesh) return;
-
     CreateTerrainMesh();
     m_hasMesh = true;
 }
 
 void Chunk::Render() {
     if (!m_hasMesh) return;
+    float s = m_tileSize;
 
-    Vector3 worldPos = GetWorldPosition();
-    DrawModel(m_model, worldPos, 1.0f, WHITE);
+    // 1) Blocks (solid cubes at tile positions)
+    for (int z = 0; z < m_size; z++) {
+        for (int x = 0; x < m_size; x++) {
+            int h = static_cast<int>(GetTile(x, z).height);
+            if (h < 1) h = 1;
+            Color c = (h == 1) ? GREEN : (h == 2) ? BROWN : (h == 3) ? GRAY : LIGHTGRAY;
+            DrawCube({(float)x * s + s*0.5f, (float)h * s * 0.5f, (float)z * s + s*0.5f},
+                     s, (float)h * s, s, c);
+        }
+    }
+
+    // 2) D&D tile grid: 17 vertical + 17 horizontal lines at each tile's top surface
+    for (int i = 0; i <= m_size; i++) {
+        float xPos = i * s;
+        // Vertical lines: from z=0 to z=m_size*s, y at tile top
+        for (int z = 0; z <= m_size; z++) {
+            float zPos = z * s;
+            // Find nearest tile to get height for this grid segment
+            int tx = (i < m_size) ? i : m_size - 1;
+            int tz = (z < m_size) ? z : m_size - 1;
+            if (tx < 0) tx = 0; if (tz < 0) tz = 0;
+            int hh = static_cast<int>(GetTile(tx, tz).height);
+            if (hh < 1) hh = 1;
+            float yGrid = hh * s + 0.02f;
+            float zStart = zPos;
+            float zEnd = (z < m_size) ? zPos + s : zPos;
+            DrawLine3D({xPos, yGrid, zStart}, {xPos, yGrid, zEnd}, DARKGRAY);
+        }
+    }
+    for (int j = 0; j <= m_size; j++) {
+        float zPos = j * s;
+        // Horizontal lines: from x=0 to x=m_size*s, y at tile top
+        for (int x = 0; x <= m_size; x++) {
+            float xPos = x * s;
+            int tx = (x < m_size) ? x : m_size - 1;
+            int tz = (j < m_size) ? j : m_size - 1;
+            if (tx < 0) tx = 0; if (tz < 0) tz = 0;
+            int hh = static_cast<int>(GetTile(tx, tz).height);
+            if (hh < 1) hh = 1;
+            float yGrid = hh * s + 0.02f;
+            float xStart = xPos;
+            float xEnd = (x < m_size) ? xPos + s : xPos;
+            DrawLine3D({xStart, yGrid, zPos}, {xEnd, yGrid, zPos}, DARKGRAY);
+        }
+    }
 }
 
 void Chunk::Unload() {
@@ -62,76 +103,38 @@ Vector3 Chunk::GetWorldPosition() const {
 
 float Chunk::GetHeightAt(float localX, float localZ) const {
     if (!m_generated) return 0.0f;
-
-    // Clamp coordinates to chunk bounds
     int tileX = static_cast<int>(localX / m_tileSize);
     int tileZ = static_cast<int>(localZ / m_tileSize);
-
-    if (tileX < 0 || tileX >= m_size || tileZ < 0 || tileZ >= m_size) {
-        return 0.0f;
-    }
-
+    if (tileX < 0 || tileX >= m_size || tileZ < 0 || tileZ >= m_size) return 0.0f;
     return GetTile(tileX, tileZ).height;
 }
 
 void Chunk::GenerateTerrain(unsigned int seed) {
-    // Enhanced procedural terrain generation using improved TerrainGenerator
+    int map[8][8] = {
+        {1,1,1,1,1,1,1,1},
+        {1,1,2,2,2,2,1,1},
+        {1,1,2,3,3,2,1,1},
+        {1,1,2,3,3,2,1,1},
+        {1,1,2,3,3,2,1,1},
+        {1,1,2,2,2,2,1,1},
+        {1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1}
+    };
+    for (int z = 0; z < m_size && z < 8; z++) {
+        for (int x = 0; x < m_size && x < 8; x++) {
+            TerrainTile& tile = GetTile(x, z);
+            int level = (x < 8 && z < 8) ? map[z][x] : 1;
+            tile.height = static_cast<float>(level);
+            tile.biomeType = 0;
+            tile.hasVegetation = false;
+        }
+    }
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
-            // World coordinates
-            int worldX = m_x * m_size + x;
-            int worldZ = m_z * m_size + z;
-
-            TerrainTile& tile = GetTile(x, z);
-
-            // Generate height using enhanced noise
-            float height = 0.0f;
-            float frequency = 0.015f;
-            float amplitude = 12.0f;
-
-            // Multiple octaves for realistic terrain
-            for (int octave = 0; octave < 5; octave++) {
-                float octaveFreq = frequency * (1 << octave);
-                float octaveAmp = amplitude / (1 << octave);
-
-                // Enhanced hash-based noise
-                unsigned int hash = seed + octave * 1000;
-                hash ^= (worldX) * 374761393U;
-                hash ^= (worldZ) * 668265263U;
-                hash = hash * 1664525U + 1013904223U;
-
-                float noise = (hash / (float)0xFFFFFFFFU) * 2.0f - 1.0f;
-                height += noise * octaveAmp * octaveFreq;
-            }
-
-            tile.height = height;
-
-            // Generate temperature (decreases with latitude and altitude)
-            float latitudeEffect = 0.8f - (std::abs(worldZ) * 0.0001f);
-            unsigned int tempHash = seed + 2000;
-            tempHash ^= worldX * 668265263U;
-            tempHash ^= worldZ * 374761393U;
-            tempHash = tempHash * 1664525U + 1013904223U;
-            float tempNoise = (tempHash / (float)0xFFFFFFFFU) * 0.4f - 0.2f;
-            tile.temperature = Clamp(latitudeEffect + tempNoise - (height * 0.05f), 0.0f, 1.0f);
-
-            // Generate humidity
-            unsigned int humidHash = seed + 3000;
-            humidHash ^= worldX * 1013904223U;
-            humidHash ^= worldZ * 1664525U;
-            humidHash = humidHash * 374761393U + 668265263U;
-            float humidNoise = (humidHash / (float)0xFFFFFFFFU) * 0.6f - 0.3f;
-            tile.humidity = Clamp(0.5f + humidNoise, 0.0f, 1.0f);
-
-            // Biome from BiomeManager via World pipeline (store only — Chunk does NOT decide biome)
-            tile.biomeType = 0; // to be overwritten by World with real BiomeManager result
-
-            // Set vegetation flag based on biome and randomness
-            unsigned int vegHash = seed + 4000;
-            vegHash ^= (worldX + worldZ) * 1013904223U;
-            vegHash = vegHash * 1664525U + 374761393U;
-            float vegChance = (vegHash / (float)0xFFFFFFFFU);
-            tile.hasVegetation = ShouldHaveVegetation(tile.biomeType, vegChance);
+            if (x < 8 && z < 8) continue;
+            GetTile(x, z).height = 1.0f;
+            GetTile(x, z).biomeType = 0;
+            GetTile(x, z).hasVegetation = false;
         }
     }
 }
@@ -147,171 +150,111 @@ void Chunk::GenerateColors() {
 
 bool Chunk::ShouldHaveVegetation(int biomeType, float randomValue) const {
     switch (biomeType) {
-        case 0: return false; // Ocean
-        case 1: return randomValue < 0.1f; // Beach - sparse vegetation
-        case 2: return randomValue < 0.6f; // Plains - moderate vegetation
-        case 3: return randomValue < 0.9f; // Forest - dense vegetation
-        case 4: return randomValue < 0.4f; // Hills - sparse vegetation
-        case 5: return randomValue < 0.2f; // Mountains - very sparse
-        case 6: return randomValue < 0.05f; // Desert - very rare
-        case 7: return randomValue < 0.8f; // Swamp - dense vegetation
+        case 0: return false;
+        case 1: return randomValue < 0.1f;
+        case 2: return randomValue < 0.6f;
+        case 3: return randomValue < 0.9f;
+        case 4: return randomValue < 0.4f;
+        case 5: return randomValue < 0.2f;
+        case 6: return randomValue < 0.05f;
+        case 7: return randomValue < 0.8f;
         default: return randomValue < 0.3f;
     }
 }
 
 void Chunk::GenerateTileColors(TerrainTile& tile) const {
-    // Enhanced color generation based on biome, height, and environmental factors
     switch (tile.biomeType) {
-        case 0: // Ocean
-            tile.baseColor = (tile.height < -4.0f) ? DARKBLUE : BLUE;
-            tile.detailColor = SKYBLUE;
-            tile.roughness = 0.1f;
-            break;
-
-        case 1: // Beach
-            tile.baseColor = BEIGE;
-            tile.detailColor = BROWN;
-            tile.roughness = 0.8f;
-            break;
-
-        case 2: // Plains
-            {
-                float grassVariation = (tile.temperature + tile.humidity) * 0.5f;
-                if (grassVariation > 0.7f) {
-                    tile.baseColor = LIME;
-                } else if (grassVariation > 0.4f) {
-                    tile.baseColor = GREEN;
-                } else {
-                    tile.baseColor = DARKGREEN;
-                }
-                tile.detailColor = tile.hasVegetation ? LIME : tile.baseColor;
-                tile.roughness = 0.6f;
-            }
-            break;
-
-        case 3: // Forest
-            tile.baseColor = DARKGREEN;
-            tile.detailColor = tile.hasVegetation ? GREEN : BROWN;
-            tile.roughness = 0.9f;
-            break;
-
-        case 4: // Hills
-            {
-                float rockiness = 1.0f - tile.humidity;
-                if (rockiness > 0.7f) {
-                    tile.baseColor = GRAY;
-                    tile.detailColor = LIGHTGRAY;
-                } else {
-                    tile.baseColor = BROWN;
-                    tile.detailColor = tile.hasVegetation ? GREEN : DARKBROWN;
-                }
-                tile.roughness = 0.8f;
-            }
-            break;
-
-        case 5: // Mountains
-            tile.baseColor = GRAY;
-            tile.detailColor = tile.height > 10.0f ? WHITE : LIGHTGRAY; // Snow cap
-            tile.roughness = 0.9f;
-            break;
-
-        case 6: // Desert
-            {
-                float sandVariation = tile.temperature;
-                if (sandVariation > 0.8f) {
-                    tile.baseColor = GOLD;
-                } else {
-                    tile.baseColor = YELLOW;
-                }
-                tile.detailColor = tile.hasVegetation ? GREEN : tile.baseColor;
-                tile.roughness = 0.7f;
-            }
-            break;
-
-        case 7: // Swamp
-            tile.baseColor = DARKGREEN;
-            tile.detailColor = tile.hasVegetation ? GREEN : BROWN;
-            tile.roughness = 0.4f; // Wet surface
-            break;
-
-        default:
-            tile.baseColor = GREEN;
-            tile.detailColor = GREEN;
-            tile.roughness = 0.5f;
-            break;
+        case 0: tile.baseColor = DARKBLUE; tile.detailColor = BLUE; tile.roughness = 0.1f; break;
+        case 1: tile.baseColor = BEIGE; tile.detailColor = BROWN; tile.roughness = 0.8f; break;
+        case 2: tile.baseColor = GREEN; tile.detailColor = LIME; tile.roughness = 0.6f; break;
+        case 3: tile.baseColor = DARKGREEN; tile.detailColor = GREEN; tile.roughness = 0.9f; break;
+        case 4: tile.baseColor = BROWN; tile.detailColor = DARKBROWN; tile.roughness = 0.8f; break;
+        case 5: tile.baseColor = GRAY; tile.detailColor = LIGHTGRAY; tile.roughness = 0.9f; break;
+        case 6: tile.baseColor = GOLD; tile.detailColor = YELLOW; tile.roughness = 0.7f; break;
+        case 7: tile.baseColor = DARKGREEN; tile.detailColor = BROWN; tile.roughness = 0.4f; break;
+        default: tile.baseColor = GREEN; tile.detailColor = GREEN; tile.roughness = 0.5f;
     }
 }
 
 void Chunk::CreateTerrainMesh() {
-    std::vector<Vector3> vertices;
-    std::vector<Vector2> texCoords;
-    std::vector<Vector3> normals;
-    std::vector<Color> colors;
-
-    // Generate enhanced mesh vertices with proper normals
-    for (int z = 0; z < m_size; z++) {
-        for (int x = 0; x < m_size; x++) {
-            const TerrainTile& tile = GetTile(x, z);
-
-            // Create vertices for this tile
-            Vector3 v1 = { x * m_tileSize, tile.height, z * m_tileSize };
-            Vector3 v2 = { (x + 1) * m_tileSize, tile.height, z * m_tileSize };
-            Vector3 v3 = { (x + 1) * m_tileSize, tile.height, (z + 1) * m_tileSize };
-            Vector3 v4 = { x * m_tileSize, tile.height, (z + 1) * m_tileSize };
-
-            // Get neighboring heights for proper normal calculation
-            float heightRight = (x + 1 < m_size) ? GetTile(x + 1, z).height : tile.height;
-            float heightDown = (z + 1 < m_size) ? GetTile(x, z + 1).height : tile.height;
-
-            // Adjust corner heights for smoother transitions
-            if (x + 1 < m_size) v2.y = heightRight;
-            if (z + 1 < m_size) v4.y = heightDown;
-            if (x + 1 < m_size && z + 1 < m_size) v3.y = GetTile(x + 1, z + 1).height;
-
-            // Choose color based on tile properties
-            Color tileColor = BlendColors(tile.baseColor, tile.detailColor, tile.hasVegetation ? 0.3f : 0.0f);
-
-            // Add the quad (two triangles) with enhanced colors
-            AddEnhancedQuad(vertices, texCoords, normals, colors, v1, v2, v3, v4, tileColor, tile);
+    std::vector<Vector3> verts;
+    std::vector<Vector2> texs;
+    std::vector<Vector3> norms;
+    std::vector<Color> cols;
+    float s = m_tileSize;
+    for (int z = 0; z < m_size; ++z) {
+        for (int x = 0; x < m_size; ++x) {
+            int level = static_cast<int>(GetTile(x, z).height);
+            if (level <= 0) level = 1;
+            float baseY = 0.0f;
+            float minX = x * s; float maxX = (x + 1) * s;
+            float minZ = z * s; float maxZ = (z + 1) * s;
+            int neighborLeft = (x > 0) ? static_cast<int>(GetTile(x-1, z).height) : level;
+            int neighborRight = (x < m_size - 1) ? static_cast<int>(GetTile(x+1, z).height) : level;
+            int neighborBack = (z > 0) ? static_cast<int>(GetTile(x, z-1).height) : level;
+            int neighborFront = (z < m_size - 1) ? static_cast<int>(GetTile(x, z+1).height) : level;
+            Color blockColor;
+            if (level == 1) blockColor = { 34, 139, 34, 255 };
+            else if (level == 2) blockColor = { 160, 120, 60, 255 };
+            else if (level == 3) blockColor = { 120, 120, 120, 255 };
+            else blockColor = { 200, 200, 230, 255 };
+            for (int y = 0; y < level; ++y) {
+                float yBase = baseY + y * s;
+                float yTop  = yBase + s;
+                AddQuad(verts, texs, norms, cols,
+                    {minX, yTop, minZ}, {maxX, yTop, minZ}, {maxX, yTop, maxZ}, {minX, yTop, maxZ},
+                    blockColor);
+                int drawLeft = (neighborLeft < level) ? 1 : (y == 0 ? 1 : 0);
+                if (drawLeft) {
+                    AddQuad(verts, texs, norms, cols,
+                        {minX, yBase, minZ}, {minX, yBase, maxZ}, {minX, yTop, maxZ}, {minX, yTop, minZ},
+                        blockColor);
+                }
+                int drawRight = (neighborRight < level) ? 1 : (y == 0 ? 1 : 0);
+                if (drawRight) {
+                    AddQuad(verts, texs, norms, cols,
+                        {maxX, yBase, minZ}, {maxX, yTop, minZ}, {maxX, yTop, maxZ}, {maxX, yBase, maxZ},
+                        blockColor);
+                }
+                int drawBack = (neighborBack < level) ? 1 : (y == 0 ? 1 : 0);
+                if (drawBack) {
+                    AddQuad(verts, texs, norms, cols,
+                        {minX, yBase, maxZ}, {maxX, yBase, maxZ}, {maxX, yTop, maxZ}, {minX, yTop, maxZ},
+                        blockColor);
+                }
+                int drawFront = (neighborFront < level) ? 1 : (y == 0 ? 1 : 0);
+                if (drawFront) {
+                    AddQuad(verts, texs, norms, cols,
+                        {minX, yBase, minZ}, {minX, yTop, minZ}, {maxX, yTop, minZ}, {maxX, yBase, minZ},
+                        blockColor);
+                }
+            }
         }
     }
-
-    // Create the mesh
     m_mesh = { 0 };
-    m_mesh.vertexCount = vertices.size();
-    m_mesh.triangleCount = vertices.size() / 3;
-
-    // Allocate mesh arrays
-    m_mesh.vertices = (float*)MemAlloc(vertices.size() * 3 * sizeof(float));
-    m_mesh.texcoords = (float*)MemAlloc(texCoords.size() * 2 * sizeof(float));
-    m_mesh.normals = (float*)MemAlloc(normals.size() * 3 * sizeof(float));
-    m_mesh.colors = (unsigned char*)MemAlloc(colors.size() * 4 * sizeof(unsigned char));
-
-    // Copy data to mesh
-    for (size_t i = 0; i < vertices.size(); i++) {
-        m_mesh.vertices[i * 3 + 0] = vertices[i].x;
-        m_mesh.vertices[i * 3 + 1] = vertices[i].y;
-        m_mesh.vertices[i * 3 + 2] = vertices[i].z;
-
-        m_mesh.normals[i * 3 + 0] = normals[i].x;
-        m_mesh.normals[i * 3 + 1] = normals[i].y;
-        m_mesh.normals[i * 3 + 2] = normals[i].z;
-
-        m_mesh.colors[i * 4 + 0] = colors[i].r;
-        m_mesh.colors[i * 4 + 1] = colors[i].g;
-        m_mesh.colors[i * 4 + 2] = colors[i].b;
-        m_mesh.colors[i * 4 + 3] = colors[i].a;
+    int vertexCount = static_cast<int>(verts.size());
+    int triangleCount = vertexCount / 3;
+    m_mesh.vertexCount = vertexCount;
+    m_mesh.triangleCount = triangleCount;
+    m_mesh.vertices = (float*)MemAlloc(vertexCount * 3 * sizeof(float));
+    m_mesh.texcoords = (float*)MemAlloc(vertexCount * 2 * sizeof(float));
+    m_mesh.normals = (float*)MemAlloc(vertexCount * 3 * sizeof(float));
+    m_mesh.colors = (unsigned char*)MemAlloc(vertexCount * 4 * sizeof(unsigned char));
+    for (int i = 0; i < vertexCount; ++i) {
+        m_mesh.vertices[i*3+0] = verts[i].x;
+        m_mesh.vertices[i*3+1] = verts[i].y;
+        m_mesh.vertices[i*3+2] = verts[i].z;
+        m_mesh.texcoords[i*2+0] = texs[i].x;
+        m_mesh.texcoords[i*2+1] = texs[i].y;
+        m_mesh.normals[i*3+0] = norms[i].x;
+        m_mesh.normals[i*3+1] = norms[i].y;
+        m_mesh.normals[i*3+2] = norms[i].z;
+        m_mesh.colors[i*4+0] = cols[i].r;
+        m_mesh.colors[i*4+1] = cols[i].g;
+        m_mesh.colors[i*4+2] = cols[i].b;
+        m_mesh.colors[i*4+3] = cols[i].a;
     }
-
-    for (size_t i = 0; i < texCoords.size(); i++) {
-        m_mesh.texcoords[i * 2 + 0] = texCoords[i].x;
-        m_mesh.texcoords[i * 2 + 1] = texCoords[i].y;
-    }
-
-    // Upload mesh to GPU
     UploadMesh(&m_mesh, false);
-
-    // Create model from mesh
     m_model = LoadModelFromMesh(m_mesh);
 }
 
@@ -325,95 +268,14 @@ Color Chunk::BlendColors(Color color1, Color color2, float factor) const {
     };
 }
 
-void Chunk::AddEnhancedQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
-                           std::vector<Vector3>& normals, std::vector<Color>& colors,
-                           Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, const TerrainTile& tile) {
-    // Calculate proper normal for the quad
-    Vector3 edge1 = Vector3Subtract(v2, v1);
-    Vector3 edge2 = Vector3Subtract(v4, v1);
-    Vector3 normal = Vector3Normalize(Vector3CrossProduct(edge1, edge2));
-
-    // Add slight color variation based on tile properties
-    Color finalColor = color;
-    if (tile.roughness > 0.7f) {
-        // Darken rough surfaces slightly
-        finalColor.r = (unsigned char)(finalColor.r * 0.9f);
-        finalColor.g = (unsigned char)(finalColor.g * 0.9f);
-        finalColor.b = (unsigned char)(finalColor.b * 0.9f);
-    }
-
-    // First triangle (v1, v2, v3)
-    vertices.push_back(v1);
-    vertices.push_back(v2);
-    vertices.push_back(v3);
-
-    texCoords.push_back({ 0.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 1.0f });
-
-    normals.push_back(normal);
-    normals.push_back(normal);
-    normals.push_back(normal);
-
-    colors.push_back(finalColor);
-    colors.push_back(finalColor);
-    colors.push_back(finalColor);
-
-    // Second triangle (v1, v3, v4)
-    vertices.push_back(v1);
-    vertices.push_back(v3);
-    vertices.push_back(v4);
-
-    texCoords.push_back({ 0.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 1.0f });
-    texCoords.push_back({ 0.0f, 1.0f });
-
-    normals.push_back(normal);
-    normals.push_back(normal);
-    normals.push_back(normal);
-
-    colors.push_back(finalColor);
-    colors.push_back(finalColor);
-    colors.push_back(finalColor);
-}
-
 void Chunk::AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
                     std::vector<Vector3>& normals, std::vector<Color>& colors,
                     Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color) {
-    // Calculate normal (assuming flat quad for now)
     Vector3 normal = { 0.0f, 1.0f, 0.0f };
-
-    // First triangle (v1, v2, v3)
-    vertices.push_back(v1);
-    vertices.push_back(v2);
-    vertices.push_back(v3);
-
-    texCoords.push_back({ 0.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 1.0f });
-
-    normals.push_back(normal);
-    normals.push_back(normal);
-    normals.push_back(normal);
-
-    colors.push_back(color);
-    colors.push_back(color);
-    colors.push_back(color);
-
-    // Second triangle (v1, v3, v4)
-    vertices.push_back(v1);
-    vertices.push_back(v3);
-    vertices.push_back(v4);
-
-    texCoords.push_back({ 0.0f, 0.0f });
-    texCoords.push_back({ 1.0f, 1.0f });
-    texCoords.push_back({ 0.0f, 1.0f });
-
-    normals.push_back(normal);
-    normals.push_back(normal);
-    normals.push_back(normal);
-
-    colors.push_back(color);
-    colors.push_back(color);
-    colors.push_back(color);
+    vertices.push_back(v1); texCoords.push_back({0.0f,0.0f}); normals.push_back(normal); colors.push_back(color);
+    vertices.push_back(v2); texCoords.push_back({1.0f,0.0f}); normals.push_back(normal); colors.push_back(color);
+    vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(normal); colors.push_back(color);
+    vertices.push_back(v1); texCoords.push_back({0.0f,0.0f}); normals.push_back(normal); colors.push_back(color);
+    vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(normal); colors.push_back(color);
+    vertices.push_back(v4); texCoords.push_back({0.0f,1.0f}); normals.push_back(normal); colors.push_back(color);
 }

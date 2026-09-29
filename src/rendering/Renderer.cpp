@@ -75,11 +75,10 @@ void Renderer::RenderWorld() {
         // which derives BiomeData from BiomeManager (single source of truth)
     }
 
-    if (m_showGrid) {
-        DrawGrid(20, 1.0f);
-    }
+    // Per-chunk grid is drawn by Chunk::Render (D&D tile grid), not global
+    // Global DrawGrid removed per request
 
-    if (m_showCoordinates) {
+    if (false) { // TEMP DISABLED for diagnostic
         DrawCoordinateSystem();
     }
 }

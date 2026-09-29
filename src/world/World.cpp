@@ -46,7 +46,9 @@ void World::Update(float deltaTime) {
 
     // Update chunk streaming periodically
     if (m_lastUpdateTime >= CHUNK_UPDATE_INTERVAL) {
-        Vector3 currentPosition = {0.0f, 0.0f, 0.0f}; // Player position placeholder
+        Vector3 currentPosition = {0.0f, 0.0f, 0.0f}; // Player position placeholder — stable origin
+        std::cout << "STREAM CENTER (placeholder) = (" << currentPosition.x << "," << currentPosition.y << "," << currentPosition.z << ")" << std::endl;
+        int cx, cz; WorldToChunk(currentPosition.x, currentPosition.z, cx, cz); std::cout << "STREAM CHUNK = (" << cx << "," << cz << ")" << std::endl;
         UpdateChunkStreaming(currentPosition);
         m_lastUpdateTime = 0.0f;
     }
@@ -54,8 +56,6 @@ void World::Update(float deltaTime) {
 
 void World::Render() {
     if (!m_initialized) return;
-
-    // Render all loaded chunks
     for (const auto& pair : m_chunks) {
         const auto& chunk = pair.second;
         if (chunk && chunk->IsGenerated() && chunk->HasMesh()) {
@@ -175,11 +175,17 @@ void World::UpdateChunkStreaming(Vector3 centerPosition) {
 }
 
 void World::UnloadDistantChunks(Vector3 centerPosition) {
+    int centerCX, centerCZ; WorldToChunk(centerPosition.x, centerPosition.z, centerCX, centerCZ);
+    float maxDistSq = m_config.renderDistance * m_config.renderDistance;
     std::vector<ChunkKey> chunksToUnload;
 
     for (const auto& pair : m_chunks) {
         const ChunkKey& key = pair.first;
-        if (ShouldUnloadChunk(key.x, key.z, centerPosition)) {
+        // Chunk distance in chunk-space (not world-space) to avoid massive unload when camera at (15,15,15)
+        int dx = key.x - centerCX;
+        int dz = key.z - centerCZ;
+        float dSq = (float)(dx*dx + dz*dz);
+        if (dSq > maxDistSq) {
             chunksToUnload.push_back(key);
         }
     }

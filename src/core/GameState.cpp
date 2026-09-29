@@ -5,6 +5,7 @@
 #include "world/World.h"
 #include "core/Timer.h"
 #include <raylib.h>
+#include <raymath.h>
 #include <iostream>
 
 GameState::GameState(Game* game)
@@ -21,22 +22,13 @@ PlayingState::PlayingState(Game* game)
     m_type = GameStateType::Playing;
 }
 
-void PlayingState::Enter() {
-    std::cout << "Entering Playing state" << std::endl;
-}
+void PlayingState::Enter() {}
 
-void PlayingState::Exit() {
-    std::cout << "Exiting Playing state" << std::endl;
-}
+void PlayingState::Exit() {}
 
 void PlayingState::Update(float deltaTime) {
-    // Update world based on camera position for chunk loading
     if (auto* world = m_game->GetWorld()) {
-        auto* camera = m_game->GetCamera();
-        if (camera) {
-            Vector3 cameraPos = camera->GetPosition();
-            world->Update(deltaTime);
-        }
+        world->Update(deltaTime);
     }
 }
 
@@ -50,9 +42,7 @@ void PlayingState::Render() {
     // Begin 3D rendering
     renderer->BeginMode3D(camera->GetCamera());
 
-    // Render world (via renderer pipeline — consistent with Game::Render architecture)
     renderer->RenderWorld();
-
     renderer->EndMode3D();
 
     // Render UI
@@ -60,13 +50,27 @@ void PlayingState::Render() {
 }
 
 void PlayingState::HandleInput() {
-    // Toggle debug info
     if (IsKeyPressed(KEY_F3)) {
         m_showDebugInfo = !m_showDebugInfo;
     }
 
-    // Camera controls are handled in Camera3DController
-    // World generation controls (diagnostic only — do not reset seed on R)
-    // Key_R intentionally disabled in Phase 2.3 to avoid unstable regeneration
-    // if (IsKeyPressed(KEY_R)) { ... }
+    // STEP 4: mouse click -> selected tile (input layer, not Chunk)
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (auto* camera = m_game->GetCamera()) {
+            Ray ray = GetMouseRay(GetMousePosition(), camera->GetCamera());
+            // Intersection with ground plane y ≈ 0 (terrain base / block bottom)
+            float dist = 0.0f;
+            Vector3 pt = {0};
+            // Simple plane intersection at y=0
+            if (ray.direction.y != 0) {
+                float t = -ray.position.y / ray.direction.y;
+                if (t > 0) {
+                    pt = Vector3Add(ray.position, Vector3Scale(ray.direction, t));
+                    int tileX = static_cast<int>(std::floor(pt.x / 1.0f));
+                    int tileZ = static_cast<int>(std::floor(pt.z / 1.0f));
+                    std::cout << "SELECTED TILE: world = (" << pt.x << "," << pt.z << ") tile = (" << tileX << "," << tileZ << ")" << std::endl;
+                }
+            }
+        }
+    }
 }

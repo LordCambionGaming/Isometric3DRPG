@@ -17,6 +17,8 @@ public:
     void SetSeed(unsigned int seed) { m_seed = seed; }
     unsigned int GetSeed() const { return m_seed; }
 
+    int GenerateHeightLevel(int worldX, int worldZ) const;
+
     // Chunk-specific generation
     void GenerateChunkData(int chunkX, int chunkZ, int chunkSize, float tileSize,
                           float* heights, float* temperatures, float* humidity) const;

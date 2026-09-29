@@ -74,6 +74,20 @@ float TerrainGenerator::HumidityNoise(int x, int z) const {
     return Clamp(PerlinNoise(x * HUMIDITY_FREQUENCY, z * HUMIDITY_FREQUENCY, 2000, HUMIDITY_OCTAVES, 0.5f) * HUMIDITY_AMPLITUDE + 0.5f, 0.0f, 1.0f);
 }
 
+int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
+    // Multi-scale: macro / medium / detail
+    float macro = PerlinNoise(worldX * 0.008f, worldZ * 0.008f, 0, 3, 0.55f);
+    float medium = PerlinNoise(worldX * 0.03f, worldZ * 0.03f, 1, 3, 0.5f);
+    float detail = PerlinNoise(worldX * 0.12f, worldZ * 0.12f, 2, 2, 0.5f);
+    float combined = (macro * 0.50f + medium * 0.30f + detail * 0.20f);
+    // Quantized discrete levels 1-5, continuous base
+    if (combined < 0.30f) return 1;
+    else if (combined < 0.50f) return 2;
+    else if (combined < 0.72f) return 3;
+    else if (combined < 0.88f) return 4;
+    else return 5;
+}
+
 float TerrainGenerator::BiomeNoise(int x, int z) const {
     return PerlinNoise(x * BIOME_FREQUENCY, z * BIOME_FREQUENCY, 3000, 2, 0.5f);
 }
