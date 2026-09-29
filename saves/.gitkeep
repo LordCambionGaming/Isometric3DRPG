@@ -1,0 +1,11 @@
+# Saves Directory
+
+This directory will contain save game files in JSON format.
+
+Save files will include:
+- Player data (position, stats, inventory)
+- World state and seed
+- Quest progress
+- Game settings
+
+Currently empty - save system will be implemented in Phase 9.

@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+bin/
+obj/
+
+# IDE files
+.vscode/
+.idea/
+*.user
+*.suo
+*.vcxproj.user
+
+# Platform specific
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Logs
+*.log
+
+# Don't ignore these important directories
+!src/
+!include/
+!data/
+!assets/
+!CMakeLists.txt
+!README.md
+!.github/

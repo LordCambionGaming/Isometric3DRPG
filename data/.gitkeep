@@ -1,0 +1,14 @@
+# Data Directory
+
+This directory will contain JSON configuration files for game content:
+
+- `world/` - World generation parameters
+- `biomes/` - Biome definitions
+- `items/` - Item definitions
+- `weapons/` - Weapon configurations
+- `enemies/` - Enemy data
+- `races/` - Player race definitions
+- `classes/` - Character class definitions
+- `quests/` - Quest configurations
+
+Currently empty - will be populated in Phase 5 (Data-Driven Content).
