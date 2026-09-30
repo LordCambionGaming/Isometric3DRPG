@@ -264,16 +264,7 @@ void Chunk::CreateTerrainMesh() {
     for (int z = 0; z < m_size; ++z) {
         for (int x = 0; x < m_size; ++x) {
             int level = static_cast<int>(GetTile(x, z).height);
-            if (level <= 0) level = 1;
-            if (x == 5 && z == 5 || x == 4 && z == 5) {
-                std::cout << "[DIAG "<<x<<","<<z<<"] level="<<level
-                  <<" h="<<GetTile(x,z).height
-                  <<" nL="<<((x>0)?(int)GetTile(x-1,z).height:level)
-                  <<" nR="<<((x<m_size-1)?(int)GetTile(x+1,z).height:level)
-                  <<" nB="<<((z>0)?(int)GetTile(x,z-1).height:level)
-                  <<" nF="<<((z<m_size-1)?(int)GetTile(x,z+1).height:level)
-                  <<" s="<<s<<std::endl;
-            }
+            if (level < 1) level = 1;
             float baseY = 0.0f;
             float minX = x * s; float maxX = (x + 1) * s;
             float minZ = z * s; float maxZ = (z + 1) * s;
@@ -281,44 +272,44 @@ void Chunk::CreateTerrainMesh() {
             int neighborRight = (x < m_size - 1) ? static_cast<int>(GetTile(x+1, z).height) : level;
             int neighborBack = (z > 0) ? static_cast<int>(GetTile(x, z-1).height) : level;
             int neighborFront = (z < m_size - 1) ? static_cast<int>(GetTile(x, z+1).height) : level;
-            Color faceColor;
-            // Visibile dall'alto: top = terra, body/dirt = marrone (strato sotto)
             Color topColor = { 34, 139, 34, 255 };    // verde erba
             Color bodyColor = { 160, 120, 60, 255 }; // marrone strato
+            Color faceColor = bodyColor;
             for (int y = 0; y < level; ++y) {
                 float yBase = baseY + y * s;
                 float yTop  = yBase + s;
-                Color faceColor = (y == level - 1) ? topColor : bodyColor;
-                // Top face always drawn at current layer top
+                // Side face color: if this layer is the top of this column, use green
+                Color sideColor = (y == level - 1) ? topColor : faceColor;
+                // Top face — FIX winding (v2/v4 scambiati), normale +Y
                 {
                     Vector3 n = { 0.0f, 1.0f, 0.0f };
                     AddQuadTilted(verts, texs, norms, cols,
                         {minX, yTop, minZ}, {minX, yTop, maxZ}, {maxX, yTop, maxZ}, {maxX, yTop, minZ},
                         topColor, n);
                 }
-                int drawLeft = (neighborLeft < level) ? 1 : (y == 0 ? 1 : 0);
+                int drawLeft = (neighborLeft != level || y == 0 || y == level - 1) ? 1 : 0;
                 if (drawLeft) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, minZ}, {minX, yBase, maxZ}, {minX, yTop, maxZ}, {minX, yTop, minZ},
-                        faceColor, Vector3{-1,0,0});
+                        sideColor, Vector3{-1,0,0});
                 }
-                int drawRight = (neighborRight < level) ? 1 : (y == 0 ? 1 : 0);
+                int drawRight = (neighborRight != level || y == 0 || y == level - 1) ? 1 : 0;
                 if (drawRight) {
                     AddQuad(verts, texs, norms, cols,
                         {maxX, yBase, minZ}, {maxX, yTop, minZ}, {maxX, yTop, maxZ}, {maxX, yBase, maxZ},
-                        faceColor, Vector3{1,0,0});
+                        sideColor, Vector3{1,0,0});
                 }
-                int drawBack = (neighborBack < level) ? 1 : (y == 0 ? 1 : 0);
+                int drawBack = (neighborBack != level || y == 0 || y == level - 1) ? 1 : 0;
                 if (drawBack) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, maxZ}, {maxX, yBase, maxZ}, {maxX, yTop, maxZ}, {minX, yTop, maxZ},
-                        faceColor, Vector3{0,0,1});
+                        sideColor, Vector3{0,0,1});
                 }
-                int drawFront = (neighborFront < level) ? 1 : (y == 0 ? 1 : 0);
+                int drawFront = (neighborFront != level || y == 0 || y == level - 1) ? 1 : 0;
                 if (drawFront) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, minZ}, {minX, yTop, minZ}, {maxX, yTop, minZ}, {maxX, yBase, minZ},
-                        faceColor, Vector3{0,0,-1});
+                        sideColor, Vector3{0,0,-1});
                 }
             }
         }
