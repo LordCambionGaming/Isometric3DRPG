@@ -22,6 +22,7 @@ public:
 
     bool IsRunning() const { return m_isRunning; }
     void RequestExit() { m_isRunning = false; }
+    void SetState(std::unique_ptr<GameState> state);
 
     // Getters for systems
     Renderer* GetRenderer() const { return m_renderer.get(); }
@@ -38,6 +39,7 @@ private:
 
     bool m_isRunning;
     bool m_debugMode;
+    bool m_stateChangedThisFrame = false;
 
     // Core systems
     std::unique_ptr<GameState> m_gameState;

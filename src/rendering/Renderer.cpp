@@ -28,6 +28,7 @@ bool Renderer::Initialize(int screenWidth, int screenHeight, const char* title) 
         }
 
         SetTargetFPS(60);
+        SetExitKey(KEY_NULL); // ESC non chiude finestra — come puzzle3d
 
         m_initialized = true;
         std::cout << "Renderer initialized: " << screenWidth << "x" << screenHeight << std::endl;

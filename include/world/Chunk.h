@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 #include <vector>
+#include "world/WorldFeatureGenerator.h"
 #include <memory>
 
 class TerrainGenerator;
@@ -15,6 +16,10 @@ struct TerrainTile {
     Color detailColor = GREEN;
     float roughness = 0.5f;
     bool hasVegetation = false;
+    bool hasWater = false;
+    float waterHeight = 2.0f; // WATER_LEVEL = 2
+    int waterFeature = 0; // 0=Dry, 1=Lake, 2=River
+    int tileWaterCount = 0;
 };
 
 class Chunk {

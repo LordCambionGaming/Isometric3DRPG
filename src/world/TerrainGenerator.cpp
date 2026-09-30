@@ -78,7 +78,7 @@ int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
     // 1. Determine large region (macro scale)
     int region = GetRegion(worldX, worldZ);
 
-    // 2. Regional shape & local detail
+    // 2. Regional shape & local detail — reduced detail weight, smoother regions
     float base = RegionNoise(worldX, worldZ);
     base = base * 0.5f + 0.5f;
     float shape = ShapeNoise(worldX, worldZ) * 0.5f + 0.5f;
@@ -88,33 +88,33 @@ int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
 
     switch (region) {
         case 0: // Plains
-            combined = base * 0.5f + shape * 0.3f + detail * 0.2f;
+            combined = base * 0.50f + shape * 0.35f + detail * 0.15f;
             if (combined < 0.30f) return 1;
             if (combined < 0.55f) return 2;
             if (combined < 0.75f) return 3;
             return 4;
         case 1: // Hills
-            combined = base * 0.3f + shape * 0.5f + detail * 0.2f;
+            combined = base * 0.45f + shape * 0.40f + detail * 0.15f;
             if (combined < 0.25f) return 1;
             if (combined < 0.50f) return 2;
             if (combined < 0.75f) return 3;
             if (combined < 0.90f) return 4;
             return 5;
         case 2: // Plateau
-            combined = base * 0.6f + shape * 0.3f + detail * 0.1f;
+            combined = base * 0.55f + shape * 0.30f + detail * 0.15f;
             if (combined < 0.35f) return 1;
             if (combined < 0.55f) return 2;
             if (combined < 0.70f) return 3;
             if (combined < 0.85f) return 4;
             return 5;
         case 3: // Mountains
-            combined = base * 0.2f + shape * 0.6f + detail * 0.2f;
+            combined = base * 0.5f + shape * 0.4f + detail * 0.1f;
             if (combined < 0.25f) return 2;
             if (combined < 0.50f) return 3;
             if (combined < 0.70f) return 4;
             return 5;
         case 4: // Lowlands
-            combined = base * 0.6f + shape * 0.2f + detail * 0.2f;
+            combined = base * 0.7f + shape * 0.2f + detail * 0.1f;
             if (combined < 0.30f) return 1;
             if (combined < 0.55f) return 2;
             if (combined < 0.75f) return 3;

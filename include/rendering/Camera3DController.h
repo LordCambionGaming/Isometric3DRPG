@@ -9,6 +9,7 @@ public:
 
     void Initialize();
     void Update(float deltaTime);
+    void FollowTarget(Vector3 target); // per seguire il player
     void HandleInput();
 
     const Camera3D& GetCamera() const { return m_camera; }

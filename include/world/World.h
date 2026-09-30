@@ -41,6 +41,9 @@ public:
 
     // Chunk management
     void UpdateChunkStreaming(Vector3 centerPosition);
+    int GetGenerationRadius() const { return GENERATION_RADIUS; }
+    int GetRenderRadius() const { return RENDER_RADIUS; }
+    int GetUnloadRadius() const { return UNLOAD_RADIUS; }
     void UnloadDistantChunks(Vector3 centerPosition);
     bool IsChunkLoaded(int chunkX, int chunkZ) const;
     int GetLoadedChunkCount() const { return static_cast<int>(m_chunks.size()); }
@@ -81,7 +84,10 @@ private:
     float m_lastUpdateTime;
     bool m_initialized;
 
-    // Streaming parameters
-    static constexpr float CHUNK_UPDATE_INTERVAL = 1.0f; // Update every second
-    static constexpr float UNLOAD_DISTANCE_MULTIPLIER = 1.5f; // Unload chunks beyond render distance * this
+    // Streaming parameters: generation / render / unload separated for player-centered design
+    static constexpr float CHUNK_UPDATE_INTERVAL = 0.5f;
+    static constexpr float GENERATION_RADIUS = 4; // chunks around player to generate
+    static constexpr float RENDER_RADIUS = 5;     // chunks visible
+    static constexpr float UNLOAD_RADIUS = 7;     // chunks to unload (beyond this)
+    static constexpr float UNLOAD_DISTANCE_MULTIPLIER = 1.5f;
 };

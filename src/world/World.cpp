@@ -154,7 +154,8 @@ Vector3 World::ChunkToWorldCenter(int chunkX, int chunkZ) const {
     };
 }
 
-void World::UpdateChunkStreaming(Vector3 centerPosition) {
+void World::UpdateChunkStreaming(Vector3 centerPosition) { // centerPosition = player position per streaming centrato
+    // Player-centered: load around player chunk, unload beyond unload radius
     // Load chunks around the center position
     int centerChunkX, centerChunkZ;
     WorldToChunk(centerPosition.x, centerPosition.z, centerChunkX, centerChunkZ);

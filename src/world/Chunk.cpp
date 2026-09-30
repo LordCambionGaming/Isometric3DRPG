@@ -1,5 +1,8 @@
 #include "world/Chunk.h"
 #include "world/TerrainGenerator.h"
+#include <cmath>
+
+// Local helper for water noise (TerrainGenerator::PerlinNoise is private)
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
@@ -115,107 +118,43 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator) {
             tile.humidity = terrainGenerator.GenerateHumidity(worldX, worldZ);
             tile.biomeType = 0;
             tile.hasVegetation = false;
+            // Water features separated from terrain height
+            int waterLevel = 2;
+            // River: narrow continuous feature using global coordinate noise, NOT just height <= 2
+            // Use low-frequency shape + high-frequency narrow modulation for continuity across chunks
+            float riverShape = terrainGenerator.GenerateHeight(worldX * 0.008f, worldZ * 0.008f); // macro path
+            float riverNarrow = terrainGenerator.GenerateHeight(worldX * 0.06f + 500.0f, worldZ * 0.06f + 500.0f); // narrow band
+            bool isRiver = (riverShape > 0.35f && riverShape < 0.65f) && (std::abs(riverNarrow) < 0.15f) && (level <= 3);
+            // Lake: true depression (level 1 only in low region, with coherence)
+            float regionValue = terrainGenerator.GetRegion(worldX, worldZ);
+            float depression = terrainGenerator.GenerateHeight(worldX * 0.03f + 100.0f, worldZ * 0.03f + 100.0f);
+            bool isLake = (level == 1) && (regionValue == 0 || regionValue == 4) && (depression < 0.25f);
+            bool isWater = isRiver || isLake;
+            tile.hasWater = isWater;
+            tile.waterHeight = static_cast<float>(waterLevel);
+            if (isRiver) tile.waterFeature = 2;
+            else if (isLake) tile.waterFeature = 1;
+            else tile.waterFeature = 0;
         }
     }
 
-    // ----- DEBUG: print height maps and distributions -----
-    // Collect height stats for this chunk
+    int tileWaterCount = 0;
     int minHeight = 999, maxHeight = -1;
-    int hist[6] = {0,0,0,0,0,0}; // livelli 1-5
-
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
-            int h = static_cast<int>(GetTile(x, z).height);
+            int h = static_cast<int>(GetTile(x,z).height);
             if (h < 1) h = 1;
             if (h < minHeight) minHeight = h;
             if (h > maxHeight) maxHeight = h;
-            if (h >= 1 && h <= 6) hist[h-1]++;
+            if (GetTile(x,z).hasWater) tileWaterCount++;
         }
     }
-
-    // Only print for a few representative chunks (-1,0), (0,0), (1,0), (0,-1), (0,1)
-    // We'll detect these by checking if any of these coordinates match
-    bool printDebug = false;
-    if (m_x == 0 && m_z == 0) {
-        // Check if we have already printed for (0,0) or need to print again for other relevant chunks
-        // We'll print for all 5 chunks, but mark which ones we print for clarity
-        if (m_x == 0 && m_z == 0) printDebug = true;
-    }
-    // Simplified: Print for chunks where (m_x == -1 || m_x == 0 || m_x == 1) && (m_z == -1 || m_z == 0 || m_z == 1)
-    // but avoid duplicate excessive output, so we'll print only once for each of the 5 positions
-    static bool printedMinusOneZero = false;
-    static bool printedZeroZero = false;
-    static bool printedPlusOneZero = false;
-    static bool printedZeroMinusOne = false;
-    static bool printedZeroPlusOne = false;
-
-    if (m_x == -1 && m_z == 0 && !printedMinusOneZero) {
-        printDebug = true;
-        printedMinusOneZero = true;
-    } else if (m_x == 0 && m_z == 0 && !printedZeroZero) {
-        printDebug = true;
-        printedZeroZero = true;
-    } else if (m_x == 1 && m_z == 0 && !printedPlusOneZero) {
-        printDebug = true;
-        printedPlusOneZero = true;
-    } else if (m_x == 0 && m_z == -1 && !printedZeroMinusOne) {
-        printDebug = true;
-        printedZeroMinusOne = true;
-    } else if (m_x == 0 && m_z == 1 && !printedZeroPlusOne) {
-        printDebug = true;
-        printedZeroPlusOne = true;
-    }
-
-    if (printDebug) {
-        std::ofstream logFile("debug/terrain_generation.log", std::ios::out | std::ios::app);
-        if (logFile.is_open()) {
-            logFile << "=== CHUNK " << m_x << "," << m_z << " === seed=" << terrainGenerator.GetSeed() << "\n";
-            logFile << "minHeight=" << minHeight << " maxHeight=" << maxHeight << "\n";
-            for (int i = 0; i < 5; i++) logFile << "level" << (i+1) << "=" << hist[i] << " ";
-            logFile << "\n";
-            if (m_x == 0 && m_z == 0) {
-                logFile << "HEIGHT MAP (0,0) 16x16:\n";
-                for (int z = 0; z < m_size; z++) {
-                    for (int x = 0; x < m_size; x++) {
-                        int h = static_cast<int>(GetTile(x, z).height);
-                        if (h < 1) h = 1;
-                        logFile << h << " ";
-                    }
-                    logFile << "\n";
-                }
-                logFile << "Intermediate samples (worldX=8+8, 32+8, 8+32):\n";
-                int samples[3][2] = {{8,8}, {32,8}, {8,32}};
-                for (int s = 0; s < 3; s++) {
-                    int wx = m_x*m_size + samples[s][0];
-                    int wz = m_z*m_size + samples[s][1];
-                    logFile << "(" << wx << "," << wz << ") reg=" << terrainGenerator.GetRegion(wx,wz) << "\n";
-                }
-            }
-            logFile << "\n";
-        }
-        // Print 16x16 height map for (0,0) only (skip for other chunks to save output)
-        if (m_x == 0 && m_z == 0) {
-            std::cout << "\n=== HEIGHT MAP CHUNK 0,0 (16x16) ===\n";
-            for (int z = 0; z < m_size; z++) {
-                for (int x = 0; x < m_size; x++) {
-                    int h = static_cast<int>(GetTile(x, z).height);
-                    if (h < 1) h = 1;
-                    if (h < 10) std::cout << " " << h;
-                    else std::cout << " " << h;
-                    std::cout << " ";
-                }
-                std::cout << "\n";
-            }
-        }
-
-        std::cout << "[Chunk " << m_x << "," << m_z << "] minHeight = " << minHeight
-                  << " maxHeight = " << maxHeight;
-        for (int i = 0; i < 5; i++) {
-            std::cout << " level " << i+1 << " = " << hist[i];
-        }
-        std::cout << "\n";
-    }
-    // ----- END DEBUG -----
+    // Debug minimo: statistiche per verifica distribuzione
+    int dryTiles = 256 - tileWaterCount;
+    std::cout << "[Chunk " << m_x << "," << m_z << "] dry=" << dryTiles
+              << " lake+river=" << tileWaterCount
+              << " minH=" << minHeight << " maxH=" << maxHeight << std::endl;
+    // ----- END DEBUG MINIMO -----
 }
 
 void Chunk::GenerateColors() {
@@ -275,6 +214,21 @@ void Chunk::CreateTerrainMesh() {
             Color topColor = { 34, 139, 34, 255 };    // verde erba
             Color bodyColor = { 160, 120, 60, 255 }; // marrone strato
             Color faceColor = bodyColor;
+            Color waterColor = { 0, 120, 200, 180 }; // acqua
+            bool hasWater = GetTile(x, z).hasWater;
+            int waterLevel = 2;
+            // Acqua: sola superficie orizzontale opaca, nessuna faccia verticale
+            if (hasWater) {
+                float yWater = 2.0f * s; // fixed water plane at depression level
+                // Superficie orizzontale sola (normale +Y), nessuna trasparenza per evitare artefatti
+                AddQuadTilted(verts, texs, norms, cols,
+                    {minX, yWater, minZ}, {minX, yWater, maxZ}, {maxX, yWater, maxZ}, {maxX, yWater, minZ},
+                    Color{0, 120, 200, 255}, Vector3{0,1,0});
+            }
+            // Water face at base of column (visible under low tiles / between blocks)
+            AddQuadTilted(verts, texs, norms, cols,
+                {minX, 0.0f, minZ}, {minX, 0.0f, maxZ}, {maxX, 0.0f, maxZ}, {maxX, 0.0f, minZ},
+                waterColor, Vector3{0,-1,0});
             for (int y = 0; y < level; ++y) {
                 float yBase = baseY + y * s;
                 float yTop  = yBase + s;
@@ -372,3 +326,5 @@ void Chunk::AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoo
     vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(normal); colors.push_back(color);
     vertices.push_back(v4); texCoords.push_back({0.0f,1.0f}); normals.push_back(normal); colors.push_back(color);
 }
+
+// NOTE: Chunk generation uses worldX/worldZ + seed; identical input -> identical output across boundaries.

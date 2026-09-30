@@ -69,6 +69,7 @@ void PlayingState::HandleInput() {
                     int tileX = static_cast<int>(std::floor(pt.x / 1.0f));
                     int tileZ = static_cast<int>(std::floor(pt.z / 1.0f));
                     std::cout << "SELECTED TILE: world = (" << pt.x << "," << pt.z << ") tile = (" << tileX << "," << tileZ << ")" << std::endl;
+                    // Tile-based movement: Player.MoveToTile(tileX, tileZ) called here when Player integrated
                 }
             }
         }

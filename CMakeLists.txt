@@ -45,6 +45,10 @@ set(SOURCES
     src/main.cpp
     src/core/Game.cpp
     src/core/GameState.cpp
+    src/core/MainMenuState.cpp
+    src/core/PauseState.cpp
+    src/core/SettingsState.cpp
+    src/player/Player.cpp
     src/core/Timer.cpp
     src/rendering/Renderer.cpp
     src/rendering/Camera3DController.cpp
@@ -52,6 +56,7 @@ set(SOURCES
     src/world/Chunk.cpp
     src/world/TerrainGenerator.cpp
     src/world/BiomeManager.cpp
+    src/world/WorldFeatureGenerator.cpp
     src/assets/AssetManager.cpp
     src/audio/AudioManager.cpp
 )

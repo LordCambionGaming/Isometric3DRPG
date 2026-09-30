@@ -1,5 +1,8 @@
 #include "core/Game.h"
 #include "core/GameState.h"
+#include "core/PauseState.h"
+#include "core/MainMenuState.h"
+#include "player/Player.h"
 #include "core/Timer.h"
 #include "rendering/Renderer.h"
 #include "rendering/Camera3DController.h"
@@ -26,6 +29,7 @@ Game::~Game() {
     Shutdown();
 }
 
+Player* g_player = nullptr;  // player globale temporaneo per integrazione
 bool Game::Initialize() {
     try {
         // Initialize core systems
@@ -74,7 +78,7 @@ bool Game::Initialize() {
         m_renderer->SetCamera(m_camera.get());
 
         // Create initial game state
-        m_gameState = std::make_unique<PlayingState>(this);
+        m_gameState = std::make_unique<MainMenuState>(this);
         m_gameState->Enter();
 
         m_isRunning = true;
@@ -102,6 +106,14 @@ void Game::Run() {
     }
 }
 
+void Game::SetState(std::unique_ptr<GameState> state) {
+    std::cout << "[STATE CHANGE] SetState called" << std::endl;
+    if (m_gameState) { m_gameState->Exit(); }
+    m_gameState = std::move(state);
+    m_stateChangedThisFrame = true;
+    if (m_gameState) m_gameState->Enter();
+}
+
 void Game::Shutdown() {
     if (m_gameState) {
         m_gameState->Exit();
@@ -119,6 +131,10 @@ void Game::Shutdown() {
 }
 
 void Game::Update(float deltaTime) {
+    m_stateChangedThisFrame = false;
+
+    // Player update (integrato dopo ESC)
+    static Player* g_player = nullptr; if (!g_player) g_player = new Player(); g_player->Update(deltaTime);
     if (m_gameState) {
         m_gameState->Update(deltaTime);
     }
@@ -156,12 +172,28 @@ void Game::HandleInput() {
         m_debugMode = !m_debugMode;
     }
 
-    if (IsKeyPressed(KEY_ESCAPE)) {
-        m_isRunning = false;
+    // Null-check before dereferencing
+    if (m_gameState) {
+        std::cout << "ESC pressed, current type=" << (int)m_gameState->GetType() << std::endl;
     }
 
-    // Delegate to current game state
-    if (m_gameState) {
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        std::cout << "[ESC] pressed" << std::endl;
+        std::cout << "[GAME] HandleInput KEY_ESCAPE" << std::endl;
+        if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
+            m_gameState = std::make_unique<PauseState>(this);
+            std::cout << "[STATE] Playing -> Pause" << std::endl;
+            m_stateChangedThisFrame = true;
+            if (m_gameState) { m_gameState->Enter(); }
+        } else if (m_gameState && m_gameState->GetType() == GameStateType::MainMenu) {
+            m_isRunning = false;
+        } else if (m_gameState && m_gameState->GetType() == GameStateType::Paused) {
+            // Da Pause: resta in Pause; back via ENTER opzione 3
+        }
+    }
+
+    // Delegate to current game state only if no transition occurred this frame
+    if (m_gameState && !m_stateChangedThisFrame) {
         m_gameState->HandleInput();
     }
 
