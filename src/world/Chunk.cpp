@@ -5,6 +5,9 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 Chunk::Chunk(int x, int z, int size, float tileSize)
     : m_x(x)
@@ -21,9 +24,9 @@ Chunk::~Chunk() {
     Unload();
 }
 
-void Chunk::Generate(unsigned int worldSeed) {
+void Chunk::Generate(const TerrainGenerator& terrainGenerator) {
     if (m_generated) return;
-    GenerateTerrain(worldSeed);
+    GenerateTerrain(terrainGenerator);
     GenerateColors();
     m_generated = true;
 }
@@ -38,24 +41,15 @@ void Chunk::Render() {
     if (!m_hasMesh) return;
     float s = m_tileSize;
 
-    // 1) Blocks (solid cubes at tile positions)
-    for (int z = 0; z < m_size; z++) {
-        for (int x = 0; x < m_size; x++) {
-            int h = static_cast<int>(GetTile(x, z).height);
-            if (h < 1) h = 1;
-            Color c = (h == 1) ? GREEN : (h == 2) ? BROWN : (h == 3) ? GRAY : LIGHTGRAY;
-            DrawCube({(float)x * s + s*0.5f, (float)h * s * 0.5f, (float)z * s + s*0.5f},
-                     s, (float)h * s, s, c);
-        }
-    }
+    // Draw voxel mesh (solid block columns per tile, with face culling)
+    DrawModel(m_model, GetWorldPosition(), 1.0f, WHITE);
 
-    // 2) D&D tile grid: 17 vertical + 17 horizontal lines at each tile's top surface
+    // D&D 16x16 grid: 17 vertical/horizontal lines at each tile top surface
+    // Use actual tile heights from terrain generation so grid aligns with block tops
     for (int i = 0; i <= m_size; i++) {
-        float xPos = i * s;
-        // Vertical lines: from z=0 to z=m_size*s, y at tile top
+        float xPos = m_x * m_size * s + i * s;
         for (int z = 0; z <= m_size; z++) {
-            float zPos = z * s;
-            // Find nearest tile to get height for this grid segment
+            float zPos = m_z * m_size * s + z * s;
             int tx = (i < m_size) ? i : m_size - 1;
             int tz = (z < m_size) ? z : m_size - 1;
             if (tx < 0) tx = 0; if (tz < 0) tz = 0;
@@ -68,10 +62,9 @@ void Chunk::Render() {
         }
     }
     for (int j = 0; j <= m_size; j++) {
-        float zPos = j * s;
-        // Horizontal lines: from x=0 to x=m_size*s, y at tile top
+        float zPos = m_z * m_size * s + j * s;
         for (int x = 0; x <= m_size; x++) {
-            float xPos = x * s;
+            float xPos = m_x * m_size * s + x * s;
             int tx = (x < m_size) ? x : m_size - 1;
             int tz = (j < m_size) ? j : m_size - 1;
             if (tx < 0) tx = 0; if (tz < 0) tz = 0;
@@ -109,34 +102,120 @@ float Chunk::GetHeightAt(float localX, float localZ) const {
     return GetTile(tileX, tileZ).height;
 }
 
-void Chunk::GenerateTerrain(unsigned int seed) {
-    int map[8][8] = {
-        {1,1,1,1,1,1,1,1},
-        {1,1,2,2,2,2,1,1},
-        {1,1,2,3,3,2,1,1},
-        {1,1,2,3,3,2,1,1},
-        {1,1,2,3,3,2,1,1},
-        {1,1,2,2,2,2,1,1},
-        {1,1,1,1,1,1,1,1},
-        {1,1,1,1,1,1,1,1}
-    };
-    for (int z = 0; z < m_size && z < 8; z++) {
-        for (int x = 0; x < m_size && x < 8; x++) {
+void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator) {
+    for (int z = 0; z < m_size; z++) {
+        for (int x = 0; x < m_size; x++) {
+            int worldX = m_x * m_size + x;
+            int worldZ = m_z * m_size + z;
             TerrainTile& tile = GetTile(x, z);
-            int level = (x < 8 && z < 8) ? map[z][x] : 1;
+            int level = terrainGenerator.GenerateHeightLevel(worldX, worldZ);
             tile.height = static_cast<float>(level);
+            // Climate from generator (for future biome linkage)
+            tile.temperature = terrainGenerator.GenerateTemperature(worldX, worldZ);
+            tile.humidity = terrainGenerator.GenerateHumidity(worldX, worldZ);
             tile.biomeType = 0;
             tile.hasVegetation = false;
         }
     }
+
+    // ----- DEBUG: print height maps and distributions -----
+    // Collect height stats for this chunk
+    int minHeight = 999, maxHeight = -1;
+    int hist[6] = {0,0,0,0,0,0}; // livelli 1-5
+
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
-            if (x < 8 && z < 8) continue;
-            GetTile(x, z).height = 1.0f;
-            GetTile(x, z).biomeType = 0;
-            GetTile(x, z).hasVegetation = false;
+            int h = static_cast<int>(GetTile(x, z).height);
+            if (h < 1) h = 1;
+            if (h < minHeight) minHeight = h;
+            if (h > maxHeight) maxHeight = h;
+            if (h >= 1 && h <= 6) hist[h-1]++;
         }
     }
+
+    // Only print for a few representative chunks (-1,0), (0,0), (1,0), (0,-1), (0,1)
+    // We'll detect these by checking if any of these coordinates match
+    bool printDebug = false;
+    if (m_x == 0 && m_z == 0) {
+        // Check if we have already printed for (0,0) or need to print again for other relevant chunks
+        // We'll print for all 5 chunks, but mark which ones we print for clarity
+        if (m_x == 0 && m_z == 0) printDebug = true;
+    }
+    // Simplified: Print for chunks where (m_x == -1 || m_x == 0 || m_x == 1) && (m_z == -1 || m_z == 0 || m_z == 1)
+    // but avoid duplicate excessive output, so we'll print only once for each of the 5 positions
+    static bool printedMinusOneZero = false;
+    static bool printedZeroZero = false;
+    static bool printedPlusOneZero = false;
+    static bool printedZeroMinusOne = false;
+    static bool printedZeroPlusOne = false;
+
+    if (m_x == -1 && m_z == 0 && !printedMinusOneZero) {
+        printDebug = true;
+        printedMinusOneZero = true;
+    } else if (m_x == 0 && m_z == 0 && !printedZeroZero) {
+        printDebug = true;
+        printedZeroZero = true;
+    } else if (m_x == 1 && m_z == 0 && !printedPlusOneZero) {
+        printDebug = true;
+        printedPlusOneZero = true;
+    } else if (m_x == 0 && m_z == -1 && !printedZeroMinusOne) {
+        printDebug = true;
+        printedZeroMinusOne = true;
+    } else if (m_x == 0 && m_z == 1 && !printedZeroPlusOne) {
+        printDebug = true;
+        printedZeroPlusOne = true;
+    }
+
+    if (printDebug) {
+        std::ofstream logFile("debug/terrain_generation.log", std::ios::out | std::ios::app);
+        if (logFile.is_open()) {
+            logFile << "=== CHUNK " << m_x << "," << m_z << " === seed=" << terrainGenerator.GetSeed() << "\n";
+            logFile << "minHeight=" << minHeight << " maxHeight=" << maxHeight << "\n";
+            for (int i = 0; i < 5; i++) logFile << "level" << (i+1) << "=" << hist[i] << " ";
+            logFile << "\n";
+            if (m_x == 0 && m_z == 0) {
+                logFile << "HEIGHT MAP (0,0) 16x16:\n";
+                for (int z = 0; z < m_size; z++) {
+                    for (int x = 0; x < m_size; x++) {
+                        int h = static_cast<int>(GetTile(x, z).height);
+                        if (h < 1) h = 1;
+                        logFile << h << " ";
+                    }
+                    logFile << "\n";
+                }
+                logFile << "Intermediate samples (worldX=8+8, 32+8, 8+32):\n";
+                int samples[3][2] = {{8,8}, {32,8}, {8,32}};
+                for (int s = 0; s < 3; s++) {
+                    int wx = m_x*m_size + samples[s][0];
+                    int wz = m_z*m_size + samples[s][1];
+                    logFile << "(" << wx << "," << wz << ") reg=" << terrainGenerator.GetRegion(wx,wz) << "\n";
+                }
+            }
+            logFile << "\n";
+        }
+        // Print 16x16 height map for (0,0) only (skip for other chunks to save output)
+        if (m_x == 0 && m_z == 0) {
+            std::cout << "\n=== HEIGHT MAP CHUNK 0,0 (16x16) ===\n";
+            for (int z = 0; z < m_size; z++) {
+                for (int x = 0; x < m_size; x++) {
+                    int h = static_cast<int>(GetTile(x, z).height);
+                    if (h < 1) h = 1;
+                    if (h < 10) std::cout << " " << h;
+                    else std::cout << " " << h;
+                    std::cout << " ";
+                }
+                std::cout << "\n";
+            }
+        }
+
+        std::cout << "[Chunk " << m_x << "," << m_z << "] minHeight = " << minHeight
+                  << " maxHeight = " << maxHeight;
+        for (int i = 0; i < 5; i++) {
+            std::cout << " level " << i+1 << " = " << hist[i];
+        }
+        std::cout << "\n";
+    }
+    // ----- END DEBUG -----
 }
 
 void Chunk::GenerateColors() {
@@ -186,6 +265,15 @@ void Chunk::CreateTerrainMesh() {
         for (int x = 0; x < m_size; ++x) {
             int level = static_cast<int>(GetTile(x, z).height);
             if (level <= 0) level = 1;
+            if (x == 5 && z == 5 || x == 4 && z == 5) {
+                std::cout << "[DIAG "<<x<<","<<z<<"] level="<<level
+                  <<" h="<<GetTile(x,z).height
+                  <<" nL="<<((x>0)?(int)GetTile(x-1,z).height:level)
+                  <<" nR="<<((x<m_size-1)?(int)GetTile(x+1,z).height:level)
+                  <<" nB="<<((z>0)?(int)GetTile(x,z-1).height:level)
+                  <<" nF="<<((z<m_size-1)?(int)GetTile(x,z+1).height:level)
+                  <<" s="<<s<<std::endl;
+            }
             float baseY = 0.0f;
             float minX = x * s; float maxX = (x + 1) * s;
             float minZ = z * s; float maxZ = (z + 1) * s;
@@ -193,40 +281,44 @@ void Chunk::CreateTerrainMesh() {
             int neighborRight = (x < m_size - 1) ? static_cast<int>(GetTile(x+1, z).height) : level;
             int neighborBack = (z > 0) ? static_cast<int>(GetTile(x, z-1).height) : level;
             int neighborFront = (z < m_size - 1) ? static_cast<int>(GetTile(x, z+1).height) : level;
-            Color blockColor;
-            if (level == 1) blockColor = { 34, 139, 34, 255 };
-            else if (level == 2) blockColor = { 160, 120, 60, 255 };
-            else if (level == 3) blockColor = { 120, 120, 120, 255 };
-            else blockColor = { 200, 200, 230, 255 };
+            Color faceColor;
+            // Visibile dall'alto: top = terra, body/dirt = marrone (strato sotto)
+            Color topColor = { 34, 139, 34, 255 };    // verde erba
+            Color bodyColor = { 160, 120, 60, 255 }; // marrone strato
             for (int y = 0; y < level; ++y) {
                 float yBase = baseY + y * s;
                 float yTop  = yBase + s;
-                AddQuad(verts, texs, norms, cols,
-                    {minX, yTop, minZ}, {maxX, yTop, minZ}, {maxX, yTop, maxZ}, {minX, yTop, maxZ},
-                    blockColor);
+                Color faceColor = (y == level - 1) ? topColor : bodyColor;
+                // Top face always drawn at current layer top
+                {
+                    Vector3 n = { 0.0f, 1.0f, 0.0f };
+                    AddQuadTilted(verts, texs, norms, cols,
+                        {minX, yTop, minZ}, {minX, yTop, maxZ}, {maxX, yTop, maxZ}, {maxX, yTop, minZ},
+                        topColor, n);
+                }
                 int drawLeft = (neighborLeft < level) ? 1 : (y == 0 ? 1 : 0);
                 if (drawLeft) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, minZ}, {minX, yBase, maxZ}, {minX, yTop, maxZ}, {minX, yTop, minZ},
-                        blockColor);
+                        faceColor, Vector3{-1,0,0});
                 }
                 int drawRight = (neighborRight < level) ? 1 : (y == 0 ? 1 : 0);
                 if (drawRight) {
                     AddQuad(verts, texs, norms, cols,
                         {maxX, yBase, minZ}, {maxX, yTop, minZ}, {maxX, yTop, maxZ}, {maxX, yBase, maxZ},
-                        blockColor);
+                        faceColor, Vector3{1,0,0});
                 }
                 int drawBack = (neighborBack < level) ? 1 : (y == 0 ? 1 : 0);
                 if (drawBack) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, maxZ}, {maxX, yBase, maxZ}, {maxX, yTop, maxZ}, {minX, yTop, maxZ},
-                        blockColor);
+                        faceColor, Vector3{0,0,1});
                 }
                 int drawFront = (neighborFront < level) ? 1 : (y == 0 ? 1 : 0);
                 if (drawFront) {
                     AddQuad(verts, texs, norms, cols,
                         {minX, yBase, minZ}, {minX, yTop, minZ}, {maxX, yTop, minZ}, {maxX, yBase, minZ},
-                        blockColor);
+                        faceColor, Vector3{0,0,-1});
                 }
             }
         }
@@ -258,6 +350,17 @@ void Chunk::CreateTerrainMesh() {
     m_model = LoadModelFromMesh(m_mesh);
 }
 
+void Chunk::AddQuadTilted(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
+                    std::vector<Vector3>& normals, std::vector<Color>& colors,
+                    Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, Vector3 customNormal) {
+    vertices.push_back(v1); texCoords.push_back({0.0f,0.0f}); normals.push_back(customNormal); colors.push_back(color);
+    vertices.push_back(v2); texCoords.push_back({1.0f,0.0f}); normals.push_back(customNormal); colors.push_back(color);
+    vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(customNormal); colors.push_back(color);
+    vertices.push_back(v1); texCoords.push_back({0.0f,0.0f}); normals.push_back(customNormal); colors.push_back(color);
+    vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(customNormal); colors.push_back(color);
+    vertices.push_back(v4); texCoords.push_back({0.0f,1.0f}); normals.push_back(customNormal); colors.push_back(color);
+}
+
 Color Chunk::BlendColors(Color color1, Color color2, float factor) const {
     factor = Clamp(factor, 0.0f, 1.0f);
     return {
@@ -270,8 +373,7 @@ Color Chunk::BlendColors(Color color1, Color color2, float factor) const {
 
 void Chunk::AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
                     std::vector<Vector3>& normals, std::vector<Color>& colors,
-                    Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color) {
-    Vector3 normal = { 0.0f, 1.0f, 0.0f };
+                    Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, Vector3 normal) {
     vertices.push_back(v1); texCoords.push_back({0.0f,0.0f}); normals.push_back(normal); colors.push_back(color);
     vertices.push_back(v2); texCoords.push_back({1.0f,0.0f}); normals.push_back(normal); colors.push_back(color);
     vertices.push_back(v3); texCoords.push_back({1.0f,1.0f}); normals.push_back(normal); colors.push_back(color);

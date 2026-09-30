@@ -18,17 +18,30 @@ public:
     unsigned int GetSeed() const { return m_seed; }
 
     int GenerateHeightLevel(int worldX, int worldZ) const;
+    int GetRegion(int worldX, int worldZ) const;
 
     // Chunk-specific generation
     void GenerateChunkData(int chunkX, int chunkZ, int chunkSize, float tileSize,
                           float* heights, float* temperatures, float* humidity) const;
 
 private:
+    // Region types for terrain generation
+    enum class TerrainRegion {
+        Plains,
+        Hills,
+        Plateau,
+        Mountains,
+        Lowlands
+    };
+
     // Multi-layer noise generation
     float HeightNoise(int x, int z) const;
     float TemperatureNoise(int x, int z) const;
     float HumidityNoise(int x, int z) const;
     float BiomeNoise(int x, int z) const;
+    float RegionNoise(int x, int z) const;
+    float ShapeNoise(int x, int z) const;
+    float DetailNoise(int x, int z) const;
 
     // Core noise functions
     float Noise(int x, int z, unsigned int seedOffset) const;
@@ -41,6 +54,11 @@ private:
     unsigned int m_seed;
 
     // Terrain generation parameters
+    static constexpr float REGION_FREQUENCY = 0.003f;
+    static constexpr float SHAPE_FREQUENCY  = 0.015f;
+    static constexpr float DETAIL_FREQUENCY = 0.050f;
+
+    // Legacy terrain generation parameters (kept for existing methods)
     static constexpr float HEIGHT_FREQUENCY = 0.015f;
     static constexpr float HEIGHT_AMPLITUDE = 12.0f;
     static constexpr int HEIGHT_OCTAVES = 5;

@@ -4,6 +4,8 @@
 #include <vector>
 #include <memory>
 
+class TerrainGenerator;
+
 struct TerrainTile {
     float height = 0.0f;
     float temperature = 0.5f;
@@ -20,7 +22,7 @@ public:
     Chunk(int x, int z, int size, float tileSize);
     ~Chunk();
 
-    void Generate(unsigned int worldSeed);
+    void Generate(const TerrainGenerator& terrainGenerator);
     void BuildMesh();
     void Render();
     void Unload();
@@ -39,12 +41,15 @@ public:
     float GetHeightAt(float localX, float localZ) const;
 
 private:
-    void GenerateTerrain(unsigned int seed);
+    void GenerateTerrain(const TerrainGenerator& terrainGenerator);
     void GenerateColors();
     void CreateTerrainMesh();
     void AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
                  std::vector<Vector3>& normals, std::vector<Color>& colors,
-                 Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color);
+                 Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, Vector3 normal);
+    void AddQuadTilted(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
+                 std::vector<Vector3>& normals, std::vector<Color>& colors,
+                 Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, Vector3 customNormal);
 
     bool ShouldHaveVegetation(int biomeType, float randomValue) const;
     void GenerateTileColors(TerrainTile& tile) const;

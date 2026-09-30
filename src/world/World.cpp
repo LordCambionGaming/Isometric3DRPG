@@ -97,7 +97,7 @@ void World::LoadChunkAt(int x, int z) {
 
     // Create new chunk
     auto chunk = std::make_unique<Chunk>(x, z, m_config.chunkSize, m_config.tileSize);
-    chunk->Generate(m_config.seed);
+    chunk->Generate(*m_terrainGenerator);
     chunk->BuildMesh();
 
     m_chunks[key] = std::move(chunk);

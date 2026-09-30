@@ -75,17 +75,52 @@ float TerrainGenerator::HumidityNoise(int x, int z) const {
 }
 
 int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
-    // Multi-scale: macro / medium / detail
-    float macro = PerlinNoise(worldX * 0.008f, worldZ * 0.008f, 0, 3, 0.55f);
-    float medium = PerlinNoise(worldX * 0.03f, worldZ * 0.03f, 1, 3, 0.5f);
-    float detail = PerlinNoise(worldX * 0.12f, worldZ * 0.12f, 2, 2, 0.5f);
-    float combined = (macro * 0.50f + medium * 0.30f + detail * 0.20f);
-    // Quantized discrete levels 1-5, continuous base
-    if (combined < 0.30f) return 1;
-    else if (combined < 0.50f) return 2;
-    else if (combined < 0.72f) return 3;
-    else if (combined < 0.88f) return 4;
-    else return 5;
+    // 1. Determine large region (macro scale)
+    int region = GetRegion(worldX, worldZ);
+
+    // 2. Regional shape & local detail
+    float base = RegionNoise(worldX, worldZ);
+    base = base * 0.5f + 0.5f;
+    float shape = ShapeNoise(worldX, worldZ) * 0.5f + 0.5f;
+    float detail = DetailNoise(worldX, worldZ) * 0.5f + 0.5f;
+
+    float combined = 0.0f;
+
+    switch (region) {
+        case 0: // Plains
+            combined = base * 0.5f + shape * 0.3f + detail * 0.2f;
+            if (combined < 0.30f) return 1;
+            if (combined < 0.55f) return 2;
+            if (combined < 0.75f) return 3;
+            return 4;
+        case 1: // Hills
+            combined = base * 0.3f + shape * 0.5f + detail * 0.2f;
+            if (combined < 0.25f) return 1;
+            if (combined < 0.50f) return 2;
+            if (combined < 0.75f) return 3;
+            if (combined < 0.90f) return 4;
+            return 5;
+        case 2: // Plateau
+            combined = base * 0.6f + shape * 0.3f + detail * 0.1f;
+            if (combined < 0.35f) return 1;
+            if (combined < 0.55f) return 2;
+            if (combined < 0.70f) return 3;
+            if (combined < 0.85f) return 4;
+            return 5;
+        case 3: // Mountains
+            combined = base * 0.2f + shape * 0.6f + detail * 0.2f;
+            if (combined < 0.25f) return 2;
+            if (combined < 0.50f) return 3;
+            if (combined < 0.70f) return 4;
+            return 5;
+        case 4: // Lowlands
+            combined = base * 0.6f + shape * 0.2f + detail * 0.2f;
+            if (combined < 0.30f) return 1;
+            if (combined < 0.55f) return 2;
+            if (combined < 0.75f) return 3;
+            return 4;
+    }
+    return 1; // fallback
 }
 
 float TerrainGenerator::BiomeNoise(int x, int z) const {
@@ -149,4 +184,26 @@ float TerrainGenerator::Interpolate(float a, float b, float x) const {
     float ft = x * PI;
     float f = (1.0f - cosf(ft)) * 0.5f;
     return a * (1.0f - f) + b * f;
+}
+int TerrainGenerator::GetRegion(int worldX, int worldZ) const {
+    float r = PerlinNoise(worldX * REGION_FREQUENCY, worldZ * REGION_FREQUENCY, 500, 2, 0.5f);
+    r = r * 0.5f + 0.5f;
+    r = Clamp(r, 0.0f, 1.0f);
+    if (r < 0.20f) return 0; // Plains
+    if (r < 0.45f) return 1; // Hills
+    if (r < 0.65f) return 2; // Plateau
+    if (r < 0.85f) return 3; // Mountains
+    return 4; // Lowlands
+}
+
+float TerrainGenerator::RegionNoise(int x, int z) const {
+    return PerlinNoise(x * REGION_FREQUENCY, z * REGION_FREQUENCY, 10, 3, 0.5f);
+}
+
+float TerrainGenerator::ShapeNoise(int x, int z) const {
+    return PerlinNoise(x * SHAPE_FREQUENCY, z * SHAPE_FREQUENCY, 20, 3, 0.5f);
+}
+
+float TerrainGenerator::DetailNoise(int x, int z) const {
+    return PerlinNoise(x * DETAIL_FREQUENCY, z * DETAIL_FREQUENCY, 30, 2, 0.5f);
 }
