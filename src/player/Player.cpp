@@ -11,37 +11,45 @@ Player::Player() {
 
 void Player::Update(float dt) {
     if (!m_path.empty() && m_pathIndex < m_path.size()) {
-        int tx = m_path[m_pathIndex].x;
-        int tz = m_path[m_pathIndex].z;
-        float targetX = tx * m_tileSize + m_tileSize * 0.5f;
-        float targetZ = tz * m_tileSize + m_tileSize * 0.5f;
+        const PathNode& node = m_path[m_pathIndex];
+        float targetX = node.x * m_tileSize + m_tileSize * 0.5f;
+        float targetZ = node.z * m_tileSize + m_tileSize * 0.5f;
+        float targetY = node.y;
 
         float dx = targetX - m_position.x;
         float dz = targetZ - m_position.z;
-        float dist = std::sqrt(dx * dx + dz * dz);
+        float dy = targetY - m_position.y;
+        float distXZ = std::sqrt(dx * dx + dz * dz);
 
         float step = m_speed * dt;
-        if (dist <= step || dist < 0.01f) {
-            // Reached this tile: snap to center, advance index, set next target
+        // If very close to target in XZ and Y is near target, snap to exact waypoint
+        bool nearX = std::abs(dx) < 0.05f;
+        bool nearZ = std::abs(dz) < 0.05f;
+        bool nearY = std::abs(dy) < 0.05f;
+        if ((nearX && nearZ && nearY) || (distXZ <= step && std::abs(dy) <= step)) {
             m_position.x = targetX;
             m_position.z = targetZ;
+            m_position.y = targetY; // snap exactly to surface
             m_pathIndex++;
 
             if (m_pathIndex < m_path.size()) {
-                int nextTx = m_path[m_pathIndex].x;
-                int nextTz = m_path[m_pathIndex].z;
-                m_target.x = nextTx * m_tileSize + m_tileSize * 0.5f;
-                m_target.z = nextTz * m_tileSize + m_tileSize * 0.5f;
+                const PathNode& next = m_path[m_pathIndex];
+                m_target.x = next.x * m_tileSize + m_tileSize * 0.5f;
+                m_target.y = next.y;
+                m_target.z = next.z * m_tileSize + m_tileSize * 0.5f;
             } else {
-                // Path finished
                 m_path.clear();
                 m_pathIndex = 0;
                 m_moving = false;
             }
         } else {
-            // Move toward tile center
-            m_position.x += (dx / dist) * step;
-            m_position.z += (dz / dist) * step;
+            // Interpolate XZ along plane direction
+            float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+            float moveStep = std::min(step, dist);
+            float ratio = (dist > 0.001f) ? moveStep / dist : 0.0f;
+            m_position.x += dx * ratio;
+            m_position.y += dy * ratio;
+            m_position.z += dz * ratio;
         }
     } else if (m_moving) {
         // Fallback direct movement (MoveToTile)
@@ -54,9 +62,10 @@ void Player::Update(float dt) {
             m_position = m_target;
             m_moving = false;
         } else {
-            m_position.x += (dx / dist) * step;
-            m_position.y += (dy / dist) * step;
-            m_position.z += (dz / dist) * step;
+            float ratio = step / dist;
+            m_position.x += dx * ratio;
+            m_position.y += dy * ratio;
+            m_position.z += dz * ratio;
         }
     }
 }
@@ -88,16 +97,26 @@ void Player::MoveToTile(int tx, int tz, float surfaceY) {
     m_moving = true;
 }
 
-void Player::SetPath(const std::vector<TileCoord>& path) {
+void Player::SetPath(const std::vector<PathNode>& path) {
     m_path = path;
     m_pathIndex = 0;
     if (!m_path.empty()) {
-        int tx = m_path[0].x;
-        int tz = m_path[0].z;
-        // Set first target; surface height will be updated in Update when needed
-        m_target.x = tx * m_tileSize + m_tileSize * 0.5f;
-        m_target.z = tz * m_tileSize + m_tileSize * 0.5f;
-        m_target.y = m_position.y; // keep current height initially; overridden when reaching tile
-        m_moving = true;
+        // Skip start tile if it matches current position (avoid 0-distance move)
+        int curTileX = GetTileX();
+        int curTileZ = GetTileZ();
+        if (m_path[0].x == curTileX && m_path[0].z == curTileZ) {
+            m_pathIndex = 1; // jump to first real waypoint
+        }
+        if (m_pathIndex < m_path.size()) {
+            const PathNode& node = m_path[m_pathIndex];
+            m_target.x = node.x * m_tileSize + m_tileSize * 0.5f;
+            m_target.y = node.y;
+            m_target.z = node.z * m_tileSize + m_tileSize * 0.5f;
+            m_moving = true;
+        } else {
+            m_path.clear();
+            m_pathIndex = 0;
+            m_moving = false;
+        }
     }
 }

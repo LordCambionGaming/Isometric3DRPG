@@ -26,6 +26,9 @@ public:
     // Check if a tile is walkable
     bool IsWalkable(int tileX, int tileZ) const;
 
+    // Check if a tile is blocked by obstacle/structure (future: trees, walls, etc.)
+    bool IsTileBlocked(int tileX, int tileZ) const;
+
     // Check if Player can traverse from one tile to adjacent tile
     bool CanTraverse(int fromX, int fromZ, int toX, int toZ) const;
 

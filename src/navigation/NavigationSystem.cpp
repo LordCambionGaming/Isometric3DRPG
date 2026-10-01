@@ -15,8 +15,17 @@ void NavigationSystem::Initialize(World* world, float maxStepHeight) {
     m_maxStepHeight = maxStepHeight;
 }
 
+bool NavigationSystem::IsTileBlocked(int tileX, int tileZ) const {
+    // STUB: Future integration with procedural trees/structures/occupancy.
+    // Currently no blocking obstacles exist in the world.
+    return false;
+}
+
 bool NavigationSystem::IsWalkable(int tileX, int tileZ) const {
     if (!m_world) return false;
+
+    // Blocked tiles (obstacles) are never walkable
+    if (IsTileBlocked(tileX, tileZ)) return false;
 
     // For now, all tiles are walkable (no obstacles yet)
     // Future: check for obstacles, structures, water depth, etc.

@@ -1,4 +1,5 @@
 #include "core/Game.h"
+#include "navigation/NavigationSystem.h"
 #include "core/GameState.h"
 #include "core/PauseState.h"
 #include "core/MainMenuState.h"
@@ -297,10 +298,16 @@ void Game::HandleInput() {
                     std::vector<TileCoord> path = m_navigation.FindPath(curTileX, curTileZ, bestTileX, bestTileZ);
 
                     if (!path.empty()) {
-                        std::cout << "[CLICK] Path found with " << path.size() << " tiles from ("
-                                  << curTileX << "," << curTileZ << ") to ("
-                                  << bestTileX << "," << bestTileZ << ")" << std::endl;
-                        m_player->SetPath(path);
+                        std::cout << "[CLICK] Path found with " << path.size() << " tiles" << std::endl;
+                        // Convert TileCoord path to PathNode with surface Y from World
+                        std::vector<PathNode> pathWithY;
+                        for (const auto& t : path) {
+                            float cx = t.x + 0.5f;
+                            float cz = t.z + 0.5f;
+                            float h = m_world->GetHeightAt(cx, cz);
+                            pathWithY.emplace_back(t.x, t.z, h);
+                        }
+                        m_player->SetPath(pathWithY);
                     } else {
                         std::cout << "[CLICK] No path to tile (" << bestTileX << "," << bestTileZ << ")" << std::endl;
                     }

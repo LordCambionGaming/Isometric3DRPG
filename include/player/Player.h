@@ -1,7 +1,15 @@
 #pragma once
 #include <raylib.h>
 #include <vector>
-#include "navigation/NavigationSystem.h"
+
+struct PathNode {
+    int x;
+    int z;
+    float y; // surface height
+
+    PathNode() : x(0), z(0), y(0.0f) {}
+    PathNode(int _x, int _z, float _y) : x(_x), z(_z), y(_y) {}
+};
 
 class Player {
 public:
@@ -17,9 +25,9 @@ public:
     int GetTileX() const;
     int GetTileZ() const;
     void MoveToTile(int tileX, int tileZ, float surfaceY);
-    void SetPath(const std::vector<TileCoord>& path);
+    void SetPath(const std::vector<PathNode>& path);
 private:
-    std::vector<TileCoord> m_path;
+    std::vector<PathNode> m_path;
     size_t m_pathIndex;
     Vector3 m_position;
     Vector3 m_target;
