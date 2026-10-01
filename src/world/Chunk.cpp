@@ -159,8 +159,7 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             bool northSolid = false, southSolid = false, eastSolid = false, westSolid = false;
 
             // Calcolo deterministico per coord mondo: non dipende dall'ordine di generazione chunk
-            int worldX = chunkOffsetX + x;
-            int worldZ = chunkOffsetZ + z;
+            // worldX/worldZ già definiti nel loop esterno (riga 144-145)
 
             // North (worldZ - 1)
             if (z > 0) northSolid = m_tiles[(z-1)*m_size + x].height > 0;
@@ -189,7 +188,8 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             // Log temporaneo per verifica coerenza confini
             static int logCount = 0;
             if (logCount < 12 && (z == 0 || x == 0 || z == m_size-1 || x == m_size-1)) {
-                std::cout << "WATER WORLD=(" << worldX << "," << worldZ << ") CHUNK=(" << m_x << "," << m_z << ") NEIGHBOR_H=" << (z==0?terrainGenerator.GenerateHeightLevel(worldX,worldZ-1):(z==m_size-1?terrainGenerator.GenerateHeightLevel(worldX,worldZ+1):(x==0?terrainGenerator.GenerateHeightLevel(worldX-1,worldZ):terrainGenerator.GenerateHeightLevel(worldX+1,worldZ)))) << " IS_WATER=" << (isWaterCandidate ? 1 : 0) << std::endl;
+                int nh = (z==0 ? terrainGenerator.GenerateHeightLevel(worldX, worldZ-1) : (z==m_size-1 ? terrainGenerator.GenerateHeightLevel(worldX, worldZ+1) : (x==0 ? terrainGenerator.GenerateHeightLevel(worldX-1, worldZ) : terrainGenerator.GenerateHeightLevel(worldX+1, worldZ))));
+                std::cout << "WATER WORLD=(" << worldX << "," << worldZ << ") CHUNK=(" << m_x << "," << m_z << ") NEIGHBOR_H=" << nh << " IS_WATER=" << (isWaterCandidate ? 1 : 0) << std::endl;
                 logCount++;
             }
 
