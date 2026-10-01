@@ -111,7 +111,7 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
     auto tStart = std::chrono::high_resolution_clock::now();
     const int chunkOffsetX = m_x * m_size;
     const int chunkOffsetZ = m_z * m_size;
-    const int waterLevel = 1;
+    const int waterLevel = 2;
     int tileWaterCount = 0;
     int minHeight = 999, maxHeight = -1;
 
@@ -293,7 +293,7 @@ void Chunk::CreateTerrainMesh() {
 
             // Water surface (only if tile has water)
             if (hasWater) {
-                const int waterLevel = 1;
+                const int waterLevel = 2;
                 float yWater = static_cast<float>(waterLevel) * s;
                 AddQuadTilted(verts, texs, norms, cols,
                     {minX, yWater, minZ}, {minX, yWater, maxZ}, {maxX, yWater, maxZ}, {maxX, yWater, minZ},
