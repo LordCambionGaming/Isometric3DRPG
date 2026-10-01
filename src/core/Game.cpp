@@ -203,6 +203,87 @@ void Game::Shutdown() {
     m_isRunning = false;
 }
 
+void Game::CreateGameSession() {
+    // Ricrea sessione completa: World, Player, spawn deterministico, streaming
+    // Seed fisso (12345) per nuova partita — non casuale
+    WorldConfig worldConfig;
+    worldConfig.seed = 12345;
+    worldConfig.chunkSize = 16;
+    worldConfig.tileSize = 1.0f;
+    worldConfig.renderDistance = 3;
+
+    if (!m_world) {
+        m_world = std::make_unique<World>();
+    }
+    if (!m_world->IsInitialized()) {
+        if (!m_world->Initialize(worldConfig)) {
+            std::cerr << "CreateGameSession: World init failed" << std::endl;
+        }
+    }
+
+    // Pre-carica chunk attorno origine
+    const int preRadius = 1;
+    for (int cx = -preRadius; cx <= preRadius; ++cx) {
+        for (int cz = -preRadius; cz <= preRadius; ++cz) {
+            if (!m_world->GetChunk(cx, cz)) m_world->LoadChunkAt(cx, cz);
+        }
+    }
+
+    // Spawn deterministico
+    float spawnX = 0.5f * worldConfig.tileSize;
+    float spawnZ = 0.5f * worldConfig.tileSize;
+    float spawnY = 0.0f;
+    bool found = false;
+    int foundTx = 0, foundTz = 0;
+    float foundHeight = 0.0f;
+    const int MAX_SPAWN_SEARCH_RADIUS = 64;
+    for (int r = 0; r <= MAX_SPAWN_SEARCH_RADIUS && !found; ++r) {
+        for (int dx = -r; dx <= r && !found; ++dx) {
+            for (int dz = -r; dz <= r && !found; ++dz) {
+                if (r > 0 && std::abs(dx) != r && std::abs(dz) != r) continue;
+                int tx = dx, tz = dz;
+                int cx = (tx >= 0) ? (tx / worldConfig.chunkSize) : ((tx - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
+                int cz = (tz >= 0) ? (tz / worldConfig.chunkSize) : ((tz - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
+                Chunk* chunk = m_world->GetChunk(cx, cz);
+                if (!chunk || !chunk->IsGenerated()) { m_world->LoadChunkAt(cx, cz); chunk = m_world->GetChunk(cx, cz); }
+                if (!chunk || !chunk->IsGenerated()) continue;
+                int lx = tx % worldConfig.chunkSize; if (lx < 0) lx += worldConfig.chunkSize;
+                int lz = tz % worldConfig.chunkSize; if (lz < 0) lz += worldConfig.chunkSize;
+                TerrainTile tile = chunk->GetTile(lx, lz);
+                if (tile.height >= 2.0f && !tile.hasWater) {
+                    foundTx = tx; foundTz = tz; foundHeight = tile.height; found = true; break;
+                }
+            }
+        }
+    }
+    if (found) {
+        spawnX = (foundTx + 0.5f) * worldConfig.tileSize;
+        spawnY = foundHeight * worldConfig.tileSize;
+        spawnZ = (foundTz + 0.5f) * worldConfig.tileSize;
+    } else {
+        spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
+    }
+
+    if (!m_player) m_player = std::make_unique<Player>();
+    m_player->SetTileSize(worldConfig.tileSize);
+    m_player->SetPosition({spawnX, spawnY, spawnZ});
+    m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
+    m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
+
+    if (m_renderer) {
+        m_renderer->SetWorld(m_world.get());
+        m_renderer->SetCamera(m_camera.get());
+    }
+}
+
+void Game::ResetGameSession() {
+    if (m_player) m_player.reset();
+    if (m_world) m_world.reset();
+    m_navigation.Initialize(nullptr, MAX_STEP_HEIGHT);
+    m_hoverTileX = -1;
+    m_hoverTileZ = -1;
+}
+
 void Game::Update(float deltaTime) {
     m_stateChangedThisFrame = false;
 

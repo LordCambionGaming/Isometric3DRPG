@@ -17,6 +17,6 @@ void PauseState::HandleInput() {
     }
     else if (IsKeyPressed(KEY_ENTER) && m_selectedOption==1) { std::cout << "PAUSE SAVE -> not implemented" << std::endl; }
     else if (IsKeyPressed(KEY_ENTER) && m_selectedOption==2) { std::cout << "PAUSE SETTINGS -> SettingsState" << std::endl; if (m_game) m_game->SetState(std::make_unique<SettingsState>(m_game, SettingsState::FromPause)); }
-    else if (IsKeyPressed(KEY_ENTER) && m_selectedOption==3) { std::cout << "[STATE CHANGE] Pause -> MainMenu" << std::endl; if (m_game) m_game->SetState(std::make_unique<MainMenuState>(m_game)); }
+    else if (IsKeyPressed(KEY_ENTER) && m_selectedOption==3) { std::cout << "[STATE CHANGE] Pause -> MainMenu (Reset session)" << std::endl; if (m_game) { m_game->ResetGameSession(); m_game->SetState(std::make_unique<MainMenuState>(m_game)); } }
     else if (IsKeyPressed(KEY_ENTER) && m_selectedOption==4) { if (m_game) m_game->RequestExit(); }
 }

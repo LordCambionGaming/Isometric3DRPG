@@ -16,8 +16,8 @@ void MainMenuState::HandleInput() {
     if (IsKeyPressed(KEY_ENTER)) {
         std::cout << "MENU ENTER selected=" << m_selectedOption << std::endl;
         if (m_selectedOption == 0) {
-            std::cout << "STATE CHANGE: MainMenuState -> PlayState" << std::endl;
-            if (m_game) { m_game->SetState(std::make_unique<PlayingState>(m_game)); }
+            std::cout << "STATE CHANGE: MainMenuState -> PlayState (Reset)" << std::endl;
+            if (m_game) { m_game->ResetGameSession(); m_game->CreateGameSession(); m_game->SetState(std::make_unique<PlayingState>(m_game)); }
         }
         else if (m_selectedOption == 1) {
             std::cout << "MENU ENTER selected=1 action=CONTINUE -> Nessun salvataggio disponibile" << std::endl;

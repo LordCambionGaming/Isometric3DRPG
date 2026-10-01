@@ -23,6 +23,7 @@ public:
     ~World();
 
     bool Initialize(const WorldConfig& config);
+    bool IsInitialized() const { return m_initialized; }
     void Update(float deltaTime);
     void Render();
 

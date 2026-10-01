@@ -20,6 +20,8 @@ public:
     ~Game();
 
     bool Initialize();
+    void ResetGameSession();
+    void CreateGameSession();
     void Run();
     void Shutdown();
 
