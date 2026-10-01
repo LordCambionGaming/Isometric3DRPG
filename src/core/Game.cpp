@@ -144,6 +144,11 @@ void Game::Update(float deltaTime) {
     // Player update (integrato dopo ESC)
     if (m_player) {
         m_player->Update(deltaTime);
+        // Single authoritative source for streaming: pass real position to World
+        if (m_world) {
+            Vector3 p = m_player->GetPosition();
+            m_world->SetPlayerPosition(p); // Update streaming center
+        }
     }
     if (m_gameState) {
         m_gameState->Update(deltaTime);
@@ -154,7 +159,7 @@ void Game::Update(float deltaTime) {
     }
 
     if (m_world) {
-        m_world->Update(deltaTime);
+        m_world->Update(deltaTime); // World handles its own streaming internally
     }
 
     if (m_audioManager) {

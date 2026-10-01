@@ -41,6 +41,8 @@ public:
 
     // Chunk management
     void UpdateChunkStreaming(Vector3 centerPosition);
+    void SetPlayerPosition(Vector3 pos);
+    void UpdateChunkLoading(Vector3 playerPosition);
     int GetGenerationRadius() const { return GENERATION_RADIUS; }
     int GetRenderRadius() const { return RENDER_RADIUS; }
     int GetUnloadRadius() const { return UNLOAD_RADIUS; }
@@ -69,7 +71,6 @@ private:
         }
     };
 
-    void UpdateChunkLoading(Vector3 playerPosition);
     void GenerateInitialChunks();
     bool ShouldLoadChunk(int chunkX, int chunkZ, Vector3 centerPos) const;
     bool ShouldUnloadChunk(int chunkX, int chunkZ, Vector3 centerPos) const;
@@ -81,6 +82,8 @@ private:
     std::unordered_map<ChunkKey, std::unique_ptr<Chunk>, ChunkKeyHash> m_chunks;
 
     Vector3 m_lastPlayerPosition;
+    int m_lastChunkX = 0;
+    int m_lastChunkZ = 0;
     float m_lastUpdateTime;
     bool m_initialized;
 
