@@ -173,6 +173,9 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             // West (worldX - 1)
             wHeight = (x > 0) ? static_cast<int>(m_tiles[z*m_size + (x-1)].height) : terrainGenerator.GenerateHeightLevel(worldX - 1, worldZ);
             bool westSolid = (wHeight > 0) && (std::abs(wHeight - level) <= 1);
+            bool allNeighborsSolid = northSolid && southSolid && eastSolid && westSolid;
+            bool isContained = isWaterCandidate && allNeighborsSolid;
+
             // Log temporaneo caso problematico (acqua volante / dislivello)
             static int logCheck = 0;
             if (logCheck < 8 && isWaterCandidate && (z==0||x==0||z==m_size-1||x==m_size-1)) {
@@ -182,9 +185,6 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
                           << " result=" << (isContained ? "WATER" : "NONE") << std::endl;
                 logCheck++;
             }
-
-            bool allNeighborsSolid = northSolid && southSolid && eastSolid && westSolid;
-            bool isContained = isWaterCandidate && allNeighborsSolid;
 
             // Fase 3: eliminare buchi interni (piccoli gruppi asciutti dentro formazione acqua)
             // NON riempire bordi: solo buchi completamente circondati da acqua della stessa formazione
