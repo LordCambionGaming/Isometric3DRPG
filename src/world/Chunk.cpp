@@ -156,22 +156,22 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             // Regola confinamento acqua: solo se tutti i 4 vicini cardinali sono solidi
             // Se anche UNO è vuoto (fuori chunk o vuoto nel chunk) → NO ACQUA
             // Conservativo ai bordi chunk: se non posso verificare vicino esterno → niente acqua
-            bool northSolid = false, southSolid = false, eastSolid = false, westSolid = false;
+            int nHeight = 0, sHeight = 0, eHeight = 0, wHeight = 0;
 
             // Calcolo deterministico per coord mondo: non dipende dall'ordine di generazione chunk
             // worldX/worldZ già definiti nel loop esterno (riga 144-145)
 
             // North (worldZ - 1) — coerenza geometrica, non solo >0
-            int nHeight = (z > 0) ? static_cast<int>(m_tiles[(z-1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ - 1);
+            nHeight = (z > 0) ? static_cast<int>(m_tiles[(z-1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ - 1);
             bool northSolid = (nHeight > 0) && (std::abs(nHeight - level) <= 1);
             // South (worldZ + 1)
-            int sHeight = (z < m_size - 1) ? static_cast<int>(m_tiles[(z+1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ + 1);
+            sHeight = (z < m_size - 1) ? static_cast<int>(m_tiles[(z+1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ + 1);
             bool southSolid = (sHeight > 0) && (std::abs(sHeight - level) <= 1);
             // East (worldX + 1)
-            int eHeight = (x < m_size - 1) ? static_cast<int>(m_tiles[z*m_size + (x+1)].height) : terrainGenerator.GenerateHeightLevel(worldX + 1, worldZ);
+            eHeight = (x < m_size - 1) ? static_cast<int>(m_tiles[z*m_size + (x+1)].height) : terrainGenerator.GenerateHeightLevel(worldX + 1, worldZ);
             bool eastSolid = (eHeight > 0) && (std::abs(eHeight - level) <= 1);
             // West (worldX - 1)
-            int wHeight = (x > 0) ? static_cast<int>(m_tiles[z*m_size + (x-1)].height) : terrainGenerator.GenerateHeightLevel(worldX - 1, worldZ);
+            wHeight = (x > 0) ? static_cast<int>(m_tiles[z*m_size + (x-1)].height) : terrainGenerator.GenerateHeightLevel(worldX - 1, worldZ);
             bool westSolid = (wHeight > 0) && (std::abs(wHeight - level) <= 1);
             // Log temporaneo caso problematico (acqua volante / dislivello)
             static int logCheck = 0;
