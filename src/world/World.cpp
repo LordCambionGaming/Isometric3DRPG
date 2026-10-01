@@ -118,7 +118,7 @@ void World::LoadChunkAt(int x, int z) {
 
     auto startGen = std::chrono::high_resolution_clock::now();
     auto chunk = std::make_unique<Chunk>(x, z, m_config.chunkSize, m_config.tileSize);
-    chunk->Generate(*m_terrainGenerator);
+    chunk->Generate(*m_terrainGenerator, this);
 
     auto endGen = std::chrono::high_resolution_clock::now();
     auto genMs = std::chrono::duration_cast<std::chrono::milliseconds>(endGen - startGen).count();
@@ -148,7 +148,7 @@ void World::ProcessPendingChunks() {
         // Load with profiling
         auto genStart = std::chrono::high_resolution_clock::now();
         auto chunk = std::make_unique<Chunk>(k.x, k.z, m_config.chunkSize, m_config.tileSize);
-        chunk->Generate(*m_terrainGenerator);
+        chunk->Generate(*m_terrainGenerator, this);
         auto genEnd = std::chrono::high_resolution_clock::now();
         long genMs = std::chrono::duration_cast<std::chrono::milliseconds>(genEnd - genStart).count();
 

@@ -22,12 +22,14 @@ struct TerrainTile {
     int tileWaterCount = 0;
 };
 
+class World;
+
 class Chunk {
 public:
     Chunk(int x, int z, int size, float tileSize);
     ~Chunk();
 
-    void Generate(const TerrainGenerator& terrainGenerator);
+    void Generate(const TerrainGenerator& terrainGenerator, World* world = nullptr);
     void BuildMesh();
     void Render();
     void Unload();
@@ -46,7 +48,7 @@ public:
     float GetHeightAt(float localX, float localZ) const;
 
 private:
-    void GenerateTerrain(const TerrainGenerator& terrainGenerator);
+    void GenerateTerrain(const TerrainGenerator& terrainGenerator, World* world = nullptr);
     void GenerateColors();
     void CreateTerrainMesh();
     void AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,

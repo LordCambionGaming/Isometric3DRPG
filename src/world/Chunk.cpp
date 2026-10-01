@@ -1,5 +1,6 @@
 #include "world/Chunk.h"
 #include "world/TerrainGenerator.h"
+#include "world/World.h"
 #include <cmath>
 
 // Local helper for water noise (TerrainGenerator::PerlinNoise is private)
@@ -11,6 +12,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <chrono>
 
 Chunk::Chunk(int x, int z, int size, float tileSize)
     : m_x(x)
@@ -27,9 +29,9 @@ Chunk::~Chunk() {
     Unload();
 }
 
-void Chunk::Generate(const TerrainGenerator& terrainGenerator) {
+void Chunk::Generate(const TerrainGenerator& terrainGenerator, World* world) {
     if (m_generated) return;
-    GenerateTerrain(terrainGenerator);
+    GenerateTerrain(terrainGenerator, world);
     GenerateColors();
     m_generated = true;
 }
@@ -105,56 +107,127 @@ float Chunk::GetHeightAt(float localX, float localZ) const {
     return GetTile(tileX, tileZ).height;
 }
 
-void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator) {
+void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* world) {
+    auto tStart = std::chrono::high_resolution_clock::now();
+    const int chunkOffsetX = m_x * m_size;
+    const int chunkOffsetZ = m_z * m_size;
+    const int waterLevel = 2;
+    int tileWaterCount = 0;
+    int minHeight = 999, maxHeight = -1;
+
+    auto tHeightStart = std::chrono::high_resolution_clock::now();
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
-            int worldX = m_x * m_size + x;
-            int worldZ = m_z * m_size + z;
-            TerrainTile& tile = GetTile(x, z);
+            const int index = z * m_size + x;
+            TerrainTile& tile = m_tiles[index];
+            const int worldX = chunkOffsetX + x;
+            const int worldZ = chunkOffsetZ + z;
+
             int level = terrainGenerator.GenerateHeightLevel(worldX, worldZ);
             tile.height = static_cast<float>(level);
-            // Climate from generator (for future biome linkage)
+            if (level < minHeight) minHeight = level;
+            if (level > maxHeight) maxHeight = level;
+
             tile.temperature = terrainGenerator.GenerateTemperature(worldX, worldZ);
             tile.humidity = terrainGenerator.GenerateHumidity(worldX, worldZ);
             tile.biomeType = 0;
             tile.hasVegetation = false;
-            // Water features separated from terrain height
-            int waterLevel = 2;
-            // River: narrow continuous feature using global coordinate noise, NOT just height <= 2
-            // Use low-frequency shape + high-frequency narrow modulation for continuity across chunks
-            float riverShape = terrainGenerator.GenerateHeight(worldX * 0.008f, worldZ * 0.008f); // macro path
-            float riverNarrow = terrainGenerator.GenerateHeight(worldX * 0.06f + 500.0f, worldZ * 0.06f + 500.0f); // narrow band
-            bool isRiver = (riverShape > 0.35f && riverShape < 0.65f) && (std::abs(riverNarrow) < 0.15f) && (level <= 3);
-            // Lake: true depression (level 1 only in low region, with coherence)
-            float regionValue = terrainGenerator.GetRegion(worldX, worldZ);
-            float depression = terrainGenerator.GenerateHeight(worldX * 0.03f + 100.0f, worldZ * 0.03f + 100.0f);
-            bool isLake = (level == 1) && (regionValue == 0 || regionValue == 4) && (depression < 0.25f);
-            bool isWater = isRiver || isLake;
-            tile.hasWater = isWater;
-            tile.waterHeight = static_cast<float>(waterLevel);
-            if (isRiver) tile.waterFeature = 2;
-            else if (isLake) tile.waterFeature = 1;
-            else tile.waterFeature = 0;
         }
     }
+    auto tHeightEnd = std::chrono::high_resolution_clock::now();
 
-    int tileWaterCount = 0;
-    int minHeight = 999, maxHeight = -1;
+    auto tWaterStart = std::chrono::high_resolution_clock::now();
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
-            int h = static_cast<int>(GetTile(x,z).height);
-            if (h < 1) h = 1;
-            if (h < minHeight) minHeight = h;
-            if (h > maxHeight) maxHeight = h;
-            if (GetTile(x,z).hasWater) tileWaterCount++;
+            const int index = z * m_size + x;
+            TerrainTile& tile = m_tiles[index];
+            const int worldX = chunkOffsetX + x;
+            const int worldZ = chunkOffsetZ + z;
+            int level = static_cast<int>(tile.height);
+
+            int region = terrainGenerator.GetRegion(worldX, worldZ);
+            float riverShape = terrainGenerator.GenerateHeight(worldX * 0.008f, worldZ * 0.008f);
+            float riverNarrow = terrainGenerator.GenerateHeight(worldX * 0.06f + 500.0f, worldZ * 0.06f + 500.0f);
+            bool isRiver = (riverShape > 0.35f && riverShape < 0.65f) && (std::abs(riverNarrow) < 0.15f) && (level <= 3);
+            float depression = terrainGenerator.GenerateHeight(worldX * 0.03f + 100.0f, worldZ * 0.03f + 100.0f);
+            bool isLake = (level == 1) && (region == 0 || region == 4) && (depression < 0.25f);
+            bool isWaterCandidate = isRiver || isLake;
+
+            // Regola confinamento acqua: solo se tutti i 4 vicini cardinali sono solidi
+            // Se anche UNO è vuoto (fuori chunk o vuoto nel chunk) → NO ACQUA
+            // Conservativo ai bordi chunk: se non posso verificare vicino esterno → niente acqua
+            bool northSolid = false, southSolid = false, eastSolid = false, westSolid = false;
+
+            // Calcolo deterministico per coord mondo: non dipende dall'ordine di generazione chunk
+            int worldX = chunkOffsetX + x;
+            int worldZ = chunkOffsetZ + z;
+
+            // North (worldZ - 1)
+            if (z > 0) northSolid = m_tiles[(z-1)*m_size + x].height > 0;
+            else {
+                int nHeight = terrainGenerator.GenerateHeightLevel(worldX, worldZ - 1);
+                northSolid = nHeight > 0;
+            }
+            // South (worldZ + 1)
+            if (z < m_size - 1) southSolid = m_tiles[(z+1)*m_size + x].height > 0;
+            else {
+                int sHeight = terrainGenerator.GenerateHeightLevel(worldX, worldZ + 1);
+                southSolid = sHeight > 0;
+            }
+            // East (worldX + 1)
+            if (x < m_size - 1) eastSolid = m_tiles[z*m_size + (x+1)].height > 0;
+            else {
+                int eHeight = terrainGenerator.GenerateHeightLevel(worldX + 1, worldZ);
+                eastSolid = eHeight > 0;
+            }
+            // West (worldX - 1)
+            if (x > 0) westSolid = m_tiles[z*m_size + (x-1)].height > 0;
+            else {
+                int wHeight = terrainGenerator.GenerateHeightLevel(worldX - 1, worldZ);
+                westSolid = wHeight > 0;
+            }
+            // Log temporaneo per verifica coerenza confini
+            static int logCount = 0;
+            if (logCount < 12 && (z == 0 || x == 0 || z == m_size-1 || x == m_size-1)) {
+                std::cout << "WATER WORLD=(" << worldX << "," << worldZ << ") CHUNK=(" << m_x << "," << m_z << ") NEIGHBOR_H=" << (z==0?terrainGenerator.GenerateHeightLevel(worldX,worldZ-1):(z==m_size-1?terrainGenerator.GenerateHeightLevel(worldX,worldZ+1):(x==0?terrainGenerator.GenerateHeightLevel(worldX-1,worldZ):terrainGenerator.GenerateHeightLevel(worldX+1,worldZ)))) << " IS_WATER=" << (isWaterCandidate ? 1 : 0) << std::endl;
+                logCount++;
+            }
+
+            bool allNeighborsSolid = northSolid && southSolid && eastSolid && westSolid;
+            bool isContained = isWaterCandidate && allNeighborsSolid;
+
+            // Fase 3: eliminare buchi interni (piccoli gruppi asciutti dentro formazione acqua)
+            // NON riempire bordi: solo buchi completamente circondati da acqua della stessa formazione
+            // Per questa versione: mantenere conservativo. Se tile non contenuto, non acqua.
+            bool isWater = isContained;
+
+            tile.hasWater = isWater;
+            tile.waterHeight = static_cast<float>(waterLevel);
+            if (isWater) {
+                if (isRiver) tile.waterFeature = 2;
+                else if (isLake) tile.waterFeature = 1;
+                else tile.waterFeature = 0;
+                tileWaterCount++;
+            } else {
+                tile.waterFeature = 0;
+            }
         }
     }
-    // Debug minimo: statistiche per verifica distribuzione
-    int dryTiles = 256 - tileWaterCount;
-    std::cout << "[Chunk " << m_x << "," << m_z << "] dry=" << dryTiles
-              << " lake+river=" << tileWaterCount
+    auto tWaterEnd = std::chrono::high_resolution_clock::now();
+    auto tEnd = std::chrono::high_resolution_clock::now();
+
+    long heightMs = std::chrono::duration_cast<std::chrono::milliseconds>(tHeightEnd - tHeightStart).count();
+    long waterMs = std::chrono::duration_cast<std::chrono::milliseconds>(tWaterEnd - tWaterStart).count();
+    long totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart).count();
+
+    if (minHeight < 1) minHeight = 1;
+    int dryTiles = (m_size * m_size) - tileWaterCount;
+    std::cout << "[GEN PERF] Chunk (" << m_x << "," << m_z << ")" << std::endl;
+    std::cout << "  Height+Biome: " << heightMs << " ms" << std::endl;
+    std::cout << "  Water: " << waterMs << " ms" << std::endl;
+    std::cout << "  Generate total: " << totalMs << " ms" << std::endl;
+    std::cout << "  dry=" << dryTiles << " lake+river=" << tileWaterCount
               << " minH=" << minHeight << " maxH=" << maxHeight << std::endl;
-    // ----- END DEBUG MINIMO -----
 }
 
 void Chunk::GenerateColors() {
@@ -195,10 +268,21 @@ void Chunk::GenerateTileColors(TerrainTile& tile) const {
 }
 
 void Chunk::CreateTerrainMesh() {
+    auto tMeshStart = std::chrono::high_resolution_clock::now();
+
     std::vector<Vector3> verts;
     std::vector<Vector2> texs;
     std::vector<Vector3> norms;
     std::vector<Color> cols;
+
+    // Reserve: estimate for 16x16 chunk, avg height 3, ~50% exposed faces
+    // Each quad = 6 vertices (2 tris), estimate ~6k-8k vertices
+    const int estimatedVerts = m_size * m_size * 3 * 3 * 6;
+    verts.reserve(estimatedVerts);
+    texs.reserve(estimatedVerts);
+    norms.reserve(estimatedVerts);
+    cols.reserve(estimatedVerts);
+
     float s = m_tileSize;
     for (int z = 0; z < m_size; ++z) {
         for (int x = 0; x < m_size; ++x) {
@@ -211,30 +295,31 @@ void Chunk::CreateTerrainMesh() {
             int neighborRight = (x < m_size - 1) ? static_cast<int>(GetTile(x+1, z).height) : level;
             int neighborBack = (z > 0) ? static_cast<int>(GetTile(x, z-1).height) : level;
             int neighborFront = (z < m_size - 1) ? static_cast<int>(GetTile(x, z+1).height) : level;
-            Color topColor = { 34, 139, 34, 255 };    // verde erba
-            Color bodyColor = { 160, 120, 60, 255 }; // marrone strato
+            Color topColor = { 34, 139, 34, 255 };
+            Color bodyColor = { 160, 120, 60, 255 };
             Color faceColor = bodyColor;
-            Color waterColor = { 0, 120, 200, 180 }; // acqua
+            Color waterColor = { 0, 120, 200, 180 };
             bool hasWater = GetTile(x, z).hasWater;
-            int waterLevel = 2;
-            // Acqua: sola superficie orizzontale opaca, nessuna faccia verticale
+
+            // Water surface (only if tile has water)
             if (hasWater) {
-                float yWater = 2.0f * s; // fixed water plane at depression level
-                // Superficie orizzontale sola (normale +Y), nessuna trasparenza per evitare artefatti
+                float yWater = 2.0f * s;
                 AddQuadTilted(verts, texs, norms, cols,
                     {minX, yWater, minZ}, {minX, yWater, maxZ}, {maxX, yWater, maxZ}, {maxX, yWater, minZ},
                     Color{0, 120, 200, 255}, Vector3{0,1,0});
             }
-            // Water face at base of column (visible under low tiles / between blocks)
+
+            // Water base plane (always drawn at y=0)
             AddQuadTilted(verts, texs, norms, cols,
                 {minX, 0.0f, minZ}, {minX, 0.0f, maxZ}, {maxX, 0.0f, maxZ}, {maxX, 0.0f, minZ},
                 waterColor, Vector3{0,-1,0});
+
             for (int y = 0; y < level; ++y) {
                 float yBase = baseY + y * s;
                 float yTop  = yBase + s;
-                // Side face color: if this layer is the top of this column, use green
                 Color sideColor = (y == level - 1) ? topColor : faceColor;
-                // Top face — FIX winding (v2/v4 scambiati), normale +Y
+
+                // Top face — sempre generata (visibilità corretta senza culling aggressivo)
                 {
                     Vector3 n = { 0.0f, 1.0f, 0.0f };
                     AddQuadTilted(verts, texs, norms, cols,
@@ -268,6 +353,8 @@ void Chunk::CreateTerrainMesh() {
             }
         }
     }
+    auto tMeshEnd = std::chrono::high_resolution_clock::now();
+
     m_mesh = { 0 };
     int vertexCount = static_cast<int>(verts.size());
     int triangleCount = vertexCount / 3;
@@ -291,8 +378,26 @@ void Chunk::CreateTerrainMesh() {
         m_mesh.colors[i*4+2] = cols[i].b;
         m_mesh.colors[i*4+3] = cols[i].a;
     }
+
+    auto tUploadStart = std::chrono::high_resolution_clock::now();
     UploadMesh(&m_mesh, false);
+    auto tUploadEnd = std::chrono::high_resolution_clock::now();
+
+    auto tLoadStart = std::chrono::high_resolution_clock::now();
     m_model = LoadModelFromMesh(m_mesh);
+    auto tLoadEnd = std::chrono::high_resolution_clock::now();
+
+    long meshMs = std::chrono::duration_cast<std::chrono::milliseconds>(tMeshEnd - tMeshStart).count();
+    long uploadMs = std::chrono::duration_cast<std::chrono::milliseconds>(tUploadEnd - tUploadStart).count();
+    long loadMs = std::chrono::duration_cast<std::chrono::milliseconds>(tLoadEnd - tLoadStart).count();
+    long totalMs = meshMs + uploadMs + loadMs;
+
+    std::cout << "[BUILD PERF] Chunk (" << m_x << "," << m_z << ")" << std::endl;
+    std::cout << "  CreateTerrainMesh: " << meshMs << " ms" << std::endl;
+    std::cout << "  UploadMesh: " << uploadMs << " ms" << std::endl;
+    std::cout << "  LoadModelFromMesh: " << loadMs << " ms" << std::endl;
+    std::cout << "  BuildMesh total: " << totalMs << " ms" << std::endl;
+    std::cout << "  vertices=" << vertexCount << " triangles=" << triangleCount << std::endl;
 }
 
 void Chunk::AddQuadTilted(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
