@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <raylib.h>
+#include "player/Player.h"
+#include "navigation/NavigationSystem.h"
 
 class GameState;
 class Renderer;
@@ -49,6 +51,14 @@ private:
     std::unique_ptr<AssetManager> m_assetManager;
     std::unique_ptr<AudioManager> m_audioManager;
     std::unique_ptr<Timer> m_timer;
+    std::unique_ptr<Player> m_player;
+    NavigationSystem m_navigation;
+
+    int m_hoverTileX = -1;
+    int m_hoverTileZ = -1;
+
+    // Movement/walkability
+    static constexpr float MAX_STEP_HEIGHT = 1.5f; // Maximum height difference Player can traverse
 
     // Window configuration
     static constexpr int SCREEN_WIDTH = 1024;

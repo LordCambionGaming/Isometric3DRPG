@@ -1,5 +1,7 @@
 #pragma once
 #include <raylib.h>
+#include <vector>
+#include "navigation/NavigationSystem.h"
 
 class Player {
 public:
@@ -10,9 +12,18 @@ public:
     int GetChunkX() const;
     int GetChunkZ() const;
     void SetPosition(Vector3 pos) { m_position = pos; }
-    void MoveToTile(int tileX, int tileZ);
+    void SetTileSize(float size) { m_tileSize = size; }
+    float GetTileSize() const { return m_tileSize; }
+    int GetTileX() const;
+    int GetTileZ() const;
+    void MoveToTile(int tileX, int tileZ, float surfaceY);
+    void SetPath(const std::vector<TileCoord>& path);
 private:
+    std::vector<TileCoord> m_path;
+    size_t m_pathIndex;
     Vector3 m_position;
     Vector3 m_target;
     bool m_moving;
+    float m_tileSize = 1.0f;
+    float m_speed = 5.0f;
 };

@@ -59,6 +59,7 @@ set(SOURCES
     src/world/WorldFeatureGenerator.cpp
     src/assets/AssetManager.cpp
     src/audio/AudioManager.cpp
+    src/navigation/NavigationSystem.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
