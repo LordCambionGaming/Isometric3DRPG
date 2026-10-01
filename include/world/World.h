@@ -48,6 +48,7 @@ public:
     int GetUnloadRadius() const { return UNLOAD_RADIUS; }
     void UnloadDistantChunks(Vector3 centerPosition);
     bool IsChunkLoaded(int chunkX, int chunkZ) const;
+    bool IsWaterAt(float worldX, float worldZ) const;
     int GetLoadedChunkCount() const { return static_cast<int>(m_chunks.size()); }
 
     // World queries
@@ -72,6 +73,7 @@ private:
     };
 
     void GenerateInitialChunks();
+    void ProcessPendingChunks();
     bool ShouldLoadChunk(int chunkX, int chunkZ, Vector3 centerPos) const;
     bool ShouldUnloadChunk(int chunkX, int chunkZ, Vector3 centerPos) const;
     float GetChunkDistanceSquared(int chunkX, int chunkZ, Vector3 centerPos) const;
@@ -80,6 +82,9 @@ private:
     std::unique_ptr<TerrainGenerator> m_terrainGenerator;
     BiomeManager m_biomeManager;
     std::unordered_map<ChunkKey, std::unique_ptr<Chunk>, ChunkKeyHash> m_chunks;
+
+    std::vector<ChunkKey> pendingChunks;
+    static constexpr int MAX_CHUNKS_PER_FRAME = 1;
 
     Vector3 m_lastPlayerPosition;
     int m_lastChunkX = 0;

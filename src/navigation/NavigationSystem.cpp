@@ -16,15 +16,19 @@ void NavigationSystem::Initialize(World* world, float maxStepHeight) {
 }
 
 bool NavigationSystem::IsTileBlocked(int tileX, int tileZ) const {
-    // STUB: Future integration with procedural trees/structures/occupancy.
-    // Currently no blocking obstacles exist in the world.
+    if (!m_world) return true; // block if world missing (safe)
+    // Same blocking logic for obstacles AND water (single source: World)
+    float tx = tileX + 0.5f;
+    float tz = tileZ + 0.5f;
+    // Water = blocked (TileData.hasWater); obstacle = blocked (stub)
+    if (m_world->IsWaterAt(tx, tz)) return true;
+    // Future: m_world->IsObstacleAt(tx, tz) → blocked
     return false;
 }
 
 bool NavigationSystem::IsWalkable(int tileX, int tileZ) const {
     if (!m_world) return false;
-
-    // Blocked tiles (obstacles) are never walkable
+    // Blocked tiles (obstacles + water) never walkable
     if (IsTileBlocked(tileX, tileZ)) return false;
 
     // For now, all tiles are walkable (no obstacles yet)

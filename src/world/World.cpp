@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cmath>
 #include <chrono>
+#include <algorithm>
 
 World::World()
     : m_terrainGenerator(nullptr)
@@ -71,6 +72,9 @@ void World::Update(float deltaTime) {
     else {
         m_lastUpdateTime += deltaTime;
     }
+
+    // Process pending chunk queue (bounded work per frame)
+    ProcessPendingChunks();
 }
 
 void World::Render() {
@@ -130,12 +134,53 @@ void World::LoadChunkAt(int x, int z) {
     std::cout << "[STREAM] Loaded chunk (" << x << "," << z << ") total=" << m_chunks.size() << std::endl;
 }
 
+void World::ProcessPendingChunks() {
+    int processed = 0;
+    auto frameStart = std::chrono::high_resolution_clock::now();
+
+    while (processed < MAX_CHUNKS_PER_FRAME && !pendingChunks.empty()) {
+        ChunkKey k = pendingChunks.front();
+        pendingChunks.erase(pendingChunks.begin());
+
+        // Skip if already loaded (could have been loaded via other path)
+        if (IsChunkLoaded(k.x, k.z)) continue;
+
+        // Load with profiling
+        auto genStart = std::chrono::high_resolution_clock::now();
+        auto chunk = std::make_unique<Chunk>(k.x, k.z, m_config.chunkSize, m_config.tileSize);
+        chunk->Generate(*m_terrainGenerator);
+        auto genEnd = std::chrono::high_resolution_clock::now();
+        long genMs = std::chrono::duration_cast<std::chrono::milliseconds>(genEnd - genStart).count();
+
+        auto meshStart = std::chrono::high_resolution_clock::now();
+        chunk->BuildMesh();
+        auto meshEnd = std::chrono::high_resolution_clock::now();
+        long meshMs = std::chrono::duration_cast<std::chrono::milliseconds>(meshEnd - meshStart).count();
+
+        ChunkKey key = {k.x, k.z};
+        m_chunks[key] = std::move(chunk);
+
+        std::cout << "[STREAM PERF] Generate chunk (" << k.x << "," << k.z << "): " << genMs << " ms" << std::endl;
+        std::cout << "[STREAM PERF] BuildMesh chunk (" << k.x << "," << k.z << "): " << meshMs << " ms" << std::endl;
+
+        processed++;
+    }
+
+    if (processed > 0) {
+        auto frameEnd = std::chrono::high_resolution_clock::now();
+        long frameMs = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart).count();
+        std::cout << "[STREAM PERF] processed=" << processed << " queued=" << pendingChunks.size()
+                  << " frameTime=" << frameMs << " ms" << std::endl;
+    }
+}
+
 void World::UnloadChunk(int x, int z) {
     ChunkKey key = {x, z};
     auto it = m_chunks.find(key);
 
     if (it != m_chunks.end()) {
-        std::cout << "[STREAM] Unloaded chunk (" << x << "," << z << ")" << std::endl;
+        std::cout << "[STREAM] Unloaded chunk (" << x << "," << z << ") distance="
+                  << (int)std::sqrt((float)(x - m_lastChunkX)*(x - m_lastChunkX) + (z - m_lastChunkZ)*(z - m_lastChunkZ)) << std::endl;
         it->second->Unload();
         m_chunks.erase(it);
     }
@@ -179,19 +224,57 @@ void World::UpdateChunkStreaming(Vector3 centerPosition) {
     std::cout << "[STREAM] Player position = (" << centerPosition.x << "," << centerPosition.y << "," << centerPosition.z << ")" << std::endl;
     std::cout << "[STREAM] Player chunk = (" << centerChunkX << "," << centerChunkZ << ")" << std::endl;
 
+    // Update pending queue: add missing chunks, remove invalid ones, sort by distance
     int before = static_cast<int>(m_chunks.size());
     std::cout << "[STREAM] Loaded chunks BEFORE = " << before << std::endl;
 
-    // Load new chunks in GENERATION_RADIUS (chunk space, not world units)
+    // 1. Compute needed chunks within GENERATION_RADIUS
+    std::vector<ChunkKey> needed;
     for (int x = centerChunkX - GENERATION_RADIUS; x <= centerChunkX + GENERATION_RADIUS; x++) {
         for (int z = centerChunkZ - GENERATION_RADIUS; z <= centerChunkZ + GENERATION_RADIUS; z++) {
-            if (ShouldLoadChunk(x, z, centerPosition)) {
-                LoadChunkAt(x, z);
+            if (GetChunkDistanceSquared(x, z, centerPosition) <= GENERATION_RADIUS * GENERATION_RADIUS) {
+                needed.push_back({x, z});
             }
         }
     }
 
-    // Unload chunks beyond UNLOAD_RADIUS (chunk-space distance)
+    // 2. Remove from pending those already loaded or no longer needed
+    std::vector<ChunkKey> cleaned;
+    for (const ChunkKey& k : pendingChunks) {
+        bool inChunks = IsChunkLoaded(k.x, k.z);
+        bool stillNeeded = false;
+        for (const ChunkKey& need : needed) {
+            if (need.x == k.x && need.z == k.z) { stillNeeded = true; break; }
+        }
+        if (!inChunks && stillNeeded) cleaned.push_back(k);
+    }
+    pendingChunks = cleaned;
+
+    // 3. Add missing needed chunks (deduplicate against chunks and pending)
+    for (const ChunkKey& k : needed) {
+        bool alreadyInChunks = IsChunkLoaded(k.x, k.z);
+        bool alreadyPending = false;
+        for (const ChunkKey& p : pendingChunks) {
+            if (p.x == k.x && p.z == k.z) { alreadyPending = true; break; }
+        }
+        if (!alreadyInChunks && !alreadyPending) {
+            pendingChunks.push_back(k);
+        }
+    }
+
+    // 4. Sort by distance to center (ascending) — closest first
+    std::sort(pendingChunks.begin(), pendingChunks.end(),
+        [centerChunkX, centerChunkZ](const ChunkKey& a, const ChunkKey& b) {
+            int da = (a.x - centerChunkX)*(a.x - centerChunkX) + (a.z - centerChunkZ)*(a.z - centerChunkZ);
+            int db = (b.x - centerChunkX)*(b.x - centerChunkX) + (b.z - centerChunkZ)*(b.z - centerChunkZ);
+            if (da != db) return da < db;
+            if (a.x != b.x) return a.x < b.x;
+            return a.z < b.z;
+        });
+
+    std::cout << "[STREAM PERF] queued=" << pendingChunks.size() << std::endl;
+
+    // Unload distant chunks
     UnloadDistantChunks(centerPosition);
 
     int after = static_cast<int>(m_chunks.size());
@@ -285,6 +368,18 @@ bool World::ShouldUnloadChunk(int chunkX, int chunkZ, Vector3 centerPos) const {
     float distSquared = GetChunkDistanceSquared(chunkX, chunkZ, centerPos);
     float unloadDistSquared = UNLOAD_RADIUS * UNLOAD_RADIUS;
     return distSquared > unloadDistSquared;
+}
+
+bool World::IsWaterAt(float worldX, float worldZ) const {
+    int chunkX, chunkZ, localX, localZ;
+    WorldToChunk(worldX, worldZ, chunkX, chunkZ, localX, localZ);
+    Chunk* chunk = const_cast<World*>(this)->GetChunk(chunkX, chunkZ);
+    if (chunk && chunk->IsGenerated()) {
+        // Single source of truth: TileData.hasWater (not height / color / coord)
+        return chunk->GetTile(localX, localZ).hasWater;
+    }
+    // Fallback to terrain generator only if chunk unavailable
+    return false;
 }
 
 float World::GetChunkDistanceSquared(int chunkX, int chunkZ, Vector3 centerPos) const {

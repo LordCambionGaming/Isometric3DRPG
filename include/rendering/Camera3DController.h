@@ -49,7 +49,7 @@ private:
     static constexpr float MAX_ZOOM = 3.0f;
     static constexpr float ZOOM_SPEED = 0.1f;
     static constexpr float ROTATION_SPEED = 2.0f;
-    static constexpr float PAN_SPEED = 5.0f;
+    static constexpr float PAN_SPEED = 10.0f;
     static constexpr float DEFAULT_DISTANCE = 20.0f;
     static constexpr float DEFAULT_HEIGHT = 15.0f;
 };
