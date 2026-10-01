@@ -72,10 +72,7 @@ void Player::Update(float dt) {
 
 void Player::Render() const {
     Vector3 p = m_position; // UNICA fonte autorevole
-    // Marker debug molto evidente sopra il Player (usato solo per verifica posizione reale)
-    DrawCube({p.x, p.y + 2.5f, p.z}, 0.6f, 0.6f, 0.6f, YELLOW);
-    DrawCylinder({p.x, p.y + 0.5f, p.z}, 0.15f, 0.15f, 2.0f, 8, LIME); // linea verticale dal player al marker
-    // Player originale
+    // Debug: solo il cubo RED e il cubo BLUE (hover), nessun marker giallo sopra il player
     DrawCube(p, 0.5f, 1.0f, 0.5f, RED);
     Vector3 h;
     h.x = p.x; h.y = p.y + 1.0f; h.z = p.z;

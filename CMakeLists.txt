@@ -60,6 +60,7 @@ set(SOURCES
     src/assets/AssetManager.cpp
     src/audio/AudioManager.cpp
     src/navigation/NavigationSystem.cpp
+     src/ui/HUD.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
