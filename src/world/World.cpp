@@ -47,6 +47,7 @@ void World::SetPlayerPosition(Vector3 pos) {
 
 void World::Update(float deltaTime) {
     if (!m_initialized) return;
+    std::cout << "[WORLD] PLAYER POSITION AT UPDATE=(" << m_lastPlayerPosition.x << "," << m_lastPlayerPosition.y << "," << m_lastPlayerPosition.z << ")" << std::endl;
 
     // Use Game-provided player position if available; fallback to last known
     Vector3 currentPosition = m_lastPlayerPosition;
@@ -58,7 +59,7 @@ void World::Update(float deltaTime) {
 
     if (chunkChanged || m_lastUpdateTime >= CHUNK_UPDATE_INTERVAL) {
         if (chunkChanged) {
-            std::cout << "[STREAM] Player chunk changed: (" << m_lastChunkX << "," << m_lastChunkZ << ") -> (" << cx << "," << cz << ")" << std::endl;
+            std::cout << "[STREAM CENTER CHANGE] old=(" << m_lastChunkX << "," << m_lastChunkZ << ") new=(" << cx << "," << cz << ")" << std::endl;
             m_lastChunkX = cx;
             m_lastChunkZ = cz;
         }
@@ -146,6 +147,7 @@ void World::ProcessPendingChunks() {
         if (IsChunkLoaded(k.x, k.z)) continue;
 
         // Load with profiling
+        std::cout << "[CHUNK LOAD] chunk=(" << k.x << "," << k.z << ")" << std::endl;
         auto genStart = std::chrono::high_resolution_clock::now();
         auto chunk = std::make_unique<Chunk>(k.x, k.z, m_config.chunkSize, m_config.tileSize);
         chunk->Generate(*m_terrainGenerator, this);
@@ -157,7 +159,10 @@ void World::ProcessPendingChunks() {
         auto meshEnd = std::chrono::high_resolution_clock::now();
         long meshMs = std::chrono::duration_cast<std::chrono::milliseconds>(meshEnd - meshStart).count();
 
+        std::cout << "[CHUNK GENERATED] chunk=(" << k.x << "," << k.z << ")" << std::endl;
+
         ChunkKey key = {k.x, k.z};
+        std::cout << "[STREAM PROCESS] chunk=(" << k.x << "," << k.z << ")" << std::endl;
         m_chunks[key] = std::move(chunk);
 
         std::cout << "[STREAM PERF] Generate chunk (" << k.x << "," << k.z << "): " << genMs << " ms" << std::endl;
@@ -258,11 +263,12 @@ void World::UpdateChunkStreaming(Vector3 centerPosition) {
             if (p.x == k.x && p.z == k.z) { alreadyPending = true; break; }
         }
         if (!alreadyInChunks && !alreadyPending) {
+            std::cout << "[STREAM QUEUE] chunk=(" << k.x << "," << k.z << ")" << std::endl;
             pendingChunks.push_back(k);
         }
     }
 
-    // 4. Sort by distance to center (ascending) â€” closest first
+    // 4. Sort by distance to center (ascending) — closest first
     std::sort(pendingChunks.begin(), pendingChunks.end(),
         [centerChunkX, centerChunkZ](const ChunkKey& a, const ChunkKey& b) {
             int da = (a.x - centerChunkX)*(a.x - centerChunkX) + (a.z - centerChunkZ)*(a.z - centerChunkZ);
@@ -302,6 +308,7 @@ void World::UnloadDistantChunks(Vector3 centerPosition) {
     }
 
     for (const ChunkKey& key : chunksToUnload) {
+        std::cout << "[CHUNK UNLOAD] chunk=(" << key.x << "," << key.z << ")" << std::endl;
         UnloadChunk(key.x, key.z);
     }
 
@@ -323,11 +330,33 @@ float World::GetHeightAt(float worldX, float worldZ) const {
 
     Chunk* chunk = const_cast<World*>(this)->GetChunk(chunkX, chunkZ);
     if (chunk && chunk->IsGenerated()) {
-        return chunk->GetHeightAt(localX * m_config.tileSize, localZ * m_config.tileSize);
+        const TerrainTile& tile = chunk->GetTile(localX, localZ);
+        // GetHeightAt() returns the visible surface; water has its own surface height.
+        if (tile.hasWater) {
+            return tile.waterHeight;
+        }
+        return tile.height;
     }
 
-    return m_terrainGenerator->GenerateHeight(static_cast<int>(worldX / m_config.tileSize),
-                                            static_cast<int>(worldZ / m_config.tileSize));
+    // Replica deterministica della generazione chunk (stessa logica di Chunk::GenerateTerrain, senza chunk)
+    int worldXInt = static_cast<int>(worldX / m_config.tileSize);
+    int worldZInt = static_cast<int>(worldZ / m_config.tileSize);
+    int level = m_terrainGenerator->GenerateHeightLevel(worldXInt, worldZInt);
+
+    // Replica feature water (stesso seed, stessa API usata in Chunk::Generate)
+    WorldFeatureGenerator featureGen;
+    featureGen.Initialize(m_terrainGenerator->GetSeed());
+    WaterFeature wf = featureGen.GetFeatureAt(worldXInt, worldZInt, *m_terrainGenerator);
+    bool isWater = (wf == WaterFeature::Sea) || (wf == WaterFeature::Lake) || (wf == WaterFeature::River);
+
+    // Regola sea: se acqua -> surface = waterHeight = 2 (SEA_LEVEL)
+    if (isWater) {
+        return 2.0f; // waterHeight / SEA_LEVEL
+    }
+    // Land: final height con clamp >= 2 (gi? applicato da GenerateHeightLevel ma verificato)
+    float h = static_cast<float>(level);
+    if (h < 2.0f) h = 2.0f;
+    return h;
 }
 
 int World::GetBiomeAt(float worldX, float worldZ) const {
@@ -378,8 +407,15 @@ bool World::IsWaterAt(float worldX, float worldZ) const {
         // Single source of truth: TileData.hasWater (not height / color / coord)
         return chunk->GetTile(localX, localZ).hasWater;
     }
-    // Fallback to terrain generator only if chunk unavailable
-    return false;
+    // Replica deterministica senza chunk (stessa logica Chunk::GenerateTerrain)
+    int wx = static_cast<int>(worldX / m_config.tileSize);
+    int wz = static_cast<int>(worldZ / m_config.tileSize);
+    if (!m_terrainGenerator) return false;
+    WorldFeatureGenerator featureGen;
+    featureGen.Initialize(m_terrainGenerator->GetSeed());
+    WaterFeature wf = featureGen.GetFeatureAt(wx, wz, *m_terrainGenerator);
+    bool isWater = (wf == WaterFeature::Sea) || (wf == WaterFeature::Lake) || (wf == WaterFeature::River);
+    return isWater;
 }
 
 float World::GetChunkDistanceSquared(int chunkX, int chunkZ, Vector3 centerPos) const {

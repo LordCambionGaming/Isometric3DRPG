@@ -18,7 +18,7 @@ struct TerrainTile {
     bool hasVegetation = false;
     bool hasWater = false;
     float waterHeight = 2.0f; // WATER_LEVEL = 2
-    int waterFeature = 0; // 0=Dry, 1=Lake, 2=River
+    int waterFeature = 0; // 0=Dry, 1=Lake, 2=River, 3=Sea
     int tileWaterCount = 0;
 };
 

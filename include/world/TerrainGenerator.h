@@ -55,7 +55,7 @@ private:
 
     // Terrain generation parameters
     static constexpr float REGION_FREQUENCY = 0.003f;
-    static constexpr float SHAPE_FREQUENCY  = 0.015f;
+    static constexpr float SHAPE_FREQUENCY  = 0.035f;
     static constexpr float DETAIL_FREQUENCY = 0.050f;
 
     // Legacy terrain generation parameters (kept for existing methods)

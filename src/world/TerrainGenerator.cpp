@@ -75,52 +75,32 @@ float TerrainGenerator::HumidityNoise(int x, int z) const {
 }
 
 int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
-    // 1. Determine large region (macro scale)
     int region = GetRegion(worldX, worldZ);
 
-    // 2. Regional shape & local detail — reduced detail weight, smoother regions
-    float base = RegionNoise(worldX, worldZ);
-    base = base * 0.5f + 0.5f;
-    float shape = ShapeNoise(worldX, worldZ) * 0.5f + 0.5f;
-    float detail = DetailNoise(worldX, worldZ) * 0.5f + 0.5f;
+    // Separate macro elevation, hill shape, local detail — no chunk bias
+    // New offset seed values to avoid seed 12345 near-origin flatness
+    float macro = PerlinNoise(worldX * 0.012f, worldZ * 0.012f, 10, 3, 0.5f); // low freq
+    float hill = PerlinNoise(worldX * 0.035f, worldZ * 0.035f, 40, 4, 0.55f);   // hill shape
+    float detail = PerlinNoise(worldX * 0.08f, worldZ * 0.08f, 70, 2, 0.5f);    // local roughness
 
-    float combined = 0.0f;
+    // Normalize to 0..1
+    macro = macro * 0.5f + 0.5f;
+    hill = hill * 0.5f + 0.5f;
+    detail = detail * 0.5f + 0.5f;
 
-    switch (region) {
-        case 0: // Plains
-            combined = base * 0.50f + shape * 0.35f + detail * 0.15f;
-            if (combined < 0.30f) return 1;
-            if (combined < 0.55f) return 2;
-            if (combined < 0.75f) return 3;
-            return 4;
-        case 1: // Hills
-            combined = base * 0.45f + shape * 0.40f + detail * 0.15f;
-            if (combined < 0.25f) return 1;
-            if (combined < 0.50f) return 2;
-            if (combined < 0.75f) return 3;
-            if (combined < 0.90f) return 4;
-            return 5;
-        case 2: // Plateau
-            combined = base * 0.55f + shape * 0.30f + detail * 0.15f;
-            if (combined < 0.35f) return 1;
-            if (combined < 0.55f) return 2;
-            if (combined < 0.70f) return 3;
-            if (combined < 0.85f) return 4;
-            return 5;
-        case 3: // Mountains
-            combined = base * 0.5f + shape * 0.4f + detail * 0.1f;
-            if (combined < 0.25f) return 2;
-            if (combined < 0.50f) return 3;
-            if (combined < 0.70f) return 4;
-            return 5;
-        case 4: // Lowlands
-            combined = base * 0.7f + shape * 0.2f + detail * 0.1f;
-            if (combined < 0.30f) return 1;
-            if (combined < 0.55f) return 2;
-            if (combined < 0.75f) return 3;
-            return 4;
-    }
-    return 1; // fallback
+    // Combine: hill shape dominates, macro shifts base, detail adds roughness
+    float combined = macro * 0.25f + hill * 0.55f + detail * 0.20f;
+
+    // Map to 1..5 with progressive transitions; preserve lowlands/plains
+    int level = static_cast<int>(std::floor(combined * 5.0f + 0.5f)); // 0.5..4.5 -> 1..5
+    if (level < 1) level = 1;
+    if (level > 5) level = 5;
+
+    // Preserve region specialization: mountains/high more likely 4/5; lowlands more 1/2
+    if (region == 3 && level < 3) level = 3; // Mountains floor
+    if (region == 4 && level > 4) level = 4; // Lowlands ceiling
+
+    return level;
 }
 
 float TerrainGenerator::BiomeNoise(int x, int z) const {

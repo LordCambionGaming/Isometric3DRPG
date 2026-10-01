@@ -1,6 +1,7 @@
 #include "world/Chunk.h"
 #include "world/TerrainGenerator.h"
 #include "world/World.h"
+#include "world/WorldFeatureGenerator.h"
 #include <cmath>
 
 // Local helper for water noise (TerrainGenerator::PerlinNoise is private)
@@ -58,7 +59,9 @@ void Chunk::Render() {
             int tx = (i < m_size) ? i : m_size - 1;
             int tz = (z < m_size) ? z : m_size - 1;
             if (tx < 0) tx = 0; if (tz < 0) tz = 0;
-            int hh = static_cast<int>(GetTile(tx, tz).height);
+            const TerrainTile& gridTile = GetTile(tx, tz);
+            if (gridTile.hasWater) continue;
+            int hh = static_cast<int>(gridTile.height);
             if (hh < 1) hh = 1;
             float yGrid = hh * s + 0.02f;
             float zStart = zPos;
@@ -73,7 +76,9 @@ void Chunk::Render() {
             int tx = (x < m_size) ? x : m_size - 1;
             int tz = (j < m_size) ? j : m_size - 1;
             if (tx < 0) tx = 0; if (tz < 0) tz = 0;
-            int hh = static_cast<int>(GetTile(tx, tz).height);
+            const TerrainTile& gridTile = GetTile(tx, tz);
+            if (gridTile.hasWater) continue;
+            int hh = static_cast<int>(gridTile.height);
             if (hh < 1) hh = 1;
             float yGrid = hh * s + 0.02f;
             float xStart = xPos;
@@ -137,6 +142,10 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
     auto tHeightEnd = std::chrono::high_resolution_clock::now();
 
     auto tWaterStart = std::chrono::high_resolution_clock::now();
+    // Usa WorldFeatureGenerator se disponibile (via world pointer), altrimenti fallback deterministico
+    WorldFeatureGenerator featureGen;
+    featureGen.Initialize(terrainGenerator.GetSeed());
+
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
             const int index = z * m_size + x;
@@ -145,64 +154,51 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             const int worldZ = chunkOffsetZ + z;
             int level = static_cast<int>(tile.height);
 
-            int region = terrainGenerator.GetRegion(worldX, worldZ);
-            float riverShape = terrainGenerator.GenerateHeight(worldX * 0.008f, worldZ * 0.008f);
-            float riverNarrow = terrainGenerator.GenerateHeight(worldX * 0.06f + 500.0f, worldZ * 0.06f + 500.0f);
-            bool isRiver = (riverShape > 0.35f && riverShape < 0.65f) && (std::abs(riverNarrow) < 0.15f) && (level <= 3);
-            float depression = terrainGenerator.GenerateHeight(worldX * 0.03f + 100.0f, worldZ * 0.03f + 100.0f);
-            bool isLake = (level == 1) && (region == 0 || region == 4) && (depression < 0.25f);
-            bool isWaterCandidate = isRiver || isLake;
+            WaterFeature wf = featureGen.GetFeatureAt(worldX, worldZ, terrainGenerator);
 
-            // Regola confinamento acqua: solo se tutti i 4 vicini cardinali sono solidi
-            // Se anche UNO è vuoto (fuori chunk o vuoto nel chunk) → NO ACQUA
-            // Conservativo ai bordi chunk: se non posso verificare vicino esterno → niente acqua
-            int nHeight = 0, sHeight = 0, eHeight = 0, wHeight = 0;
-
-            // Calcolo deterministico per coord mondo: non dipende dall'ordine di generazione chunk
-            // worldX/worldZ già definiti nel loop esterno (riga 144-145)
-
-            // North (worldZ - 1) — coerenza geometrica, non solo >0
-            nHeight = (z > 0) ? static_cast<int>(m_tiles[(z-1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ - 1);
-            bool northSolid = (nHeight > 0) && (std::abs(nHeight - level) <= 1);
-            // South (worldZ + 1)
-            sHeight = (z < m_size - 1) ? static_cast<int>(m_tiles[(z+1)*m_size + x].height) : terrainGenerator.GenerateHeightLevel(worldX, worldZ + 1);
-            bool southSolid = (sHeight > 0) && (std::abs(sHeight - level) <= 1);
-            // East (worldX + 1)
-            eHeight = (x < m_size - 1) ? static_cast<int>(m_tiles[z*m_size + (x+1)].height) : terrainGenerator.GenerateHeightLevel(worldX + 1, worldZ);
-            bool eastSolid = (eHeight > 0) && (std::abs(eHeight - level) <= 1);
-            // West (worldX - 1)
-            wHeight = (x > 0) ? static_cast<int>(m_tiles[z*m_size + (x-1)].height) : terrainGenerator.GenerateHeightLevel(worldX - 1, worldZ);
-            bool westSolid = (wHeight > 0) && (std::abs(wHeight - level) <= 1);
-            bool allNeighborsSolid = northSolid && southSolid && eastSolid && westSolid;
-            bool isContained = isWaterCandidate && allNeighborsSolid;
-
-            // Log temporaneo caso problematico (acqua volante / dislivello)
-            static int logCheck = 0;
-            if (logCheck < 8 && isWaterCandidate && (z==0||x==0||z==m_size-1||x==m_size-1)) {
-                std::cout << "WATER CHECK world=(" << worldX << "," << worldZ << ") height=" << level
-                          << " waterH=" << waterLevel
-                          << " N=" << nHeight << " S=" << sHeight << " E=" << eHeight << " W=" << wHeight
-                          << " result=" << (isContained ? "WATER" : "NONE") << std::endl;
-                logCheck++;
+            // REGOLA PER TERRENO: se LAND (non Sea/Lake/River) → height minima SEA_LEVEL=2
+            bool isLand = (wf == WaterFeature::None);
+            if (isLand && level < waterLevel) {
+                tile.height = static_cast<float>(waterLevel);
+                level = waterLevel; // aggiorna per coerenza con resto loop se serve
+            } else if (!isLand) {
+                // Zona marina (Sea): mantiene height grezza (può essere < SEA_LEVEL)
+                tile.height = static_cast<float>(level); // già impostato, ma esplicito
             }
 
-            // Fase 3: eliminare buchi interni (piccoli gruppi asciutti dentro formazione acqua)
-            // NON riempire bordi: solo buchi completamente circondati da acqua della stessa formazione
-            // Per questa versione: mantenere conservativo. Se tile non contenuto, non acqua.
-            bool isWater = isContained;
+            bool isWater = (wf == WaterFeature::Sea) || (wf == WaterFeature::Lake) || (wf == WaterFeature::River);
+            int waterFeatureCode = static_cast<int>(wf);
 
-            tile.hasWater = isWater;
-            tile.waterHeight = static_cast<float>(waterLevel);
             if (isWater) {
-                if (isRiver) tile.waterFeature = 2;
-                else if (isLake) tile.waterFeature = 1;
-                else tile.waterFeature = 0;
+                // Terreno sottostante sempre presente: tile.height già impostato
+                tile.hasWater = true;
+                tile.waterHeight = static_cast<float>(waterLevel); // 2 = SEA_LEVEL
+                tile.waterFeature = waterFeatureCode;
                 tileWaterCount++;
             } else {
+                tile.hasWater = false;
+                tile.waterHeight = 0.0f;
                 tile.waterFeature = 0;
             }
         }
     }
+    int stats[5][2] = {{0,0},{0,0},{0,0},{0,0},{0,0}}; // [height-1][0=water,1=dry]
+    for (int z = 0; z < m_size; z++) {
+        for (int x = 0; x < m_size; x++) {
+            const int index = z * m_size + x;
+            TerrainTile& tile = m_tiles[index];
+            int h = static_cast<int>(tile.height); if (h < 1) h = 1; if (h > 5) h = 5;
+            bool w = tile.hasWater;
+            stats[h-1][w ? 0 : 1]++;
+        }
+    }
+    if (m_x == 0 && m_z == 0) {
+        std::cout << "[SPAWN TERRAIN STATS] chunk=(0,0)" << std::endl;
+        for (int h = 1; h <= 5; ++h) {
+            std::cout << "  h" << h << " water=" << stats[h-1][0] << " dry=" << stats[h-1][1] << std::endl;
+        }
+    }
+
     auto tWaterEnd = std::chrono::high_resolution_clock::now();
     auto tEnd = std::chrono::high_resolution_clock::now();
 
@@ -212,6 +208,33 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
 
     if (minHeight < 1) minHeight = 1;
     int dryTiles = (m_size * m_size) - tileWaterCount;
+    int sea=0, lake=0, river=0, totalWater=0;
+    int minH=999, maxH=-1;
+    for (int z = 0; z < m_size; z++) {
+        for (int x = 0; x < m_size; x++) {
+            const int index = z * m_size + x;
+            TerrainTile& tile = m_tiles[index];
+            int h = static_cast<int>(tile.height); if (h < 1) h = 1; if (h > 5) h = 5;
+            if (tile.hasWater) totalWater++;
+            if (tile.waterFeature == 3) sea++;
+            else if (tile.waterFeature == 1) lake++;
+            else if (tile.waterFeature == 2) river++;
+            if (h < minH) minH = h;
+            if (h > maxH) maxH = h;
+        }
+    }
+    int dry = (m_size * m_size) - totalWater;
+    std::cout << "[WATER AUDIT] chunk=(" << m_x << "," << m_z << ") sea=" << sea << " lake=" << lake << " river=" << river << " water=" << totalWater << " dry=" << dry << " minH=" << minH << " maxH=" << maxH << std::endl;
+    int h1=0,h2=0,h3=0,h4=0,h5=0;
+    for (int z=0; z<m_size; z++) {
+        for (int x=0; x<m_size; x++) {
+            int idx=z*m_size+x;
+            int h=static_cast<int>(m_tiles[idx].height);
+            if (h<1) h=1; if (h>5) h=5;
+            switch(h){case 1:h1++;break;case 2:h2++;break;case 3:h3++;break;case 4:h4++;break;case 5:h5++;break;}
+        }
+    }
+    std::cout << "[WORLD GEN AUDIT] chunk=(" << m_x << "," << m_z << ") h1=" << h1 << " h2=" << h2 << " h3=" << h3 << " h4=" << h4 << " h5=" << h5 << std::endl;
     std::cout << "[GEN PERF] Chunk (" << m_x << "," << m_z << ")" << std::endl;
     std::cout << "  Height+Biome: " << heightMs << " ms" << std::endl;
     std::cout << "  Water: " << waterMs << " ms" << std::endl;
@@ -300,18 +323,14 @@ void Chunk::CreateTerrainMesh() {
                     Color{0, 120, 200, 255}, Vector3{0,1,0});
             }
 
-            // Water base plane (always drawn at y=0)
-            AddQuadTilted(verts, texs, norms, cols,
-                {minX, 0.0f, minZ}, {minX, 0.0f, maxZ}, {maxX, 0.0f, maxZ}, {maxX, 0.0f, minZ},
-                waterColor, Vector3{0,-1,0});
-
             for (int y = 0; y < level; ++y) {
                 float yBase = baseY + y * s;
                 float yTop  = yBase + s;
                 Color sideColor = (y == level - 1) ? topColor : faceColor;
 
-                // Top face — sempre generata (visibilità corretta senza culling aggressivo)
-                {
+                // Top face: una tile coperta dall'acqua non deve mostrare
+                // contemporaneamente la superficie superiore del terreno.
+                if (!hasWater) {
                     Vector3 n = { 0.0f, 1.0f, 0.0f };
                     AddQuadTilted(verts, texs, norms, cols,
                         {minX, yTop, minZ}, {minX, yTop, maxZ}, {maxX, yTop, maxZ}, {maxX, yTop, minZ},
