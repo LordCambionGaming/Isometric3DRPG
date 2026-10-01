@@ -53,6 +53,9 @@ private:
     };
 
     float Heuristic(int x1, int z1, int x2, int z2) const;
+
+    // Movement cost between two tiles (base 1 + slope factor)
+    float CalculateMovementCost(int fromX, int fromZ, int toX, int toZ) const;
     void GetNeighbors(const TileCoord& tile, std::vector<TileCoord>& neighbors) const;
     std::vector<TileCoord> ReconstructPath(const std::vector<Node>& allNodes, const TileCoord& start, const TileCoord& target) const;
 };

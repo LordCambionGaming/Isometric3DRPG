@@ -59,9 +59,36 @@ bool NavigationSystem::CanTraverse(int fromX, int fromZ, int toX, int toZ) const
     return delta <= m_maxStepHeight;
 }
 
+float NavigationSystem::CalculateMovementCost(int fromX, int fromZ, int toX, int toZ) const {
+    if (!m_world) return 1.0f;
+
+    float fromCenterX = fromX + 0.5f;
+    float fromCenterZ = fromZ + 0.5f;
+    float toCenterX = toX + 0.5f;
+    float toCenterZ = toZ + 0.5f;
+
+    float fromHeight = m_world->GetHeightAt(fromCenterX, fromCenterZ);
+    float toHeight = m_world->GetHeightAt(toCenterX, toCenterZ);
+
+    float delta = toHeight - fromHeight;
+
+    // Cost rules:
+    // same level = 1
+    // ascent     = 3 (1 base + 2 penalty)
+    // descent    = 0
+    if (delta > 0.01f) {
+        return 3.0f; // ascent
+    } else if (delta < -0.01f) {
+        return 0.0f; // descent
+    } else {
+        return 1.0f; // same level
+    }
+}
+
 float NavigationSystem::Heuristic(int x1, int z1, int x2, int z2) const {
-    // Manhattan distance for 4-directional movement
-    return static_cast<float>(std::abs(x2 - x1) + std::abs(z2 - z1));
+    // Admissible heuristic for asymmetric costs: use 0
+    // Manhattan not admissible when descent=0, ascent=3
+    return 0.0f;
 }
 
 void NavigationSystem::GetNeighbors(const TileCoord& tile, std::vector<TileCoord>& neighbors) const {
@@ -213,8 +240,9 @@ std::vector<TileCoord> NavigationSystem::FindPath(
             }
             if (inClosed) continue;
 
-            // Calculate tentative g
-            float tentativeG = current.g + 1.0f; // Cost = 1.0 per move
+            // Calculate tentative g using actual movement cost
+            float moveCost = CalculateMovementCost(current.coord.x, current.coord.z, neighborCoord.x, neighborCoord.z);
+            float tentativeG = current.g + moveCost;
 
             // Find if neighbor already in open set
             Node* openNeighbor = nullptr;
