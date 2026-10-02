@@ -28,6 +28,7 @@ Game::Game()
     , m_audioManager(nullptr)
     , m_timer(nullptr)
     , m_hud(nullptr)
+    , m_combatSystem(nullptr)
 {
 }
 
@@ -45,6 +46,7 @@ bool Game::Initialize() {
         m_camera = std::make_unique<Camera3DController>();
         m_world = std::make_unique<World>();
         m_hud = std::make_unique<HUD>();
+        m_combatSystem = std::make_unique<CombatSystem>();
 
         // Initialize renderer (creates window)
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
@@ -199,6 +201,7 @@ void Game::Shutdown() {
     if (m_camera) m_camera.reset();
     if (m_renderer) m_renderer.reset();
     if (m_timer) m_timer.reset();
+    if (m_combatSystem) m_combatSystem.reset();
 
     m_isRunning = false;
 }

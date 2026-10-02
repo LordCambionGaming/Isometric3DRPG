@@ -4,6 +4,8 @@
 #include <raylib.h>
 #include "player/Player.h"
 #include "navigation/NavigationSystem.h"
+#include "core/CombatSystem.h"
+
 
 class GameState;
 class Renderer;
@@ -37,6 +39,7 @@ public:
     Timer* GetTimer() const { return m_timer.get(); }
     Player* GetPlayer() const { return m_player.get(); }
     HUD* GetHUD() const { return m_hud.get(); }
+    core::CombatSystem* GetCombatSystem() const { return m_combatSystem.get(); }
 
 private:
     void Update(float deltaTime);
@@ -57,6 +60,7 @@ private:
     std::unique_ptr<Player> m_player;
     std::unique_ptr<HUD> m_hud;
     NavigationSystem m_navigation;
+    std::unique_ptr<core::CombatSystem> m_combatSystem;
 
     int m_hoverTileX = -1;
     int m_hoverTileZ = -1;

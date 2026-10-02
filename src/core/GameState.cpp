@@ -1,6 +1,7 @@
 #include "core/GameState.h"
 #include "core/Game.h"
 #include <raylib.h>
+#include "core/CombatSystem.h"
 
 GameState::GameState(Game* game)
     : m_game(game)
@@ -37,5 +38,29 @@ void PlayingState::Render() {}
 void PlayingState::HandleInput() {
     if (IsKeyPressed(KEY_F3)) {
         m_showDebugInfo = !m_showDebugInfo;
+    }
+
+    // Tiro D20 durante Playing con tasto F5
+    if (IsKeyPressed(KEY_F5) && m_game->GetCombatSystem()) {
+        core::CombatRoll roll = m_game->GetCombatSystem()->TestCombatRoll(0);
+        
+        // Mostra risultato a schermo tramite debug info o HUD
+        if (m_showDebugInfo) {
+            std::cout << "\n=== COMBATTIMENTO D20 ===" << std::endl;
+            std::cout << "Risultato: " << roll.rollValue << std::endl;
+            
+            switch (roll.result) {
+                case core::CombatResult::CriticalFailure:
+                    std::cout << "CRITICAL FAILURE! 1 naturale!" << std::endl;
+                    break;
+                case core::CombatResult::Normal:
+                    std::cout << "Tiro normale." << std::endl;
+                    break;
+                case core::CombatResult::CriticalSuccess:
+                    std::cout << "CRITICAL SUCCESS! 20 naturale!" << std::endl;
+                    break;
+            }
+            std::cout << "Descrizione: " << roll.description << std::endl;
+        }
     }
 }
