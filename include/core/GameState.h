@@ -1,5 +1,7 @@
 #pragma once
+
 #include "core/CombatSystem.h"
+
 enum class GameStateType {
     Playing,
     Paused,
