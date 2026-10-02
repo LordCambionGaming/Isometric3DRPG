@@ -3,8 +3,12 @@ name: Build
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,25 +21,33 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          libasound2-dev \
-          libx11-dev \
-          libxrandr-dev \
-          libxi-dev \
-          libgl1-mesa-dev \
-          libglu1-mesa-dev \
-          libxcursor-dev \
-          libxinerama-dev
+          libasound2-dev libx11-dev libxrandr-dev libxi-dev \
+          libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev
 
-    - name: Configure CMake (3.16 - 3.30 compatible)
+    - name: Configure CMake
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_CXX_STANDARD=20
 
-    - name: Build (FetchContent: raylib 5.5, nlohmann/json 3.11.3)
+    - name: Build
       run: cmake --build build --config Release
 
-    - name: Test executable
+    - name: Package
       run: |
-        ls -la build/
-        file build/Isometric3DRPG || true
+        mkdir dist
+        cp build/Isometric3DRPG dist/
+        # copia anche eventuali asset/livelli, adatta al tuo progetto:
+        # cp -r assets dist/
+        tar -czf Isometric3DRPG-linux.tar.gz -C dist .
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Isometric3DRPG-linux
+        path: Isometric3DRPG-linux.tar.gz
+
+    - name: Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: Isometric3DRPG-linux.tar.gz
