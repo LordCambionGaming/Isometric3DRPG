@@ -39,4 +39,6 @@ public:
 
 private:
     bool m_showDebugInfo;
+    core::CombatRoll m_lastRoll;
+    float m_rollTimer = 0.0f;
 };

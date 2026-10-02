@@ -32,9 +32,62 @@ void PlayingState::Enter() {}
 
 void PlayingState::Exit() {}
 
-void PlayingState::Update(float /*deltaTime*/) {}
+void PlayingState::Update(float deltaTime) {
+    // Timer per far scomparire il testo del tiro D20 dopo 2 secondi
+    if (m_lastRoll.rollValue != 0) {
+        m_rollTimer += deltaTime;
+        if (m_rollTimer >= 2.0f) {
+            m_lastRoll = core::CombatRoll{0, core::CombatResult::Normal, ""};
+            m_rollTimer = 0.0f;
+        }
+    }
+}
 
-void PlayingState::Render() {}
+void PlayingState::Render() {
+    // Mostra risultato D20 a schermo se attivo
+    if (m_lastRoll.rollValue != 0) {
+        const float fontSize = 48.0f;
+        const float textPadding = 16.0f;
+        
+        // Posizione centro schermo con offset Y per leggibilità
+        const Vector2 pos = { GetScreenWidth() / 2.0f - textPadding, 
+                             GetScreenHeight() / 2.0f + 50.0f };
+        
+        // Colore in base al risultato
+        Color textColor;
+        switch (m_lastRoll.result) {
+            case core::CombatResult::CriticalFailure:
+                textColor = RED;
+                break;
+            case core::CombatResult::CriticalSuccess:
+                textColor = GREEN;
+                break;
+            default:
+                textColor = WHITE;
+                break;
+        }
+        
+        // Disegna numero del tiro
+        DrawText(TextFormat("D20: %d", m_lastRoll.rollValue), pos.x, pos.y - fontSize * 1.5f, 
+                 fontSize, textColor);
+        
+        // Disegna descrizione risultato
+        const char* resultText = "";
+        switch (m_lastRoll.result) {
+            case core::CombatResult::CriticalFailure:
+                resultText = "CRITICAL FAILURE!";
+                break;
+            case core::CombatResult::Normal:
+                resultText = "Tiro normale.";
+                break;
+            case core::CombatResult::CriticalSuccess:
+                resultText = "CRITICAL SUCCESS!";
+                break;
+        }
+        
+        DrawText(resultText, pos.x, pos.y, fontSize, textColor);
+    }
+}
 
 void PlayingState::HandleInput() {
     if (IsKeyPressed(KEY_F3)) {
@@ -45,7 +98,11 @@ void PlayingState::HandleInput() {
     if (IsKeyPressed(KEY_F5) && m_game->GetCombatSystem()) {
         core::CombatRoll roll = m_game->GetCombatSystem()->TestCombatRoll(0);
         
-        // Mostra risultato a schermo tramite debug info o HUD
+        // Salva risultato per visualizzazione grafica
+        m_lastRoll = roll;
+        m_rollTimer = 0.0f;
+        
+        // Mostra anche nella console (opzionale)
         if (m_showDebugInfo) {
             std::cout << "\n=== COMBATTIMENTO D20 ===" << std::endl;
             std::cout << "Risultato: " << roll.rollValue << std::endl;
