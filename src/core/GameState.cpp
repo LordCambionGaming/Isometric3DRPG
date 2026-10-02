@@ -2,6 +2,7 @@
 #include "core/Game.h"
 #include <raylib.h>
 #include "core/CombatSystem.h"
+#include <iostream>
 
 GameState::GameState(Game* game)
     : m_game(game)

@@ -4,20 +4,20 @@
 
 namespace core {
 
+enum class CombatResult {
+    CriticalFailure,  // 1 naturale
+    Normal,           // 2-19
+    CriticalSuccess   // 20 naturale
+};
+
+struct CombatRoll {
+    int rollValue;
+    CombatResult result;
+    std::string description;
+};
+
 class CombatSystem {
 public:
-    enum class CombatResult {
-        CriticalFailure,  // 1 naturale
-        Normal,          // 2-19
-        CriticalSuccess   // 20 naturale
-    };
-
-    struct CombatRoll {
-        int rollValue;
-        CombatResult result;
-        std::string description;
-    };
-
     CombatSystem();
     ~CombatSystem() = default;
 
@@ -29,7 +29,6 @@ public:
     int GetLastRollValue() const { return m_lastRollValue; }
     std::string GetLastDescription() const { return m_lastDescription; }
 
-    // Metodo per testare il tiro durante il gioco (es. dal menu o pause)
     CombatRoll TestCombatRoll(int difficultyModifier = 0);
 
 private:

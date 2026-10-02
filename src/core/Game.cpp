@@ -46,7 +46,7 @@ bool Game::Initialize() {
         m_camera = std::make_unique<Camera3DController>();
         m_world = std::make_unique<World>();
         m_hud = std::make_unique<HUD>();
-        m_combatSystem = std::make_unique<CombatSystem>();
+        m_combatSystem = std::make_unique<core::CombatSystem>();
 
         // Initialize renderer (creates window)
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
