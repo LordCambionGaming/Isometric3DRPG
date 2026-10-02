@@ -3,21 +3,31 @@ name: Build
 on:
   push:
     branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag della release (es. v1.0.0), lascia vuoto per non creare release'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Linux Dependencies (Raylib)
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -25,29 +35,51 @@ jobs:
           libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev
 
     - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CXX_STANDARD=20
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20
 
     - name: Build
       run: cmake --build build --config Release
 
-    - name: Package
+    - name: Package (Linux)
+      if: runner.os == 'Linux'
       run: |
         mkdir dist
         cp build/Isometric3DRPG dist/
-        # copia anche eventuali asset/livelli, adatta al tuo progetto:
-        # cp -r assets dist/
+        # cp -r assets dist/    # adatta ai tuoi asset/livelli
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
+
+    - name: Package (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory dist | Out-Null
+        $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
+        Copy-Item $exe.FullName dist/
+        # Copy-Item -Recurse assets dist/    # adatta ai tuoi asset/livelli
+        Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Isometric3DRPG-linux
-        path: Isometric3DRPG-linux.tar.gz
+        name: Isometric3DRPG-${{ runner.os }}
+        path: |
+          Isometric3DRPG-linux.tar.gz
+          Isometric3DRPG-windows.zip
+        if-no-files-found: ignore
 
-    - name: Release
-      if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        merge-multiple: true
+
+    - name: Create release
       uses: softprops/action-gh-release@v2
       with:
-        files: Isometric3DRPG-linux.tar.gz
+        tag_name: ${{ inputs.tag }}
+        target_commitish: ${{ github.sha }}
+        files: artifacts/*
+        generate_release_notes: true
