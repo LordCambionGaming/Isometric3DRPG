@@ -14,7 +14,10 @@ public:
 
 private:
     Rectangle Board() const;
+    Rectangle Felt() const;
 
     ui::DiceRoller m_dice;
     core::CombatRoll m_result{};
+    bool  m_showResult = false;
+    float m_time = 0.0f;
 };
