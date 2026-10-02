@@ -321,10 +321,6 @@ void Game::Render() {
 
     m_renderer->BeginFrame();
 
-    if (m_gameState) {
-        m_gameState->Render();
-    }
-
     if (m_gameState &&
         m_gameState->GetType() == GameStateType::Playing &&
         m_camera &&
@@ -369,6 +365,12 @@ void Game::Render() {
         if (m_hud && m_player) {
             m_hud->Render(*m_player, camera);
         }
+    }
+
+    // Overlay 2D dello stato corrente (menu, pausa, testo D20...).
+    // Va disegnato dopo il mondo 3D e l'HUD, altrimenti viene coperto.
+    if (m_gameState) {
+        m_gameState->Render();
     }
 
     if (m_debugMode) {
