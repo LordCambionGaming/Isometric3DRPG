@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Linux Dependencies (Raylib)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libasound2-dev \
+          libx11-dev \
+          libxrandr-dev \
+          libxi-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libxcursor-dev \
+          libxinerama-dev
+
+    - name: Configure CMake (3.16 - 3.30 compatible)
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_STANDARD=20
+
+    - name: Build (FetchContent: raylib 5.5, nlohmann/json 3.11.3)
+      run: cmake --build build --config Release
+
+    - name: Test executable
+      run: |
+        ls -la build/
+        file build/Isometric3DRPG || true
