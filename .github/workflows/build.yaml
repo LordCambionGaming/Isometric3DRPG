@@ -1,11 +1,7 @@
 name: Build
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag della release (es. v1.0.0), lascia vuoto per non creare release'
