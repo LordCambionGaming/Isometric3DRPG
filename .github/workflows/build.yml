@@ -13,6 +13,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install Linux Dependencies (Raylib)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libasound2-dev \
+          libx11-dev \
+          libxrandr-dev \
+          libxi-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libxcursor-dev \
+          libxinerama-dev
+
     - name: Configure CMake (3.16 - 3.30 compatible)
       run: |
         cmake -S . -B build \
