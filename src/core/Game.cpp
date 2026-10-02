@@ -47,6 +47,7 @@ bool Game::Initialize() {
         m_world = std::make_unique<World>();
         m_hud = std::make_unique<HUD>();
         m_combatSystem = std::make_unique<core::CombatSystem>();
+        m_combatSystem->Initialize();
 
         // Initialize renderer (creates window)
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
@@ -290,7 +291,12 @@ void Game::ResetGameSession() {
 void Game::Update(float deltaTime) {
     m_stateChangedThisFrame = false;
 
-    if (m_player) {
+    // Con la board del dado (o la pausa) il mondo è congelato
+    const bool frozen = m_gameState &&
+        (m_gameState->GetType() == GameStateType::DiceRoll ||
+         m_gameState->GetType() == GameStateType::Paused);
+
+    if (m_player && !frozen) {
         m_player->Update(deltaTime);
         // Single authoritative source for streaming: pass real position to World
         if (m_world) {
@@ -302,11 +308,11 @@ void Game::Update(float deltaTime) {
         m_gameState->Update(deltaTime);
     }
 
-    if (m_camera) {
+    if (m_camera && !frozen) {
         m_camera->Update(deltaTime);
     }
 
-    if (m_world) {
+    if (m_world && !frozen) {
         m_world->Update(deltaTime); // World handles its own streaming internally
     }
 
@@ -321,10 +327,12 @@ void Game::Render() {
 
     m_renderer->BeginFrame();
 
-    if (m_gameState &&
-        m_gameState->GetType() == GameStateType::Playing &&
-        m_camera &&
-        m_world)
+    // Il mondo è visibile in gioco e dietro la board del dado
+    const bool worldVisible = m_gameState &&
+        (m_gameState->GetType() == GameStateType::Playing ||
+         m_gameState->GetType() == GameStateType::DiceRoll);
+
+    if (worldVisible && m_camera && m_world)
     {
         const Camera3D camera = m_camera->GetCamera();
 
@@ -367,7 +375,7 @@ void Game::Render() {
         }
     }
 
-    // Overlay 2D dello stato corrente (menu, pausa, testo D20...).
+    // Overlay 2D dello stato corrente (menu, pausa, board del dado, testo D20).
     // Va disegnato dopo il mondo 3D e l'HUD, altrimenti viene coperto.
     if (m_gameState) {
         m_gameState->Render();
@@ -393,6 +401,7 @@ void Game::HandleInput() {
             m_isRunning = false;
         }
         // Da Pause: resta in Pause; si torna indietro con ENTER sull'opzione 3
+        // Da DiceRoll: ESC è gestito da DiceRollState (torna al gioco)
     }
 
     // Delegate to current game state only if no transition occurred this frame
@@ -400,8 +409,9 @@ void Game::HandleInput() {
         m_gameState->HandleInput();
     }
 
-    // Camera input
-    if (m_camera) {
+    // Camera input (non reagire al mouse mentre è aperta la board del dado)
+    const bool diceOpen = m_gameState && m_gameState->GetType() == GameStateType::DiceRoll;
+    if (m_camera && !diceOpen) {
         m_camera->HandleInput();
     }
 

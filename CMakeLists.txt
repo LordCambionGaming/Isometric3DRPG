@@ -50,6 +50,8 @@ set(SOURCES
     src/core/SettingsState.cpp
     src/player/Player.cpp
     src/core/Timer.cpp
+    src/core/DiceRollState.cpp
+    src/core/CombatSystem.cpp
     src/rendering/Renderer.cpp
     src/rendering/Camera3DController.cpp
     src/world/World.cpp
@@ -61,7 +63,8 @@ set(SOURCES
     src/audio/AudioManager.cpp
     src/navigation/NavigationSystem.cpp
     src/ui/HUD.cpp
-    src/core/CombatSystem.cpp
+    src/ui/DiceRoller.cpp
+    
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

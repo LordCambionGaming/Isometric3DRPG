@@ -6,7 +6,8 @@ enum class GameStateType {
     Playing,
     Paused,
     MainMenu,
-    Loading
+    Loading,
+    DiceRoll
 };
 
 class Game;
@@ -41,6 +42,6 @@ public:
 
 private:
     bool m_showDebugInfo;
-    core::CombatRoll m_lastRoll;
+    core::CombatRoll m_lastRoll{};
     float m_rollTimer = 0.0f;
 };
