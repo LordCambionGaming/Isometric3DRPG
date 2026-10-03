@@ -41,7 +41,7 @@ jobs:
       run: |
         mkdir -p dist
         cp build/Isometric3DRPG dist/
-        cp -r assets dist/
+        cp -r src/assets dist/
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
 
     - name: Package (Windows)
@@ -51,7 +51,7 @@ jobs:
         New-Item -ItemType Directory -Force dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
-        Copy-Item -Recurse assets dist/
+        Copy-Item -Recurse src/assets dist/
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
