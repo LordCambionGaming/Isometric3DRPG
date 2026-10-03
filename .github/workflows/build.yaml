@@ -51,10 +51,16 @@ jobs:
         mkdir -p dist
         EXE=$(find build -name Isometric3DRPG -type f | head -1)
         cp "$EXE" dist/
-        # Copia la cartella assets da src/ a dist/
-        if [ -d "src/assets" ]; then
-          cp -r src/assets dist/
+        
+        # Cerca automaticamente la cartella assets nel repository (escludendo la cartella build)
+        ASSETS_DIR=$(find . -name "assets" -type d | grep -v "build" | head -1)
+        if [ -n "$ASSETS_DIR" ]; then
+          echo "Trovata cartella assets in: $ASSETS_DIR"
+          cp -r "$ASSETS_DIR" dist/
+        else
+          echo "Attenzione: cartella assets non trovata!"
         fi
+        
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
 
     - name: Package (Windows)
@@ -64,10 +70,16 @@ jobs:
         New-Item -ItemType Directory -Force dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
-        # Copia la cartella assets da src/ a dist/
-        if (Test-Path "src/assets") {
-            Copy-Item -Recurse "src/assets" dist/
+        
+        # Cerca automaticamente la cartella assets nel repository (escludendo la cartella build)
+        $assets = Get-ChildItem -Path . -Recurse -Filter "assets" -Directory | Where-Object { $_.FullName -notmatch "build" } | Select-Object -First 1
+        if ($assets) {
+            Write-Host "Trovata cartella assets in: $($assets.FullName)"
+            Copy-Item -Recurse $assets.FullName dist/
+        } else {
+            Write-Warning "Attenzione: cartella assets non trovata!"
         }
+        
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
