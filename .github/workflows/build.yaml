@@ -39,7 +39,7 @@ jobs:
     - name: Package (Linux)
       if: runner.os == 'Linux'
       run: |
-        mkdir -p dist
+        mkdir dist
         cp build/Isometric3DRPG dist/
         cp -r src/assets dist/
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
@@ -48,7 +48,7 @@ jobs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force dist | Out-Null
+        New-Item -ItemType Directory dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
         Copy-Item -Recurse src/assets dist/
@@ -72,13 +72,10 @@ jobs:
         path: artifacts
         merge-multiple: true
 
-    - name: List artifacts
-      run: ls -laR artifacts
-
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ inputs.tag }}
         target_commitish: ${{ github.sha }}
-        files: artifacts/**/*
+        files: artifacts/*
         generate_release_notes: true
