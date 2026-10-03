@@ -21,42 +21,28 @@ constexpr Color kBlood     { 200,  30,  44, 255 };
 inline Font& DiceFont() {
     static Font font{};
     static bool loaded = false;
+
     if (!loaded) {
         loaded = true;
-        // il font vive in src/assets/fonts/ (e viene copiato in <build>/assets/fonts/ da CMake):
-        // si prova sia dalla cartella di lavoro sia da quella dell'eseguibile
-        const char* dirs[] = {
-            "assets/fonts/",
-            "src/assets/fonts/",
-            "../assets/fonts/",
-            "../src/assets/fonts/",
-            "../../assets/fonts/",
-            "../../src/assets/fonts/",
-            "../../../assets/fonts/",
-            "../../../src/assets/fonts/",
-            "../../../../assets/fonts/",
-            "../../../../src/assets/fonts/"
-        };
-        const char* names[] = { "gothic.ttf", "OldeEnglish.ttf" };
-        const char* bases[] = { "", GetApplicationDirectory() };
-        for (const char* base : bases) {
-            for (const char* d : dirs) {
-                for (const char* n : names) {
-                    const char* path = TextFormat("%s%s%s", base, d, n);
-                    if (FileExists(path)) {
-                        font = LoadFontEx(path, 128, nullptr, 0);
-                        if (font.texture.id != 0) {
-                            SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
-                            std::cout << "[Gothic] font caricato: " << path << std::endl;
-                            return font;
-                        }
-                    }
-                }
+
+        const char* path = "assets/fonts/gothic.ttf";
+
+        if (FileExists(path)) {
+            font = LoadFontEx(path, 128, nullptr, 0);
+
+            if (font.texture.id != 0) {
+                SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+                std::cout << "[Gothic] font caricato: " << path << std::endl;
+                return font;
             }
         }
-        std::cerr << "[Gothic] gothic.ttf (font dei dadi) NON trovato: uso il font di default" << std::endl;
+
+        std::cerr << "[Gothic] ERRORE: assets/fonts/gothic.ttf non trovato"
+                  << std::endl;
+
         font = GetFontDefault();
     }
+
     return font;
 }
 
