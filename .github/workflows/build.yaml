@@ -1,7 +1,7 @@
 name: Build
 
 on:
-   workflow_dispatch:
+  workflow_dispatch:
     inputs:
       tag:
         description: 'Tag della release (es. v1.0.0), lascia vuoto per non creare release'
@@ -39,19 +39,19 @@ jobs:
     - name: Package (Linux)
       if: runner.os == 'Linux'
       run: |
-        mkdir dist
+        mkdir -p dist
         cp build/Isometric3DRPG dist/
-        # cp -r assets dist/    # adatta ai tuoi asset/livelli
+        cp -r assets dist/
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
 
     - name: Package (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        New-Item -ItemType Directory dist | Out-Null
+        New-Item -ItemType Directory -Force dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
-        # Copy-Item -Recurse assets dist/    # adatta ai tuoi asset/livelli
+        Copy-Item -Recurse assets dist/
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
@@ -72,10 +72,13 @@ jobs:
         path: artifacts
         merge-multiple: true
 
+    - name: List artifacts
+      run: ls -laR artifacts
+
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ inputs.tag }}
         target_commitish: ${{ github.sha }}
-        files: artifacts/*
+        files: artifacts/**/*
         generate_release_notes: true
