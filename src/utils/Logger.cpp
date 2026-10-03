@@ -8,6 +8,9 @@ std::mutex Logger::s_mutex;
 std::ofstream Logger::s_logFile;
 bool Logger::s_initialized = false;
 
+// Forward declaration per evitare errori di ordine
+static std::string GetTimestamp();
+
 void Logger::Initialize(const std::string& logPath) {
     std::lock_guard<std::mutex> lock(s_mutex);
     
@@ -27,7 +30,7 @@ void Logger::Initialize(const std::string& logPath) {
         
         if (s_logFile.is_open()) {
             // Write a header to indicate the log file was created
-            s_logFile << "Log file initialized at: " << GetTimestamp() << "\n";
+            s_logFile << GetTimestamp() << " " << "[INFO] Log file initialized\n";
             s_initialized = true;
         } else {
             Logger::LogWarning("Failed to open log file: " + logPath);
