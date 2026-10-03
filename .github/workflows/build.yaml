@@ -52,13 +52,11 @@ jobs:
         EXE=$(find build -name Isometric3DRPG -type f | head -1)
         cp "$EXE" dist/
         
-        # Copia direttamente src/assets e rimuove eventuali file .cpp al suo interno
-        if [ -d "src/assets" ]; then
-          echo "Copia di src/assets in dist/"
-          cp -r src/assets dist/
-          find dist/assets -name "*.cpp" -type f -delete
+        # Copia la cartella assets dalla root del progetto
+        if [ -d "assets" ]; then
+          cp -r assets dist/
         else
-          echo "Attenzione: cartella src/assets non trovata!"
+          echo "Attenzione: cartella assets non trovata nella root!"
         fi
         
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
@@ -71,13 +69,11 @@ jobs:
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
         
-        # Copia direttamente src/assets e rimuove eventuali file .cpp al suo interno
-        if (Test-Path "src/assets") {
-            Write-Host "Copia di src/assets in dist/"
-            Copy-Item -Recurse "src/assets" dist/
-            Get-ChildItem -Path "dist/assets" -Recurse -Filter "*.cpp" | Remove-Item -Force
+        # Copia la cartella assets dalla root del progetto
+        if (Test-Path "assets") {
+            Copy-Item -Recurse "assets" dist/
         } else {
-            Write-Warning "Attenzione: cartella src/assets non trovata!"
+            Write-Warning "Attenzione: cartella assets non trovata nella root!"
         }
         
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
