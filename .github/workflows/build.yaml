@@ -36,22 +36,33 @@ jobs:
     - name: Build
       run: cmake --build build --config Release
 
+    - name: Locate executable (Linux)
+      if: runner.os == 'Linux'
+      run: find build -name Isometric3DRPG -type f
+
+    - name: Locate executable (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object FullName
+
     - name: Package (Linux)
       if: runner.os == 'Linux'
       run: |
-        mkdir dist
-        cp build/Isometric3DRPG dist/
-        cp -r src/assets dist/
+        mkdir -p dist
+        EXE=$(find build -name Isometric3DRPG -type f | head -1)
+        EXE_DIR=$(dirname "$EXE")
+        cp "$EXE" dist/
+        cp -r "$EXE_DIR/assets" dist/
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
 
     - name: Package (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        New-Item -ItemType Directory dist | Out-Null
+        New-Item -ItemType Directory -Force dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
-        Copy-Item -Recurse src/assets dist/
+        Copy-Item -Recurse (Join-Path $exe.Directory.FullName "assets") dist/
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
@@ -72,10 +83,13 @@ jobs:
         path: artifacts
         merge-multiple: true
 
+    - name: List artifacts
+      run: ls -laR artifacts
+
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ inputs.tag }}
         target_commitish: ${{ github.sha }}
-        files: artifacts/*
+        files: artifacts/**/*
         generate_release_notes: true
