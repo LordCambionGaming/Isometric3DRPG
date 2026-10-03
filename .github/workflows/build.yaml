@@ -52,11 +52,12 @@ jobs:
         EXE=$(find build -name Isometric3DRPG -type f | head -1)
         cp "$EXE" dist/
         
-        # Copia la cartella assets dalla root del progetto
+        # Copia la cartella assets direttamente dalla root del progetto
         if [ -d "assets" ]; then
           cp -r assets dist/
         else
-          echo "Attenzione: cartella assets non trovata nella root!"
+          echo "Errore: cartella assets non trovata nella root del repository!"
+          exit 1
         fi
         
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
@@ -69,11 +70,12 @@ jobs:
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
         
-        # Copia la cartella assets dalla root del progetto
+        # Copia la cartella assets direttamente dalla root del progetto
         if (Test-Path "assets") {
             Copy-Item -Recurse "assets" dist/
         } else {
-            Write-Warning "Attenzione: cartella assets non trovata nella root!"
+            Write-Error "Errore: cartella assets non trovata nella root del repository!"
+            exit 1
         }
         
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
@@ -106,3 +108,4 @@ jobs:
         target_commitish: ${{ github.sha }}
         files: artifacts/**/*
         generate_release_notes: true
+        token: ${{ secrets.GITHUB_TOKEN }}
