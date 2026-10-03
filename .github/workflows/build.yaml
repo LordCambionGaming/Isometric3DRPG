@@ -52,13 +52,13 @@ jobs:
         EXE=$(find build -name Isometric3DRPG -type f | head -1)
         cp "$EXE" dist/
         
-        # Cerca automaticamente la cartella assets nel repository (escludendo la cartella build)
-        ASSETS_DIR=$(find . -name "assets" -type d | grep -v "build" | head -1)
-        if [ -n "$ASSETS_DIR" ]; then
-          echo "Trovata cartella assets in: $ASSETS_DIR"
-          cp -r "$ASSETS_DIR" dist/
+        # Copia direttamente src/assets e rimuove eventuali file .cpp al suo interno
+        if [ -d "src/assets" ]; then
+          echo "Copia di src/assets in dist/"
+          cp -r src/assets dist/
+          find dist/assets -name "*.cpp" -type f -delete
         else
-          echo "Attenzione: cartella assets non trovata!"
+          echo "Attenzione: cartella src/assets non trovata!"
         fi
         
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
@@ -71,13 +71,13 @@ jobs:
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
         
-        # Cerca automaticamente la cartella assets nel repository (escludendo la cartella build)
-        $assets = Get-ChildItem -Path . -Recurse -Filter "assets" -Directory | Where-Object { $_.FullName -notmatch "build" } | Select-Object -First 1
-        if ($assets) {
-            Write-Host "Trovata cartella assets in: $($assets.FullName)"
-            Copy-Item -Recurse $assets.FullName dist/
+        # Copia direttamente src/assets e rimuove eventuali file .cpp al suo interno
+        if (Test-Path "src/assets") {
+            Write-Host "Copia di src/assets in dist/"
+            Copy-Item -Recurse "src/assets" dist/
+            Get-ChildItem -Path "dist/assets" -Recurse -Filter "*.cpp" | Remove-Item -Force
         } else {
-            Write-Warning "Attenzione: cartella assets non trovata!"
+            Write-Warning "Attenzione: cartella src/assets non trovata!"
         }
         
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
