@@ -50,9 +50,11 @@ jobs:
       run: |
         mkdir -p dist
         EXE=$(find build -name Isometric3DRPG -type f | head -1)
-        EXE_DIR=$(dirname "$EXE")
         cp "$EXE" dist/
-        cp -r "$EXE_DIR/assets" dist/
+        # Copia la cartella assets da src/ a dist/
+        if [ -d "src/assets" ]; then
+          cp -r src/assets dist/
+        fi
         tar -czf Isometric3DRPG-linux.tar.gz -C dist .
 
     - name: Package (Windows)
@@ -62,7 +64,10 @@ jobs:
         New-Item -ItemType Directory -Force dist | Out-Null
         $exe = Get-ChildItem -Path build -Recurse -Filter Isometric3DRPG.exe | Select-Object -First 1
         Copy-Item $exe.FullName dist/
-        Copy-Item -Recurse (Join-Path $exe.Directory.FullName "assets") dist/
+        # Copia la cartella assets da src/ a dist/
+        if (Test-Path "src/assets") {
+            Copy-Item -Recurse "src/assets" dist/
+        }
         Compress-Archive -Path dist/* -DestinationPath Isometric3DRPG-windows.zip
 
     - uses: actions/upload-artifact@v4
