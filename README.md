@@ -15,25 +15,30 @@ This project is a foundation for a fully-featured 3D isometric RPG with procedur
 - **Modular Architecture**: Clean separation of systems for future expansion
 - **Cross-platform Build**: CMake-based build system with GitHub Actions CI
 
-### Planned Features
-- Player character and movement
-- NPC system with AI
-- Combat system with D20 mechanics
-- Inventory and item system
-- Quest system
-- Save/load functionality
-- Advanced procedural generation (biomes, structures, dungeons)
-- Data-driven content via JSON
+### Implemented Features
+- **Player Character System**: Movement on tile grid with height-aware costs (same level: 1, uphill: 3, downhill: 1)
+- **Water System**: Non-traversable water with lake and river generation
+- **Biome System**: Height-based biome assignment (Ocean, Beach, Plains, Forest, Hills, Mountains, Desert, Swamp)
+- **Navigation System**: Tile-based navigation for player movement
+- **Dice Board 3D**: Dedicated screen with 3D D20 die, dedicated font, and game pause during rolls
+- **Combat System**: D20 mechanics with critical success/failure handling
+- **Main Menu State**: Full menu system with option selection
+- **Pause Menu State**: Pause functionality accessible via ESC key
+- **Settings State**: Game settings configuration
+- **Debug Information**: F1 for basic debug, F3 for additional debug info
+- **World Streaming**: Chunk generation and loading around player position
 
 ## Technical Architecture
 
 ### Core Systems
 - **Game**: Main game loop and system coordination
-- **Renderer**: 3D rendering with Raylib
-- **World**: Chunk-based world management
+- **Renderer**: 3D rendering with Raylib 5.5
+- **World**: Chunk-based world management with streaming
 - **Camera**: Isometric 3D camera controller
-- **AssetManager**: Resource loading and management
+- **AssetManager**: Resource loading and management (textures, models, fonts)
 - **AudioManager**: Sound and music system
+- **CombatSystem**: D20 combat mechanics
+- **NavigationSystem**: Tile-based navigation for player movement
 
 ### Procedural Generation
 The game uses deterministic procedural generation:
@@ -41,6 +46,12 @@ The game uses deterministic procedural generation:
 - **Noise-based Terrain**: Multi-octave noise for realistic heightmaps
 - **Runtime Mesh Creation**: Terrain meshes generated in real-time
 - **Color-coded Biomes**: Height-based terrain coloring
+
+### World Features
+- **Terrain Generation**: Voxel/block-based terrain with height levels
+- **Chunk System**: Efficient chunk loading and unloading around player
+- **Water Features**: Lakes, rivers, and sea generation
+- **Biome Manager**: Dynamic biome assignment based on environment conditions
 
 ## Building
 
@@ -65,7 +76,7 @@ cmake --build build
 
 ### Dependencies
 All dependencies are automatically fetched via CMake FetchContent:
-- **Raylib 5.0**: Graphics, input, and audio
+- **Raylib 5.5**: Graphics, input, and audio
 - **nlohmann/json 3.11.3**: JSON parsing (for future data systems)
 
 ## Controls
@@ -78,6 +89,7 @@ All dependencies are automatically fetched via CMake FetchContent:
 - **R**: Regenerate world with random seed
 - **F1**: Toggle debug information
 - **F3**: Toggle additional debug info
+- **ESC**: Open Pause Menu during gameplay
 - **Escape**: Exit game
 
 ## Project Structure
@@ -85,11 +97,12 @@ All dependencies are automatically fetched via CMake FetchContent:
 ```
 IsometricRPG/
 ├── include/           # Header files
-│   ├── core/         # Core game systems
+│   ├── core/         # Core game systems (Game, GameState, CombatSystem)
 │   ├── rendering/    # Rendering and camera
-│   ├── world/        # World and terrain
+│   ├── world/        # World and terrain generation
 │   ├── assets/       # Asset management
-│   └── audio/        # Audio systems
+│   ├── audio/        # Audio systems
+│   └── utils/        # Utility classes (Logger)
 ├── src/              # Source files (mirrors include structure)
 ├── data/             # Game data (JSON configurations)
 ├── assets/           # External assets (textures, models, audio)
@@ -105,17 +118,17 @@ IsometricRPG/
 - Geometric primitives and procedural meshes
 - Runtime content creation
 
-### Data-Driven Design
-- Game content defined in JSON files
-- C++ implements systems, JSON defines content
-- Easy content addition without code changes
-- Modular and extensible architecture
-
-### Extensible Foundation
+### Modular Design
 - Clean system separation
-- Future-proof architecture
-- Supports incremental feature addition
+- Independent systems with clear interfaces
 - Memory-safe C++ with smart pointers
+- Extensible architecture for future features
+
+### Performance-Oriented
+- Chunk-based world streaming
+- Efficient terrain generation
+- Optimized rendering pipeline
+- Smart resource management
 
 ## GitHub Actions
 
@@ -128,16 +141,16 @@ The project includes automated CI/CD:
 
 This project follows a phase-based development approach:
 
-1. **Phase 1** ✅: Engine Foundation
-2. **Phase 2**: Procedural World Enhancement
-3. **Phase 3**: Player Character System
-4. **Phase 4**: Entity and NPC Systems
-5. **Phase 5**: Data-Driven Content
-6. **Phase 6**: Combat System
-7. **Phase 7**: Inventory and Items
-8. **Phase 8**: Quests and NPCs
-9. **Phase 9**: Save System
-10. **Phase 10**: Polish and Effects
+1. **Phase 1** ✅: Engine Foundation (Core systems, world generation, player movement)
+2. **Phase 2**: Procedural World Enhancement (Biomes, water features, terrain optimization)
+3. **Phase 3**: Player Character System (Movement costs, navigation, pathfinding)
+4. **Phase 4**: Entity and NPC Systems (NPC implementation)
+5. **Phase 5**: Data-Driven Content (JSON configurations)
+6. **Phase 6**: Combat System (D20 mechanics, combat rolls)
+7. **Phase 7**: Inventory and Items (Item system)
+8. **Phase 8**: Quests and NPCs (Quest system)
+9. **Phase 9**: Save System (Save/load functionality)
+10. **Phase 10**: Polish and Effects (Visual effects, UI polish)
 
 ## Architecture Goals
 
@@ -145,11 +158,7 @@ This project follows a phase-based development approach:
 - **Scalable**: Support for large worlds and complex systems
 - **Performant**: Efficient chunk loading and rendering
 - **Modular**: Independent systems with clear interfaces
-- **Data-Driven**: Content creation without code modification
-
-## License
-
-[License to be determined]
+- **Data-Driven**: Content creation without code modification (future)
 
 ## World Generation
 
@@ -181,3 +190,19 @@ Press F1 to view debug information:
 - Control reference
 
 The debug system provides transparency into the engine's operation and helps with development and troubleshooting.
+
+## Planned Features
+
+- NPC system with AI behavior
+- Inventory and item system
+- Quest system
+- Save/load functionality
+- Advanced procedural generation (structures, dungeons)
+- Data-driven content via JSON configurations
+- Enhanced UI/UX polish
+- Additional visual effects
+- Multiplayer support (future consideration)
+
+## License
+
+[License to be determined]
