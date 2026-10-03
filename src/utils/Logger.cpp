@@ -1,10 +1,8 @@
-
 #include "utils/Logger.h"
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
-
 
 std::mutex Logger::s_mutex;
 std::ofstream Logger::s_logFile;
@@ -18,13 +16,24 @@ void Logger::Initialize(const std::string& logPath) {
     // Create logs directory if it doesn't exist
     try {
         std::filesystem::create_directories("logs");
-    } catch (...) {
-        // Ignore errors creating directory
+    } catch (const std::exception& e) {
+        // Log warning se non possiamo creare la directory, ma continuiamo
+        Logger::LogWarning("Failed to create logs directory: " + std::string(e.what()));
     }
     
-    s_logFile.open(logPath, std::ios::app);
-    if (s_logFile.is_open()) {
-        s_initialized = true;
+    // Create the log file if it doesn't exist and open it
+    try {
+        s_logFile.open(logPath, std::ios::app);
+        
+        if (s_logFile.is_open()) {
+            // Write a header to indicate the log file was created
+            s_logFile << "Log file initialized at: " << GetTimestamp() << "\n";
+            s_initialized = true;
+        } else {
+            Logger::LogWarning("Failed to open log file: " + logPath);
+        }
+    } catch (const std::exception& e) {
+        Logger::LogError("Exception opening log file: " + std::string(e.what()));
     }
 }
 
