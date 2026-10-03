@@ -17,7 +17,6 @@ bool AssetManager::Initialize() {
         std::filesystem::create_directories(ASSETS_PATH);
 
         m_initialized = true;
-        std::cout << "AssetManager initialized" << std::endl;
         return true;
     }
     catch (const std::exception& e) {
@@ -31,7 +30,6 @@ void AssetManager::Shutdown() {
 
     Clear();
     m_initialized = false;
-    std::cout << "AssetManager shutdown" << std::endl;
 }
 
 Texture2D* AssetManager::LoadTexture(const std::string& filename) {
@@ -60,8 +58,6 @@ Texture2D* AssetManager::LoadTexture(const std::string& filename) {
 
         Texture2D* result = texture.get();
         m_textures[filename] = std::move(texture);
-
-        std::cout << "Loaded texture: " << filename << std::endl;
         return result;
     }
     catch (const std::exception& e) {
@@ -75,7 +71,6 @@ void AssetManager::UnloadTexture(const std::string& filename) {
     if (it != m_textures.end()) {
         ::UnloadTexture(*it->second);
         m_textures.erase(it);
-        std::cout << "Unloaded texture: " << filename << std::endl;
     }
 }
 
@@ -105,8 +100,6 @@ Model* AssetManager::LoadModel(const std::string& filename) {
 
         Model* result = model.get();
         m_models[filename] = std::move(model);
-
-        std::cout << "Loaded model: " << filename << std::endl;
         return result;
     }
     catch (const std::exception& e) {
@@ -120,7 +113,6 @@ void AssetManager::UnloadModel(const std::string& filename) {
     if (it != m_models.end()) {
         ::UnloadModel(*it->second);
         m_models.erase(it);
-        std::cout << "Unloaded model: " << filename << std::endl;
     }
 }
 
@@ -150,8 +142,6 @@ Font* AssetManager::LoadFont(const std::string& filename) {
 
         Font* result = font.get();
         m_fonts[filename] = std::move(font);
-
-        std::cout << "Loaded font: " << filename << std::endl;
         return result;
     }
     catch (const std::exception& e) {
@@ -165,7 +155,6 @@ void AssetManager::UnloadFont(const std::string& filename) {
     if (it != m_fonts.end()) {
         ::UnloadFont(*it->second);
         m_fonts.erase(it);
-        std::cout << "Unloaded font: " << filename << std::endl;
     }
 }
 
@@ -199,8 +188,6 @@ void AssetManager::Clear() {
         ::UnloadFont(*pair.second);
     }
     m_fonts.clear();
-
-    std::cout << "AssetManager cleared all assets" << std::endl;
 }
 
 std::string AssetManager::GetFullPath(const std::string& filename) const {

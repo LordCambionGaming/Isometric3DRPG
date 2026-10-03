@@ -1,7 +1,6 @@
 #include "core/CombatSystem.h"
 #include <random>
 #include <sstream>
-#include <iostream>
 
 namespace core {
 
@@ -50,12 +49,9 @@ CombatRoll CombatSystem::RollD20(int difficultyModifier) {
 }
 
 CombatRoll CombatSystem::TestCombatRoll(int difficultyModifier) {
-    std::cout << "\n--- TEST COMBATTIMENTO D20 ---" << std::endl;
-    std::cout << "Modificatore difficoltà: " << difficultyModifier << std::endl;
-    
     CombatRoll roll = RollD20(difficultyModifier);
 
-    // Stampa il risultato per debug/test
+    // Stampa il risultato per debug/test (mantenuto solo se necessario)
     switch (roll.result) {
         case CombatResult::CriticalFailure:
             std::cout << "RISULTATO: CRITICAL FAILURE" << std::endl;
@@ -64,7 +60,7 @@ CombatRoll CombatSystem::TestCombatRoll(int difficultyModifier) {
             std::cout << "RISULTATO: CRITICAL SUCCESS" << std::endl;
             break;
         case CombatResult::Normal:
-            std::cout << "RISULTATO: NORMAL" << std::endl;
+            // Nessun output per i casi normali
             break;
     }
 

@@ -30,7 +30,6 @@ bool AudioManager::Initialize() {
         SetMasterVolume(m_masterVolume);
 
         m_initialized = true;
-        std::cout << "AudioManager initialized" << std::endl;
         return true;
     }
     catch (const std::exception& e) {
@@ -59,8 +58,6 @@ void AudioManager::Shutdown() {
 
     CloseAudioDevice();
     m_initialized = false;
-
-    std::cout << "AudioManager shutdown" << std::endl;
 }
 
 Sound* AudioManager::LoadSound(const std::string& filename) {
@@ -90,8 +87,6 @@ Sound* AudioManager::LoadSound(const std::string& filename) {
 
         Sound* result = sound.get();
         m_sounds[filename] = std::move(sound);
-
-        std::cout << "Loaded sound: " << filename << std::endl;
         return result;
     }
     catch (const std::exception& e) {
@@ -112,7 +107,6 @@ void AudioManager::UnloadSound(const std::string& filename) {
     if (it != m_sounds.end()) {
         ::UnloadSound(*it->second);
         m_sounds.erase(it);
-        std::cout << "Unloaded sound: " << filename << std::endl;
     }
 }
 
@@ -143,8 +137,6 @@ Music* AudioManager::LoadMusic(const std::string& filename) {
 
         Music* result = music.get();
         m_music[filename] = std::move(music);
-
-        std::cout << "Loaded music: " << filename << std::endl;
         return result;
     }
     catch (const std::exception& e) {
@@ -161,7 +153,6 @@ void AudioManager::PlayMusic(const std::string& filename) {
     if (music) {
         ::PlayMusicStream(*music);
         m_currentMusic = filename;
-        std::cout << "Playing music: " << filename << std::endl;
     }
 }
 
