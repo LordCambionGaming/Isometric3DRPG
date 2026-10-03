@@ -1,5 +1,5 @@
 #include "assets/AssetManager.h"
-#include <iostream>
+#include "utils/Logger.h"
 #include <filesystem>
 
 AssetManager::AssetManager()
@@ -20,7 +20,7 @@ bool AssetManager::Initialize() {
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "Failed to initialize AssetManager: " << e.what() << std::endl;
+        Logger::LogError("Failed to initialize AssetManager: " + std::string(e.what()));
         return false;
     }
 }
@@ -44,7 +44,7 @@ Texture2D* AssetManager::LoadTexture(const std::string& filename) {
 
     // Check if file exists
     if (!std::filesystem::exists(fullPath)) {
-        std::cerr << "Texture file not found: " << fullPath << std::endl;
+        Logger::LogError("Texture file not found: " + fullPath);
         return nullptr;
     }
 
@@ -52,7 +52,7 @@ Texture2D* AssetManager::LoadTexture(const std::string& filename) {
         auto texture = std::make_unique<Texture2D>(::LoadTexture(fullPath.c_str()));
 
         if (texture->id == 0) {
-            std::cerr << "Failed to load texture: " << fullPath << std::endl;
+            Logger::LogError("Failed to load texture: " + fullPath);
             return nullptr;
         }
 
@@ -61,7 +61,7 @@ Texture2D* AssetManager::LoadTexture(const std::string& filename) {
         return result;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception loading texture " << filename << ": " << e.what() << std::endl;
+        Logger::LogError("Exception loading texture " + filename + ": " + std::string(e.what()));
         return nullptr;
     }
 }
@@ -86,7 +86,7 @@ Model* AssetManager::LoadModel(const std::string& filename) {
 
     // Check if file exists
     if (!std::filesystem::exists(fullPath)) {
-        std::cerr << "Model file not found: " << fullPath << std::endl;
+        Logger::LogError("Model file not found: " + fullPath);
         return nullptr;
     }
 
@@ -94,7 +94,7 @@ Model* AssetManager::LoadModel(const std::string& filename) {
         auto model = std::make_unique<Model>(::LoadModel(fullPath.c_str()));
 
         if (model->meshCount == 0) {
-            std::cerr << "Failed to load model: " << fullPath << std::endl;
+            Logger::LogError("Failed to load model: " + fullPath);
             return nullptr;
         }
 
@@ -103,7 +103,7 @@ Model* AssetManager::LoadModel(const std::string& filename) {
         return result;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception loading model " << filename << ": " << e.what() << std::endl;
+        Logger::LogError("Exception loading model " + filename + ": " + std::string(e.what()));
         return nullptr;
     }
 }
@@ -128,7 +128,7 @@ Font* AssetManager::LoadFont(const std::string& filename) {
 
     // Check if file exists
     if (!std::filesystem::exists(fullPath)) {
-        std::cerr << "Font file not found: " << fullPath << std::endl;
+        Logger::LogError("Font file not found: " + fullPath);
         return nullptr;
     }
 
@@ -136,7 +136,7 @@ Font* AssetManager::LoadFont(const std::string& filename) {
         auto font = std::make_unique<Font>(::LoadFont(fullPath.c_str()));
 
         if (font->texture.id == 0) {
-            std::cerr << "Failed to load font: " << fullPath << std::endl;
+            Logger::LogError("Failed to load font: " + fullPath);
             return nullptr;
         }
 
@@ -145,7 +145,7 @@ Font* AssetManager::LoadFont(const std::string& filename) {
         return result;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception loading font " << filename << ": " << e.what() << std::endl;
+        Logger::LogError("Exception loading font " + filename + ": " + std::string(e.what()));
         return nullptr;
     }
 }

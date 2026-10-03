@@ -1,5 +1,5 @@
 #include "audio/AudioManager.h"
-#include <iostream>
+#include "utils/Logger.h"
 #include <filesystem>
 #include <raymath.h>
 
@@ -20,7 +20,7 @@ bool AudioManager::Initialize() {
         InitAudioDevice();
 
         if (!IsAudioDeviceReady()) {
-            std::cerr << "Failed to initialize audio device!" << std::endl;
+            Logger::LogError("Failed to initialize audio device!");
             return false;
         }
 
@@ -33,7 +33,7 @@ bool AudioManager::Initialize() {
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "Failed to initialize AudioManager: " << e.what() << std::endl;
+        Logger::LogError("Failed to initialize AudioManager: " + std::string(e.what()));
         return false;
     }
 }
@@ -73,7 +73,7 @@ Sound* AudioManager::LoadSound(const std::string& filename) {
 
     // Check if file exists
     if (!std::filesystem::exists(fullPath)) {
-        std::cerr << "Sound file not found: " << fullPath << std::endl;
+        Logger::LogError("Sound file not found: " + fullPath);
         return nullptr;
     }
 
@@ -81,7 +81,7 @@ Sound* AudioManager::LoadSound(const std::string& filename) {
         auto sound = std::make_unique<Sound>(::LoadSound(fullPath.c_str()));
 
         if (sound->stream.buffer == nullptr) {
-            std::cerr << "Failed to load sound: " << fullPath << std::endl;
+            Logger::LogError("Failed to load sound: " + fullPath);
             return nullptr;
         }
 
@@ -90,7 +90,7 @@ Sound* AudioManager::LoadSound(const std::string& filename) {
         return result;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception loading sound " << filename << ": " << e.what() << std::endl;
+        Logger::LogError("Exception loading sound " + filename + ": " + std::string(e.what()));
         return nullptr;
     }
 }
@@ -123,7 +123,7 @@ Music* AudioManager::LoadMusic(const std::string& filename) {
 
     // Check if file exists
     if (!std::filesystem::exists(fullPath)) {
-        std::cerr << "Music file not found: " << fullPath << std::endl;
+        Logger::LogError("Music file not found: " + fullPath);
         return nullptr;
     }
 
@@ -131,7 +131,7 @@ Music* AudioManager::LoadMusic(const std::string& filename) {
         auto music = std::make_unique<Music>(::LoadMusicStream(fullPath.c_str()));
 
         if (music->stream.buffer == nullptr) {
-            std::cerr << "Failed to load music: " << fullPath << std::endl;
+            Logger::LogError("Failed to load music: " + fullPath);
             return nullptr;
         }
 
@@ -140,7 +140,7 @@ Music* AudioManager::LoadMusic(const std::string& filename) {
         return result;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception loading music " << filename << ": " << e.what() << std::endl;
+        Logger::LogError("Exception loading music " + filename + ": " + std::string(e.what()));
         return nullptr;
     }
 }

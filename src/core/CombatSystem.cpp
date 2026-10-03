@@ -1,6 +1,8 @@
 #include "core/CombatSystem.h"
+#include "utils/Logger.h"
 #include <random>
 #include <sstream>
+#include <iostream>
 
 namespace core {
 
@@ -51,21 +53,20 @@ CombatRoll CombatSystem::RollD20(int difficultyModifier) {
 CombatRoll CombatSystem::TestCombatRoll(int difficultyModifier) {
     CombatRoll roll = RollD20(difficultyModifier);
 
-    // Stampa il risultato per debug/test (mantenuto solo se necessario)
+    // Stampa il risultato per debug/test (ora su file log invece che console)
     switch (roll.result) {
         case CombatResult::CriticalFailure:
-            std::cout << "RISULTATO: CRITICAL FAILURE" << std::endl;
+            Logger::LogError("RISULTATO: CRITICAL FAILURE");
             break;
         case CombatResult::CriticalSuccess:
-            std::cout << "RISULTATO: CRITICAL SUCCESS" << std::endl;
+            Logger::LogInfo("RISULTATO: CRITICAL SUCCESS");
             break;
         case CombatResult::Normal:
             // Nessun output per i casi normali
             break;
     }
 
-    std::cout << roll.description << std::endl;
-    std::cout << "-----------------------------------\n" << std::endl;
+    Logger::LogDebug(roll.description);
 
     return roll;
 }

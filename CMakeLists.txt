@@ -64,6 +64,7 @@ set(SOURCES
     src/navigation/NavigationSystem.cpp
     src/ui/HUD.cpp
     src/ui/DiceRoller.cpp
+    src/utils/Logger.cpp
     
 )
 
