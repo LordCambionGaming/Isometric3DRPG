@@ -16,7 +16,9 @@ public:
     bool IsEnabled() const { return m_enabled; }
 
 private:
-    void DrawPlayerIndicator(const Vector3& playerPosition, const Camera3D& camera) const;
+    // playerPosition: feet (used for the in/out-of-view decision, unchanged).
+    // headAnchor: world point above the head where the on-screen chevron is drawn.
+    void DrawPlayerIndicator(const Vector3& playerPosition, const Vector3& headAnchor, const Camera3D& camera) const;
 
     bool m_enabled = true;
 };

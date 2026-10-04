@@ -11,7 +11,9 @@ namespace
 {
     constexpr float EDGE_MARGIN = 48.0f;
 
-    constexpr float V_OFFSET_Y = 42.0f;
+    // Small screen-space gap between the chevron tip and the projected head anchor.
+    // The big vertical offset now comes from projecting a world point above the head.
+    constexpr float V_OFFSET_Y = 4.0f;
     constexpr float V_HALF_WIDTH = 22.0f;
     constexpr float V_HEIGHT = 24.0f;
     constexpr float V_WIDTH = 6.0f;
@@ -51,10 +53,10 @@ void HUD::Render(const Player& player, const Camera3D& camera)
     if (!m_enabled)
         return;
 
-    DrawPlayerIndicator(player.GetPosition(), camera);
+    DrawPlayerIndicator(player.GetPosition(), player.GetIndicatorAnchor(), camera);
 }
 
-void HUD::DrawPlayerIndicator(const Vector3& playerPosition, const Camera3D& camera) const
+void HUD::DrawPlayerIndicator(const Vector3& playerPosition, const Vector3& headAnchor, const Camera3D& camera) const
 {
     const float sw = static_cast<float>(GetScreenWidth());
     const float sh = static_cast<float>(GetScreenHeight());
@@ -87,8 +89,11 @@ void HUD::DrawPlayerIndicator(const Vector3& playerPosition, const Camera3D& cam
     // ------------------------------
     if (inFront && inside)
     {
-        const float x = projected.x;
-        const float y = projected.y - V_OFFSET_Y;
+        // Chevron tip sits just above the head: project the head anchor, not the feet.
+        const Vector2 head = GetWorldToScreen(headAnchor, camera);
+        const float x = Finite(head) ? head.x : projected.x;
+        float y = (Finite(head) ? head.y : projected.y) - V_OFFSET_Y;
+        y = std::max(y, V_HEIGHT + V_WIDTH); // keep the chevron fully visible at the top edge
 
         const Vector2 a = {x - V_HALF_WIDTH, y - V_HEIGHT};
         const Vector2 b = {x, y};

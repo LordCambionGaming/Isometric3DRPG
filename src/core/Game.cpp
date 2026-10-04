@@ -143,8 +143,22 @@ bool Game::Initialize() {
             spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
         }
 
+        // Player visual: loaded once through AssetManager (cached + owned there), shared by every Player.
+        m_playerModel = m_assetManager->LoadModel("models/player/player_animated.glb");
+        if (!m_playerModel) {
+            std::cerr << "[PLAYER MODEL] could not load models/player/player_animated.glb, using fallback visual" << std::endl;
+        } else {
+            // Clips (0 Idle, 1 Walk, 2 Attack) come from the same file; also cached by AssetManager.
+            m_playerAnims = m_assetManager->LoadAnimations("models/player/player_animated.glb", m_playerAnimCount);
+            if (!m_playerAnims) {
+                std::cerr << "[PLAYER ANIM] no animations in models/player/player_animated.glb, static pose" << std::endl;
+            }
+        }
+
         m_player = std::make_unique<Player>();
         m_player->SetTileSize(worldConfig.tileSize);
+        m_player->SetModel(m_playerModel);
+        m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
         m_player->SetPosition({spawnX, spawnY, spawnZ});
         m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
 
@@ -270,6 +284,8 @@ void Game::CreateGameSession() {
 
     if (!m_player) m_player = std::make_unique<Player>();
     m_player->SetTileSize(worldConfig.tileSize);
+    m_player->SetModel(m_playerModel); // already loaded in Initialize(); no reload
+    m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
     m_player->SetPosition({spawnX, spawnY, spawnZ});
     m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
@@ -452,6 +468,13 @@ void Game::HandleInput() {
 
         m_hoverTileX = bestTileX;
         m_hoverTileZ = bestTileZ;
+
+        // Attack trigger (visual only): turn toward the hovered tile and play the Attack clip once.
+        // Movement, pathfinding and CombatSystem are not involved; call StartAttack() from the real
+        // combat trigger when there is one.
+        if (IsKeyPressed(KEY_F)) {
+            m_player->StartAttack({ static_cast<float>(bestTileX) + 0.5f, 0.0f, static_cast<float>(bestTileZ) + 0.5f });
+        }
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             const int curTileX = m_player->GetTileX();

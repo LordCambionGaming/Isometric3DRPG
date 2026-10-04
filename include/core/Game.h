@@ -58,6 +58,9 @@ private:
     std::unique_ptr<AudioManager> m_audioManager;
     std::unique_ptr<Timer> m_timer;
     std::unique_ptr<Player> m_player;
+    Model* m_playerModel = nullptr; // loaded once via AssetManager (which owns it)
+    ModelAnimation* m_playerAnims = nullptr; // Idle/Walk/Attack, loaded once via AssetManager (which owns it)
+    int m_playerAnimCount = 0;
     std::unique_ptr<HUD> m_hud;
     NavigationSystem m_navigation;
     std::unique_ptr<core::CombatSystem> m_combatSystem;

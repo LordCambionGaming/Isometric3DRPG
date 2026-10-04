@@ -116,6 +116,49 @@ void AssetManager::UnloadModel(const std::string& filename) {
     }
 }
 
+ModelAnimation* AssetManager::LoadAnimations(const std::string& filename, int& outCount) {
+    outCount = 0;
+    if (!m_initialized) return nullptr;
+
+    // Check if already loaded
+    auto cached = m_animations.find(filename);
+    if (cached != m_animations.end()) {
+        outCount = cached->second.count;
+        return cached->second.data;
+    }
+
+    std::string fullPath = GetFullPath(filename);
+
+    // Check if file exists
+    if (!std::filesystem::exists(fullPath)) {
+        Logger::LogError("Animation file not found: " + fullPath);
+        return nullptr;
+    }
+
+    int count = 0;
+    ModelAnimation* animations = ::LoadModelAnimations(fullPath.c_str(), &count);
+    if (!animations || count <= 0) {
+        Logger::LogError("No animations found in: " + fullPath);
+        if (animations) ::UnloadModelAnimations(animations, count);
+        return nullptr;
+    }
+
+    AnimationSet set;
+    set.data = animations;
+    set.count = count;
+    m_animations[filename] = set;
+    outCount = count;
+    return animations;
+}
+
+void AssetManager::UnloadAnimations(const std::string& filename) {
+    auto it = m_animations.find(filename);
+    if (it != m_animations.end()) {
+        ::UnloadModelAnimations(it->second.data, it->second.count);
+        m_animations.erase(it);
+    }
+}
+
 Font* AssetManager::LoadFont(const std::string& filename) {
     if (!m_initialized) return nullptr;
 
@@ -166,6 +209,10 @@ bool AssetManager::HasModel(const std::string& filename) const {
     return m_models.find(filename) != m_models.end();
 }
 
+bool AssetManager::HasAnimations(const std::string& filename) const {
+    return m_animations.find(filename) != m_animations.end();
+}
+
 bool AssetManager::HasFont(const std::string& filename) const {
     return m_fonts.find(filename) != m_fonts.end();
 }
@@ -182,6 +229,12 @@ void AssetManager::Clear() {
         ::UnloadModel(*pair.second);
     }
     m_models.clear();
+
+    // Unload all animation sets
+    for (auto& pair : m_animations) {
+        ::UnloadModelAnimations(pair.second.data, pair.second.count);
+    }
+    m_animations.clear();
 
     // Unload all fonts
     for (auto& pair : m_fonts) {
