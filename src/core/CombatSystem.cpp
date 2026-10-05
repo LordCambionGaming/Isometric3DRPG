@@ -1,4 +1,5 @@
 #include "core/CombatSystem.h"
+#include "core/Dice.h"
 #include "utils/Logger.h"
 #include <random>
 #include <sstream>
@@ -19,12 +20,8 @@ void CombatSystem::Reset() {
 }
 
 CombatRoll CombatSystem::RollD20(int difficultyModifier) {
-    // Generatore di numeri casuali
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 20);
-
-    int roll = dist(gen);
+    // Fonte unica di casualita': core/Dice (la stessa usata dalla Character Creation e dai futuri tiri NdX)
+    int roll = RollDie(20);
     CombatRoll result;
     result.rollValue = roll;
 

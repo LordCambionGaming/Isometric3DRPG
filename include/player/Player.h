@@ -1,6 +1,7 @@
 #pragma once
 #include <raylib.h>
 #include <vector>
+#include "core/Character.h"
 
 struct PathNode {
     int x;
@@ -45,6 +46,11 @@ public:
     bool StartAttack(Vector3 targetWorld);
     bool IsAttacking() const { return m_animState == AnimState::Attack; }
 
+    // Character sheet (gameplay data, no visuals). Filled once by the Character Creation flow.
+    // The Player is rebuilt by Game::CreateGameSession(), so a new game never inherits an old sheet.
+    void SetCharacter(const core::Character& character) { m_character = character; }
+    const core::Character& GetCharacter() const { return m_character; }
+
 private:
     enum class AnimState { Idle, Walk, Attack };
 
@@ -87,6 +93,8 @@ private:
     int m_appliedFrame = -1;
     float m_visualYaw = 0.0f;  // radians around +Y; 0 = the model's native facing (+Z). Visual only.
     float m_attackYaw = 0.0f;
+
+    core::Character m_character; // gameplay data, see SetCharacter()
 
     void UpdateVisual(float dt, const Vector3& posBefore);
     void ApplyClipPose(int clip, float phase);

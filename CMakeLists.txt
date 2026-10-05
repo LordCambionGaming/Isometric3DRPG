@@ -52,6 +52,9 @@ set(SOURCES
     src/core/Timer.cpp
     src/core/DiceRollState.cpp
     src/core/CombatSystem.cpp
+    src/core/Dice.cpp
+    src/core/Character.cpp
+    src/core/CharacterCreationState.cpp
     src/rendering/Renderer.cpp
     src/rendering/Camera3DController.cpp
     src/world/World.cpp

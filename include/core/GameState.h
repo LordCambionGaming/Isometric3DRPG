@@ -7,7 +7,8 @@ enum class GameStateType {
     Paused,
     MainMenu,
     Loading,
-    DiceRoll
+    DiceRoll,
+    CharacterCreation
 };
 
 class Game;
