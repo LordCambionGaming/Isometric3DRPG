@@ -2,9 +2,10 @@
 
 #include <memory>
 #include <raylib.h>
-#include "player/Player.h"
+#include "entities/Player.h"
 #include "navigation/NavigationSystem.h"
 #include "core/CombatSystem.h"
+#include <entities/Mob.h>
 
 
 class GameState;
@@ -40,6 +41,8 @@ public:
     Player* GetPlayer() const { return m_player.get(); }
     HUD* GetHUD() const { return m_hud.get(); }
     core::CombatSystem* GetCombatSystem() const { return m_combatSystem.get(); }
+    Mob* GetHoveredMob() const { return m_hoveredMob; }
+    void SetHoveredMob(Mob* mob) { m_hoveredMob = mob; }
 
 private:
     void Update(float deltaTime);
@@ -64,7 +67,7 @@ private:
     std::unique_ptr<HUD> m_hud;
     NavigationSystem m_navigation;
     std::unique_ptr<core::CombatSystem> m_combatSystem;
-
+    Mob* m_hoveredMob = nullptr;
     int m_hoverTileX = -1;
     int m_hoverTileZ = -1;
 
@@ -73,4 +76,5 @@ private:
     static constexpr int SCREEN_WIDTH = 1024;
     static constexpr int SCREEN_HEIGHT = 768;
     static constexpr const char* WINDOW_TITLE = "Isometric RPG";
+std::unique_ptr<Mob> m_testMob;
 };

@@ -30,11 +30,21 @@ AbilityScores RollAbilityPool();
 
 struct WeaponDef {
     const char* name = "";
-    DiceExpr damage{ 0, 0 };
+    DiceExpr damage{ 1, 8 };  // Default: 1d8
+    float range = 1.5f;       // Portata in metri (1.5m = mischia, 8m = distanza)
 };
 
-// Warrior -> Longsword 1d8, Ranger -> Bow 1d8, Rogue -> Dagger 1d4.
 WeaponDef StartingWeapon(CharacterClass cls);
+
+
+
+struct Vitals {
+    int currentHP = 0;
+    int tempHP = 0;        // punti ferita temporanei (D&D 5e)
+    int currentMP = 0;     // mana (per il futuro)
+
+    bool IsAlive() const { return currentHP > 0; }
+};
 
 struct Character {
     Race race = Race::Human;
@@ -44,6 +54,35 @@ struct Character {
     AbilityScores abilities{};                 // valorizzato da CreateCharacter()
     std::vector<WeaponDef> ownedWeapons;       // armi possedute
     int equippedWeapon = -1;                   // indice in ownedWeapons; -1 = disarmato
+
+    Vitals vitals{};
+    int HitDie()const {
+        switch (characterClass) {
+            case CharacterClass::Rogue: return 8;
+            case CharacterClass::Warrior:
+            case CharacterClass::Ranger:
+            default: return 10;
+        }
+    }
+
+    int MaxHP() const {
+        const int die = HitDie();
+        const int modCon = Modifier(Ability::Con);
+        int hp = die + modCon;                      // livello 1
+        for (int l = 2; l <= level; ++l)
+            hp += (die / 2 + 1) + modCon;           // livelli successivi (media D&D 5e)
+        return std::max(1, hp);                     // mai < 1
+    }
+
+        int HPPercent() const {
+        const int max = MaxHP();
+        return (max > 0) ? (vitals.currentHP * 100) / max : 0;
+    }
+
+    float HPFraction() const {
+        const int max = MaxHP();
+        return (max > 0) ? static_cast<float>(vitals.currentHP) / static_cast<float>(max) : 0.0f;
+    }
 
     int Score(Ability a) const { return abilities[static_cast<std::size_t>(a)]; }
     int Modifier(Ability a) const { return AbilityModifier(Score(a)); }

@@ -66,6 +66,7 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
     c.abilities = abilities;
     c.ownedWeapons.push_back(StartingWeapon(cls));
     c.equippedWeapon = -1;   // posseduta, non equipaggiata: si parte disarmati
+    c.vitals.currentHP = c.MaxHP();
     return c;
 }
 

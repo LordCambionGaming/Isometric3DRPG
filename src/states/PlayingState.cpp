@@ -1,25 +1,12 @@
-#include "core/GameState.h"
-#include "core/DiceRollState.h"
+#include "states/PlayingState.h"
+#include "states/DiceRollState.h"
 #include "core/Game.h"
+#include "entities/Player.h"
+#include "entities/Mob.h"
 #include <raylib.h>
-#include <iostream>
+#include <raymath.h>
 #include <memory>
 
-GameState::GameState(Game* game)
-    : m_game(game)
-    , m_type(GameStateType::Playing)
-{
-}
-
-// ---------------------------------------------------------------------------
-// PlayingState
-//
-// La logica di gioco vive in Game (update, render 3D, picking, click-to-move).
-// PlayingState gestisce solo i tasti di gioco e l'overlay del risultato D20.
-//   F3 : debug info
-//   F5 : tiro di debug istantaneo
-//   R  : apre la board del dado (DiceRollState, gioco in pausa)
-// ---------------------------------------------------------------------------
 PlayingState::PlayingState(Game* game)
     : GameState(game)
     , m_showDebugInfo(true)
@@ -32,7 +19,7 @@ void PlayingState::Enter() {}
 void PlayingState::Exit() {}
 
 void PlayingState::Update(float deltaTime) {
-    // Il testo del tiro di debug scompare dopo 2 secondi
+    // Il testo del tiro di debug/overlay scompare dopo 2 secondi
     if (m_lastRoll.rollValue != 0) {
         m_rollTimer += deltaTime;
         if (m_rollTimer >= 2.0f) {
@@ -72,19 +59,49 @@ void PlayingState::Render() {
 }
 
 void PlayingState::HandleInput() {
+    // F3: Toggle debug info
     if (IsKeyPressed(KEY_F3)) {
         m_showDebugInfo = !m_showDebugInfo;
     }
 
-    // F5: tiro di debug istantaneo (TestCombatRoll stampa già in console)
+    // F5: Tiro D20 istantaneo di test
     if (IsKeyPressed(KEY_F5) && m_game->GetCombatSystem()) {
         m_lastRoll = m_game->GetCombatSystem()->TestCombatRoll(0);
         m_rollTimer = 0.0f;
     }
 
-    // R: apre la board del dado, il gioco va in pausa
+    // R: Apre il lancio dadi libero (senza bersaglio)
     if (IsKeyPressed(KEY_R)) {
-        m_game->SetState(std::make_unique<DiceRollState>(m_game));
-        return;   // PlayingState è stato distrutto da SetState: non toccare i membri
+        m_game->SetState(std::make_unique<DiceRollState>(m_game, nullptr));
+        return; // PlayingState � stato distrutto da SetState
     }
+
+    Player* player = m_game->GetPlayer();
+    if (!player) return;
+
+    // F: Attacca il Mob puntato o selezionato
+    if (IsKeyPressed(KEY_F)) {
+        Mob* targetMob = m_game->GetHoveredMob();
+
+        if (targetMob && targetMob->IsAttackable()) {
+            const auto& chr = player->GetCharacter();
+            core::WeaponDef weapon = chr.HasEquippedWeapon() ? 
+                chr.ownedWeapons[chr.equippedWeapon] : core::StartingWeapon(chr.characterClass);
+
+            float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
+
+            if (dist <= weapon.range) {
+                // Nel raggio d'attacco: passa allo stato di tiro dadi orientato al Mob
+                m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
+                return;
+            } else {
+                TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio arma: %.2fm)", dist, weapon.range);
+            }
+        }
+    }
+
+    // Tasti rapidi di test vita/danno giocatore
+    if (IsKeyPressed(KEY_H)) player->TakeDamage(1);
+    if (IsKeyPressed(KEY_J)) player->TakeDamage(5);
+    if (IsKeyPressed(KEY_K)) player->Heal(player->GetCharacter().MaxHP());
 }

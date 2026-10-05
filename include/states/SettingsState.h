@@ -1,5 +1,5 @@
 #pragma once
-#include "core/GameState.h"
+#include "states/GameState.h"
 class SettingsState : public GameState {
 public:
     enum PreviousState { FromPause, FromMainMenu };

@@ -1,7 +1,7 @@
-#include "core/MainMenuState.h"
+#include "states/MainMenuState.h"
 #include <memory>
-#include "core/SettingsState.h"
-#include "core/CharacterCreationState.h"
+#include "states/SettingsState.h"
+#include "states/CharacterCreationState.h"
 #include <iostream>
 #include "core/Game.h"
 #include <raylib.h>

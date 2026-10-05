@@ -2,6 +2,7 @@
 #include <raylib.h>
 #include <vector>
 #include "core/Character.h"
+#include <algorithm>
 
 struct PathNode {
     int x;
@@ -50,6 +51,18 @@ public:
     // The Player is rebuilt by Game::CreateGameSession(), so a new game never inherits an old sheet.
     void SetCharacter(const core::Character& character) { m_character = character; }
     const core::Character& GetCharacter() const { return m_character; }
+    core::Character& GetCharacterMutable() { return m_character; }
+
+    void TakeDamage(int amount) {
+        m_character.vitals.currentHP =
+            std::max(0, m_character.vitals.currentHP - amount);
+    }
+
+    void Heal(int amount) {
+        m_character.vitals.currentHP =
+            std::min(m_character.MaxHP(), m_character.vitals.currentHP + amount);
+    }
+    bool IsAlive() const { return m_character.vitals.currentHP > 0; }
 
 private:
     enum class AnimState { Idle, Walk, Attack };

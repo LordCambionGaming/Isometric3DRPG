@@ -128,7 +128,7 @@ void Renderer::RenderDebugInfo() {
     currentY += lineHeight;
     DrawText("Arrow Keys: Rotate", 10, currentY, 12, LIGHTGRAY);
     currentY += lineHeight;
-    DrawText("R: Regenerate world", 10, currentY, 12, LIGHTGRAY);
+    DrawText("R: Dice   ", 10, currentY, 12, LIGHTGRAY);
     currentY += lineHeight;
     DrawText("F1: Toggle debug", 10, currentY, 12, LIGHTGRAY);
     currentY += lineHeight;

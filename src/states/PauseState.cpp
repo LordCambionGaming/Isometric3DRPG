@@ -1,10 +1,11 @@
-#include "core/PauseState.h"
+#include "states/PauseState.h"
 #include <memory>
 #include <iostream>
-#include "core/SettingsState.h"
-#include "core/MainMenuState.h"
+#include "states/SettingsState.h"
+#include "states/MainMenuState.h"
 #include "core/Game.h"
 #include <raylib.h>
+#include <states/PlayingState.h>
 PauseState::PauseState(class Game* game) : GameState(game), m_selectedOption(0) { m_type = GameStateType::Paused; }
 void PauseState::Enter() {}
 void PauseState::Exit() {}

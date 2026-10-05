@@ -1,10 +1,10 @@
-#include "core/SettingsState.h"
+#include "states/SettingsState.h"
 #include <memory>
 #include "core/Game.h"
 #include <raylib.h>
 #include <iostream>
-#include <core/PauseState.h>
-#include <core/MainMenuState.h>
+#include <states/PauseState.h>
+#include <states/MainMenuState.h>
 
 SettingsState::SettingsState(class Game* game, PreviousState prev)
     : GameState(game), m_prev(prev) { m_type = GameStateType::Loading; }

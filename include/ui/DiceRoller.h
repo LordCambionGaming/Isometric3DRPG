@@ -1,14 +1,12 @@
 #pragma once
 #include <functional>
+#include <vector>
 #include <raylib.h>
 #include <raymath.h>
 #include "core/CombatSystem.h"
 
 namespace ui {
 
-// D20 3D (icosaedro) con lancio trascinabile.
-// Fisica 2D per la posizione, orientamento 3D con quaternioni.
-// Il risultato vero viene deciso al lancio; la faccia finale lo mostra.
 class DiceRoller {
 public:
     enum class State { Idle, Dragging, Flying, Settled };
@@ -19,18 +17,17 @@ public:
     DiceRoller(const DiceRoller&) = delete;
     DiceRoller& operator=(const DiceRoller&) = delete;
 
+    void SetSides(int sides);
     void SetRollProvider(RollProvider provider) { m_provider = std::move(provider); }
     void SetBounds(Rectangle bounds) { m_bounds = bounds; }
     void Reset();
 
     void HandleInput();
     void Update(float dt);
-    void Render();                       // non const: disegna in una RenderTexture
+    void Render();
 
     State GetState() const { return m_state; }
     bool IsBusy() const { return m_state == State::Dragging || m_state == State::Flying; }
-
-    // true una sola volta, quando il dado si e' fermato E allineato sulla faccia
     bool ConsumeResult(core::CombatRoll& out);
 
 private:
@@ -41,6 +38,7 @@ private:
     void Integrate(float dt);
     Quaternion TargetFor(int face) const;
     Vector2 RestPos() const;
+    Vector2 FaceUV(int face, int k) const;
 
     State m_state = State::Idle;
     Rectangle m_bounds{ 0, 0, 600, 400 };
@@ -58,15 +56,21 @@ private:
     bool m_aligned = false;
     RollProvider m_provider;
 
-    // geometria
-    Vector3 m_v[12];
-    int     m_f[20][3];
-    Vector3 m_n[20];
-    int     m_number[20];
-    int     m_faceOfNumber[21];
+    // --- Geometria Dinamica ---
+    struct Polygon {
+        std::vector<int> v;
+        Vector3 n;
+        int number;
+    };
+    int m_sides = 20;
+    std::vector<Vector3> m_v;
+    std::vector<Polygon> m_faces;
+    std::vector<int> m_faceOfNumber;
 
-    // risorse GPU (create al primo Render)
+    // --- Risorse GPU ---
     bool m_ready = false;
+    int m_atlasCols = 5;
+    int m_atlasRows = 4;
     Texture2D m_atlas{};
     RenderTexture2D m_rt{};
 };

@@ -1,13 +1,14 @@
-#include "core/CharacterCreationState.h"
-#include "core/MainMenuState.h"
+#include "states/CharacterCreationState.h"
+#include "states/MainMenuState.h"
 #include "core/Game.h"
-#include "player/Player.h"
+#include "entities/Player.h"
 #include "ui/GothicTheme.h"
 #include <raylib.h>
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <states/PlayingState.h>
 
 using namespace ui::theme;
 
@@ -117,7 +118,8 @@ void CharacterCreationState::HandleInput() {
                   << " CON " << character.Score(core::Ability::Con)
                   << " INT " << character.Score(core::Ability::Int)
                   << " WIS " << character.Score(core::Ability::Wis)
-                  << " CHA " << character.Score(core::Ability::Cha) << ")" << std::endl;
+                  << " CHA " << character.Score(core::Ability::Cha) 
+                  << ", HP " << character.vitals.currentHP << "/" << character.MaxHP()<<")" << std::endl;
         if (m_game) {
             // Stessa sequenza che prima faceva "Nuova partita" nel menu, ora dopo la conferma.
             m_game->ResetGameSession();

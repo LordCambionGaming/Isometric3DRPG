@@ -1,9 +1,9 @@
 #include "core/Game.h"
 #include "navigation/NavigationSystem.h"
-#include "core/GameState.h"
-#include "core/PauseState.h"
-#include "core/MainMenuState.h"
-#include "player/Player.h"
+#include "states/GameState.h"
+#include "states/PauseState.h"
+#include "states/MainMenuState.h"
+#include "entities/Player.h"
 #include "core/Timer.h"
 #include "rendering/Renderer.h"
 #include "rendering/Camera3DController.h"
@@ -16,6 +16,7 @@
 #include <raymath.h>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 Game::Game()
     : m_isRunning(false)
@@ -38,7 +39,6 @@ Game::~Game() {
 
 bool Game::Initialize() {
     try {
-        // Initialize core systems
         m_timer = std::make_unique<Timer>();
         m_assetManager = std::make_unique<AssetManager>();
         m_audioManager = std::make_unique<AudioManager>();
@@ -49,13 +49,11 @@ bool Game::Initialize() {
         m_combatSystem = std::make_unique<core::CombatSystem>();
         m_combatSystem->Initialize();
 
-        // Initialize renderer (creates window)
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
             std::cerr << "Failed to initialize renderer!" << std::endl;
             return false;
         }
 
-        // Initialize other systems
         if (!m_assetManager->Initialize()) {
             std::cerr << "Failed to initialize asset manager!" << std::endl;
             return false;
@@ -66,11 +64,9 @@ bool Game::Initialize() {
             return false;
         }
 
-        // Initialize camera
         m_camera->Initialize();
         m_camera->SetIsometricView();
 
-        // Initialize world
         WorldConfig worldConfig;
         worldConfig.seed = 12345;
         worldConfig.chunkSize = 16;
@@ -82,8 +78,6 @@ bool Game::Initialize() {
             return false;
         }
 
-        // Deterministic spawn: find valid land tile near origin (0,0)
-        // Valid = height >= 2 (SEA_LEVEL) && !hasWater
         float spawnX = 0.5f * worldConfig.tileSize;
         float spawnZ = 0.5f * worldConfig.tileSize;
         float spawnY = 0.0f;
@@ -91,8 +85,7 @@ bool Game::Initialize() {
         int foundTx = 0, foundTz = 0;
         float foundHeight = 0.0f;
         const int MAX_SPAWN_SEARCH_RADIUS = 64;
-
-        // Pre-carica solo i chunk attorno all'origine; gli altri vengono caricati on-demand
+        
         const int preRadius = 1;
         for (int cx = -preRadius; cx <= preRadius; ++cx) {
             for (int cz = -preRadius; cz <= preRadius; ++cz) {
@@ -100,11 +93,10 @@ bool Game::Initialize() {
             }
         }
 
-        // Ricerca deterministica per anelli (raggio crescente)
         for (int r = 0; r <= MAX_SPAWN_SEARCH_RADIUS && !found; ++r) {
             for (int dx = -r; dx <= r && !found; ++dx) {
                 for (int dz = -r; dz <= r && !found; ++dz) {
-                    if (r > 0 && std::abs(dx) != r && std::abs(dz) != r) continue; // solo l'anello
+                    if (r > 0 && std::abs(dx) != r && std::abs(dz) != r) continue;
                     const int tx = dx;
                     const int tz = dz;
 
@@ -116,13 +108,11 @@ bool Game::Initialize() {
                         m_world->LoadChunkAt(cx, cz);
                         chunk = m_world->GetChunk(cx, cz);
                     }
-                    if (!chunk || !chunk->IsGenerated()) {
-                        continue; // non bloccante
-                    }
+                    if (!chunk || !chunk->IsGenerated()) continue;
 
                     int lx = tx % worldConfig.chunkSize; if (lx < 0) lx += worldConfig.chunkSize;
                     int lz = tz % worldConfig.chunkSize; if (lz < 0) lz += worldConfig.chunkSize;
-                    const TerrainTile tile = chunk->GetTile(lx, lz); // unica fonte autorevole
+                    const TerrainTile tile = chunk->GetTile(lx, lz);
                     if (tile.height >= 2.0f && !tile.hasWater) {
                         foundTx = tx;
                         foundTz = tz;
@@ -137,22 +127,13 @@ bool Game::Initialize() {
             spawnX = (foundTx + 0.5f) * worldConfig.tileSize;
             spawnY = foundHeight * worldConfig.tileSize;
             spawnZ = (foundTz + 0.5f) * worldConfig.tileSize;
-            std::cout << "[SPAWN] tile=(" << foundTx << "," << foundTz << ") height=" << foundHeight << std::endl;
         } else {
-            std::cerr << "[SPAWN ERROR] No valid land found within radius " << MAX_SPAWN_SEARCH_RADIUS << std::endl;
             spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
         }
 
-        // Player visual: loaded once through AssetManager (cached + owned there), shared by every Player.
         m_playerModel = m_assetManager->LoadModel("models/player/player_animated.glb");
-        if (!m_playerModel) {
-            std::cerr << "[PLAYER MODEL] could not load models/player/player_animated.glb, using fallback visual" << std::endl;
-        } else {
-            // Clips (0 Idle, 1 Walk, 2 Attack) come from the same file; also cached by AssetManager.
+        if (m_playerModel) {
             m_playerAnims = m_assetManager->LoadAnimations("models/player/player_animated.glb", m_playerAnimCount);
-            if (!m_playerAnims) {
-                std::cerr << "[PLAYER ANIM] no animations in models/player/player_animated.glb, static pose" << std::endl;
-            }
         }
 
         m_player = std::make_unique<Player>();
@@ -163,19 +144,15 @@ bool Game::Initialize() {
         m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
 
         m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
-
-        // Connect systems
+        
         m_renderer->SetWorld(m_world.get());
         m_renderer->SetCamera(m_camera.get());
 
-        // Create initial game state
         m_gameState = std::make_unique<MainMenuState>(this);
         m_gameState->Enter();
 
         m_isRunning = true;
-        m_debugMode = true; // Start with debug info visible
-
-        std::cout << "Game initialized successfully! World seed: " << worldConfig.seed << std::endl;
+        m_debugMode = true;
 
         return true;
     }
@@ -209,6 +186,7 @@ void Game::Shutdown() {
         m_gameState.reset();
     }
 
+    if (m_testMob) m_testMob.reset();
     if (m_world) m_world.reset();
     if (m_hud) m_hud.reset();
     if (m_audioManager) m_audioManager.reset();
@@ -222,24 +200,17 @@ void Game::Shutdown() {
 }
 
 void Game::CreateGameSession() {
-    // Ricrea sessione completa: World, Player, spawn deterministico, streaming
-    // Seed fisso (12345) per nuova partita — non casuale
     WorldConfig worldConfig;
     worldConfig.seed = 12345;
     worldConfig.chunkSize = 16;
     worldConfig.tileSize = 1.0f;
     worldConfig.renderDistance = 3;
 
-    if (!m_world) {
-        m_world = std::make_unique<World>();
-    }
+    if (!m_world) m_world = std::make_unique<World>();
     if (!m_world->IsInitialized()) {
-        if (!m_world->Initialize(worldConfig)) {
-            std::cerr << "CreateGameSession: World init failed" << std::endl;
-        }
+        m_world->Initialize(worldConfig);
     }
 
-    // Pre-carica chunk attorno origine
     const int preRadius = 1;
     for (int cx = -preRadius; cx <= preRadius; ++cx) {
         for (int cz = -preRadius; cz <= preRadius; ++cz) {
@@ -247,26 +218,22 @@ void Game::CreateGameSession() {
         }
     }
 
-    // Spawn deterministico
-    float spawnX = 0.5f * worldConfig.tileSize;
-    float spawnZ = 0.5f * worldConfig.tileSize;
-    float spawnY = 0.0f;
+    float spawnX = 0.5f, spawnY = 0.0f, spawnZ = 0.5f;
     bool found = false;
     int foundTx = 0, foundTz = 0;
     float foundHeight = 0.0f;
-    const int MAX_SPAWN_SEARCH_RADIUS = 64;
-    for (int r = 0; r <= MAX_SPAWN_SEARCH_RADIUS && !found; ++r) {
+    for (int r = 0; r <= 64 && !found; ++r) {
         for (int dx = -r; dx <= r && !found; ++dx) {
             for (int dz = -r; dz <= r && !found; ++dz) {
                 if (r > 0 && std::abs(dx) != r && std::abs(dz) != r) continue;
                 int tx = dx, tz = dz;
-                int cx = (tx >= 0) ? (tx / worldConfig.chunkSize) : ((tx - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
-                int cz = (tz >= 0) ? (tz / worldConfig.chunkSize) : ((tz - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
+                int cx = (tx >= 0) ? (tx / 16) : ((tx - 15) / 16);
+                int cz = (tz >= 0) ? (tz / 16) : ((tz - 15) / 16);
                 Chunk* chunk = m_world->GetChunk(cx, cz);
                 if (!chunk || !chunk->IsGenerated()) { m_world->LoadChunkAt(cx, cz); chunk = m_world->GetChunk(cx, cz); }
                 if (!chunk || !chunk->IsGenerated()) continue;
-                int lx = tx % worldConfig.chunkSize; if (lx < 0) lx += worldConfig.chunkSize;
-                int lz = tz % worldConfig.chunkSize; if (lz < 0) lz += worldConfig.chunkSize;
+                int lx = tx % 16; if (lx < 0) lx += 16;
+                int lz = tz % 16; if (lz < 0) lz += 16;
                 TerrainTile tile = chunk->GetTile(lx, lz);
                 if (tile.height >= 2.0f && !tile.hasWater) {
                     foundTx = tx; foundTz = tz; foundHeight = tile.height; found = true; break;
@@ -275,20 +242,23 @@ void Game::CreateGameSession() {
         }
     }
     if (found) {
-        spawnX = (foundTx + 0.5f) * worldConfig.tileSize;
-        spawnY = foundHeight * worldConfig.tileSize;
-        spawnZ = (foundTz + 0.5f) * worldConfig.tileSize;
-    } else {
-        spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
+        spawnX = (foundTx + 0.5f);
+        spawnY = foundHeight;
+        spawnZ = (foundTz + 0.5f);
     }
 
     if (!m_player) m_player = std::make_unique<Player>();
     m_player->SetTileSize(worldConfig.tileSize);
-    m_player->SetModel(m_playerModel); // already loaded in Initialize(); no reload
+    m_player->SetModel(m_playerModel);
     m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
     m_player->SetPosition({spawnX, spawnY, spawnZ});
     m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
+
+    // Creiamo un mostro di prova reale (Orco con 20 HP e CA 12)
+   Vector3 mobPos = { spawnX + 2.0f, spawnY, spawnZ + 2.0f };
+m_testMob = std::make_unique<Enemy>("Orco di Prova", mobPos, 20, 12);
+m_hoveredMob = m_testMob.get();
 
     if (m_renderer) {
         m_renderer->SetWorld(m_world.get());
@@ -296,9 +266,12 @@ void Game::CreateGameSession() {
     }
 }
 
+
 void Game::ResetGameSession() {
+    if (m_testMob) m_testMob.reset();
     if (m_player) m_player.reset();
     if (m_world) m_world.reset();
+    m_hoveredMob = nullptr;
     m_navigation.Initialize(nullptr, MAX_STEP_HEIGHT);
     m_hoverTileX = -1;
     m_hoverTileZ = -1;
@@ -307,17 +280,19 @@ void Game::ResetGameSession() {
 void Game::Update(float deltaTime) {
     m_stateChangedThisFrame = false;
 
-    // Con la board del dado (o la pausa) il mondo è congelato
     const bool frozen = m_gameState &&
         (m_gameState->GetType() == GameStateType::DiceRoll ||
          m_gameState->GetType() == GameStateType::Paused);
 
     if (m_player && !frozen) {
         m_player->Update(deltaTime);
-        // Single authoritative source for streaming: pass real position to World
         if (m_world) {
             m_world->SetPlayerPosition(m_player->GetPosition());
         }
+    }
+
+    if (m_testMob && !frozen) {
+        m_testMob->Update(deltaTime);
     }
 
     if (m_gameState) {
@@ -329,7 +304,7 @@ void Game::Update(float deltaTime) {
     }
 
     if (m_world && !frozen) {
-        m_world->Update(deltaTime); // World handles its own streaming internally
+        m_world->Update(deltaTime);
     }
 
     if (m_audioManager) {
@@ -338,18 +313,15 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    if (!m_renderer)
-        return;
+    if (!m_renderer) return;
 
     m_renderer->BeginFrame();
 
-    // Il mondo è visibile in gioco e dietro la board del dado
     const bool worldVisible = m_gameState &&
         (m_gameState->GetType() == GameStateType::Playing ||
          m_gameState->GetType() == GameStateType::DiceRoll);
 
-    if (worldVisible && m_camera && m_world)
-    {
+    if (worldVisible && m_camera && m_world) {
         const Camera3D camera = m_camera->GetCamera();
 
         m_renderer->BeginMode3D(camera);
@@ -360,15 +332,16 @@ void Game::Render() {
             m_player->Render();
         }
 
-        // Hover tile outline stays in 3D.
+        if (m_testMob) {
+            m_testMob->Render(camera);
+        }
+
         if (m_hoverTileX != -9999 && m_hoverTileZ != -9999) {
             const int tx = m_hoverTileX;
             const int tz = m_hoverTileZ;
-
             const float tileCenterX = static_cast<float>(tx) + 0.5f;
             const float tileCenterZ = static_cast<float>(tz) + 0.5f;
             const float surfaceY = m_world->GetHeightAt(tileCenterX, tileCenterZ) + 0.05f;
-
             const float s = 1.0f;
 
             const Vector3 p0 = { static_cast<float>(tx),     surfaceY, static_cast<float>(tz) };
@@ -384,15 +357,11 @@ void Game::Render() {
 
         m_renderer->EndMode3D();
 
-        // FINAL 2D HUD PASS.
-        // This is the only place the Player indicator is drawn.
         if (m_hud && m_player) {
             m_hud->Render(*m_player, camera);
         }
     }
 
-    // Overlay 2D dello stato corrente (menu, pausa, board del dado, testo D20).
-    // Va disegnato dopo il mondo 3D e l'HUD, altrimenti viene coperto.
     if (m_gameState) {
         m_gameState->Render();
     }
@@ -405,37 +374,29 @@ void Game::Render() {
 }
 
 void Game::HandleInput() {
-    // Global input handling
     if (IsKeyPressed(KEY_F1)) {
         m_debugMode = !m_debugMode;
     }
 
     if (IsKeyPressed(KEY_ESCAPE)) {
         if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
-            SetState(std::make_unique<PauseState>(this)); // Playing -> Pause
+            SetState(std::make_unique<PauseState>(this));
         } else if (m_gameState && m_gameState->GetType() == GameStateType::MainMenu) {
             m_isRunning = false;
         }
-        // Da Pause: resta in Pause; si torna indietro con ENTER sull'opzione 3
-        // Da DiceRoll: ESC è gestito da DiceRollState (torna al gioco)
     }
 
-    // Delegate to current game state only if no transition occurred this frame
     if (m_gameState && !m_stateChangedThisFrame) {
         m_gameState->HandleInput();
     }
 
-    // Camera input (non reagire al mouse mentre è aperta la board del dado)
     const bool diceOpen = m_gameState && m_gameState->GetType() == GameStateType::DiceRoll;
     if (m_camera && !diceOpen) {
         m_camera->HandleInput();
     }
 
-    // Click-to-move + hover tile calculation (only when playing)
     if (m_camera && m_world && m_player && m_gameState && m_gameState->GetType() == GameStateType::Playing) {
         const Ray ray = GetMouseRay(GetMousePosition(), m_camera->GetCamera());
-
-        // Voxel raycast picking
         const float maxDist = 100.0f;
         const float step = 0.5f;
         int bestTileX = -9999;
@@ -469,9 +430,6 @@ void Game::HandleInput() {
         m_hoverTileX = bestTileX;
         m_hoverTileZ = bestTileZ;
 
-        // Attack trigger (visual only): turn toward the hovered tile and play the Attack clip once.
-        // Movement, pathfinding and CombatSystem are not involved; call StartAttack() from the real
-        // combat trigger when there is one.
         if (IsKeyPressed(KEY_F)) {
             m_player->StartAttack({ static_cast<float>(bestTileX) + 0.5f, 0.0f, static_cast<float>(bestTileZ) + 0.5f });
         }
@@ -491,6 +449,15 @@ void Game::HandleInput() {
                 }
                 m_player->SetPath(pathWithY);
             }
+        }
+    }
+
+    if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
+        if (IsKeyPressed(KEY_N) && m_testMob) {
+            m_testMob->TakeDamage(3);
+        }
+        if (IsKeyPressed(KEY_M) && m_testMob) {
+            m_testMob->Heal(20);
         }
     }
 }

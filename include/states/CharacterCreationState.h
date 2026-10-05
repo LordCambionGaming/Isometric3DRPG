@@ -1,6 +1,6 @@
 #pragma once
 #include <array>
-#include "core/GameState.h"
+#include "states/GameState.h"
 #include "core/Character.h"
 
 // Nuova Partita -> CharacterCreationState -> Conferma -> PlayingState.
