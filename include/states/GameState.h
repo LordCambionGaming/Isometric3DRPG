@@ -6,7 +6,8 @@ enum class GameStateType {
     MainMenu,
     Loading,
     DiceRoll,
-    CharacterCreation
+    CharacterCreation,
+    Inventory
 };
 
 class Game;
@@ -23,6 +24,7 @@ public:
     virtual void HandleInput() = 0;
 
     GameStateType GetType() const { return m_type; }
+
 
 protected:
     Game* m_game = nullptr;

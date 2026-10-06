@@ -37,6 +37,10 @@ public:
     virtual void Heal(int amount) {
         m_currentHP = std::min(m_maxHP, m_currentHP + amount);
     }
+    BoundingBox GetBounds() const {
+    return { { m_position.x - 0.4f, m_position.y,        m_position.z - 0.4f },
+             { m_position.x + 0.4f, m_position.y + 1.2f, m_position.z + 0.4f } };
+    }
 
 protected:
     std::string m_name;

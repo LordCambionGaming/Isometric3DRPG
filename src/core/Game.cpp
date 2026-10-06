@@ -282,7 +282,8 @@ void Game::Update(float deltaTime) {
 
     const bool frozen = m_gameState &&
         (m_gameState->GetType() == GameStateType::DiceRoll ||
-         m_gameState->GetType() == GameStateType::Paused);
+         m_gameState->GetType() == GameStateType::Paused   || 
+         m_gameState->GetType() == GameStateType::Inventory);
 
     if (m_player && !frozen) {
         m_player->Update(deltaTime);
@@ -319,7 +320,8 @@ void Game::Render() {
 
     const bool worldVisible = m_gameState &&
         (m_gameState->GetType() == GameStateType::Playing ||
-         m_gameState->GetType() == GameStateType::DiceRoll);
+         m_gameState->GetType() == GameStateType::DiceRoll|| 
+         m_gameState->GetType() == GameStateType::Inventory);
 
     if (worldVisible && m_camera && m_world) {
         const Camera3D camera = m_camera->GetCamera();
@@ -335,6 +337,7 @@ void Game::Render() {
         if (m_testMob) {
             m_testMob->Render(camera);
         }
+        if (m_hoveredMob) DrawBoundingBox(m_hoveredMob->GetBounds(), YELLOW);
 
         if (m_hoverTileX != -9999 && m_hoverTileZ != -9999) {
             const int tx = m_hoverTileX;
@@ -373,7 +376,7 @@ void Game::Render() {
     m_renderer->EndFrame();
 }
 
-void Game::HandleInput() {
+   void Game::HandleInput() {
     if (IsKeyPressed(KEY_F1)) {
         m_debugMode = !m_debugMode;
     }
@@ -386,12 +389,18 @@ void Game::HandleInput() {
         }
     }
 
+    if (m_camera && m_gameState && m_gameState->GetType() == GameStateType::Playing) {
+
+    }
+
     if (m_gameState && !m_stateChangedThisFrame) {
         m_gameState->HandleInput();
     }
 
-    const bool diceOpen = m_gameState && m_gameState->GetType() == GameStateType::DiceRoll;
-    if (m_camera && !diceOpen) {
+    const bool modalOpen = m_gameState &&
+    (m_gameState->GetType() == GameStateType::DiceRoll ||
+     m_gameState->GetType() == GameStateType::Inventory);
+    if (m_camera && !modalOpen){ 
         m_camera->HandleInput();
     }
 
@@ -424,15 +433,20 @@ void Game::HandleInput() {
         if (bestTileX == -9999 || bestTileZ == -9999) {
             m_hoverTileX = -9999;
             m_hoverTileZ = -9999;
+            m_hoveredMob = nullptr;
             return;
         }
 
         m_hoverTileX = bestTileX;
         m_hoverTileZ = bestTileZ;
-
-        if (IsKeyPressed(KEY_F)) {
-            m_player->StartAttack({ static_cast<float>(bestTileX) + 0.5f, 0.0f, static_cast<float>(bestTileZ) + 0.5f });
+        m_hoveredMob = nullptr;
+        if (m_testMob && m_testMob->IsAlive()) {
+            const Vector3 mp = m_testMob->GetPosition();
+            if ((int)std::floor(mp.x) == bestTileX && (int)std::floor(mp.z) == bestTileZ)
+            m_hoveredMob = m_testMob.get();
         }
+
+        
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             const int curTileX = m_player->GetTileX();
@@ -460,4 +474,5 @@ void Game::HandleInput() {
             m_testMob->Heal(20);
         }
     }
+
 }

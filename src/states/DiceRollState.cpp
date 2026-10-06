@@ -16,9 +16,25 @@ using namespace ui::theme;
 namespace {
 
 // Regole del colpo (per ora fisse: quando ci sara' un'arma equipaggiata andranno lette da li)
-const core::DiceExpr kWeaponDice{ 1, 6 };
-constexpr int   kAttackBonus    = 0;
-constexpr int   kDamageModifier = 2;
+core::WeaponDef CurrentWeapon(const Game* game) {
+    if (game) {
+        if (const Player* p = game->GetPlayer()) {
+            const core::Character& c = p->GetCharacter();
+            if (c.HasEquippedWeapon()) return c.ownedWeapons[c.equippedWeapon];
+        }
+    }
+    return core::WeaponDef{};   // non raggiungibile in combattimento: PlayingState blocca l'attacco da disarmati
+}
+
+// Caratteristica usata dall'arma: a distanza DEX, in mischia STR.
+int WeaponAbilityModifier(const Game* game) {
+    const Player* p = game ? game->GetPlayer() : nullptr;
+    if (!p) return 0;
+    const core::WeaponDef w = CurrentWeapon(game);
+    const core::Ability a = (w.range > 2.0f) ? core::Ability::Dex : core::Ability::Str;
+    return p->GetCharacter().Modifier(a);
+}
+
 constexpr int   kMaxPoolDice    = 8;      // oltre, i dadi si tirano col vecchio percorso semplice
 constexpr float kPendingDelay   = 1.1f;   // pausa per leggere il risultato prima del dado successivo
 
@@ -113,7 +129,7 @@ core::CombatRoll DiceRollState::ThrowGothicDie() {
     if (m_phase == Phase::Attack) {
         core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
         if (cs) {
-            m_attackResult = cs->RollAttack(kAttackBonus, m_target->GetArmorClass());
+            m_attackResult = cs->RollAttack(WeaponAbilityModifier(m_game), m_target->GetArmorClass());
             m_attackRolled = true;
             roll.rollValue = m_attackResult.d20Roll;
             roll.result = m_attackResult.resultType;
@@ -139,8 +155,9 @@ core::CombatRoll DiceRollState::ThrowGothicDie() {
 }
 
 core::DiceExpr DiceRollState::DamagePool() const {
+    const core::DiceExpr wd = CurrentWeapon(m_game).damage;
     const bool crit = m_attackRolled && m_attackResult.resultType == core::CombatResult::CriticalSuccess;
-    return core::DiceExpr{ kWeaponDice.count * (crit ? 2 : 1), kWeaponDice.sides };
+    return core::DiceExpr{ wd.count * (crit ? 2 : 1), wd.sides };
 }
 
 // Mette sul feltro il dado giusto (cambia solido e atlas se serve), pronto per essere afferrato.
@@ -156,7 +173,7 @@ void DiceRollState::BeginPool(const core::DiceExpr& pool) {
 void DiceRollState::FinishDamage() {
     core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
     if (cs) {
-        m_damageResult = cs->ResolveDamage(kWeaponDice, m_poolValues, kDamageModifier);
+        m_damageResult = cs->ResolveDamage(CurrentWeapon(m_game).damage, m_poolValues, WeaponAbilityModifier(m_game));
         m_damageRolled = true;
     }
     m_combatDone = true;
@@ -254,13 +271,15 @@ void DiceRollState::Exit() {
             const core::DiceExpr pool = DamagePool();
             std::vector<int> dice = (m_phase == Phase::Damage) ? m_poolValues : std::vector<int>{};
             while ((int)dice.size() < pool.count) dice.push_back(core::RollDie(pool.sides));
-            m_damageResult = cs->ResolveDamage(kWeaponDice, dice, kDamageModifier);
+            m_damageResult = cs->ResolveDamage(CurrentWeapon(m_game).damage, dice, WeaponAbilityModifier(m_game));
             m_damageRolled = true;
         }
     }
     if (m_damageRolled) {
         m_damageApplied = true;
         m_target->TakeDamage(m_damageResult.totalDamage);
+         if (Player* p = m_game->GetPlayer())
+        p->StartAttack(m_target->GetPosition()); 
     }
 }
 
@@ -408,7 +427,7 @@ void DiceRollState::RenderGothic() {
                 if (m_damageRolled) {
                     banner = TextFormat("%s", m_damageResult.log.c_str());
                     bannerColor = kGoldBright;
-                    subline = "Dadi: " + JoinValues(m_poolValues) + "   Modificatore: +" + std::to_string(kDamageModifier);
+                    subline = "Dadi: " + JoinValues(m_poolValues) + "   Modificatore: +" + std::to_string(WeaponAbilityModifier(m_game));
                 } else {
                     banner = TextFormat("Dado %d/%d:  %d", have, m_pool.count, m_result.rollValue);
                     subline = "Dadi: " + JoinValues(m_poolValues);

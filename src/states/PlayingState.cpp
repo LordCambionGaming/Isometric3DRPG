@@ -6,6 +6,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <memory>
+#include <states/InventoryState.h>
 
 PlayingState::PlayingState(Game* game)
     : GameState(game)
@@ -80,25 +81,27 @@ void PlayingState::HandleInput() {
     if (!player) return;
 
     // F: Attacca il Mob puntato o selezionato
-    if (IsKeyPressed(KEY_F)) {
+        if (IsKeyPressed(KEY_F)) {
         Mob* targetMob = m_game->GetHoveredMob();
 
         if (targetMob && targetMob->IsAttackable()) {
             const auto& chr = player->GetCharacter();
-            core::WeaponDef weapon = chr.HasEquippedWeapon() ? 
-                chr.ownedWeapons[chr.equippedWeapon] : core::StartingWeapon(chr.characterClass);
-
-            float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
-
-            if (dist <= weapon.range) {
-                // Nel raggio d'attacco: passa allo stato di tiro dadi orientato al Mob
-                m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
-                return;
+            if (!chr.HasEquippedWeapon()) {
+                TraceLog(LOG_INFO, "[COMBAT] Nessuna arma equipaggiata: premi I per equipaggiarne una");
             } else {
+                const core::WeaponDef& weapon = chr.ownedWeapons[chr.equippedWeapon];
+                const float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
+
+                if (dist <= weapon.range) {
+                    m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
+                    return;
+                }
                 TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio arma: %.2fm)", dist, weapon.range);
             }
         }
     }
+
+    if (IsKeyPressed(KEY_I)) { m_game->SetState(std::make_unique<InventoryState>(m_game)); return; }
 
     // Tasti rapidi di test vita/danno giocatore
     if (IsKeyPressed(KEY_H)) player->TakeDamage(1);
