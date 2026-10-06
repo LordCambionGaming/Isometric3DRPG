@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <algorithm>
 #include "core/Dice.h"
 
@@ -75,18 +76,27 @@ public:
         return res;
     }
 
-    DamageRollResult RollDamage(const DiceExpr& weaponDice, int statModifier, bool isCrit = false) {
-        int diceCount = isCrit ? weaponDice.count * 2 : weaponDice.count;
-        DiceResult diceRes = RollDice(diceCount, weaponDice.sides);
+    // Esito del danno a partire da dadi GIA' lanciati (per esempio lanciati a mano sulla board dei dadi).
+    // E' l'unico punto che applica la formula del danno: RollDamage qui sotto la usa a sua volta.
+    DamageRollResult ResolveDamage(const DiceExpr& weaponDice, const std::vector<int>& rolls, int statModifier) {
+        int sum = 0;
+        for (int r : rolls) sum += r;
 
         DamageRollResult res;
         res.weaponDice = weaponDice;
-        res.diceTotal = diceRes.total;
+        res.diceTotal = sum;
         res.modifier = statModifier;
-        res.totalDamage = std::max(1, diceRes.total + statModifier);
-        res.log = "Danno: " + std::to_string(res.totalDamage) + 
+        res.totalDamage = std::max(1, sum + statModifier);
+        res.log = "Danno: " + std::to_string(res.totalDamage) +
                   " (" + ToString(weaponDice) + " + " + std::to_string(statModifier) + ")";
         return res;
+    }
+
+    // Tira i dadi del danno al posto del giocatore (colpo critico = dadi raddoppiati).
+    DamageRollResult RollDamage(const DiceExpr& weaponDice, int statModifier, bool isCrit = false) {
+        int diceCount = isCrit ? weaponDice.count * 2 : weaponDice.count;
+        DiceResult diceRes = RollDice(diceCount, weaponDice.sides);
+        return ResolveDamage(weaponDice, diceRes.dice, statModifier);
     }
 };
 

@@ -8,7 +8,7 @@
 
 class Mob;
 
-// Dado "semplice" usato SOLO per i tiri che non sono un singolo d20 (1d4, 2d6, 3d20, ...).
+// Dado "semplice": serve solo per i tiri che la board gotica non sa mostrare (facce diverse da 4/6/8/10/12/20).
 struct VisualDice3D {
     Vector3 position{ 0.0f, 0.0f, 0.0f };
     Vector3 velocity{ 0.0f, 0.0f, 0.0f };
@@ -20,12 +20,13 @@ struct VisualDice3D {
     Color color = WHITE;
 };
 
-// Un singolo d20 (attacco contro un Mob oppure 1d20 libero) usa la board gotica originale:
-// feltro, guglie, d20 3D con ricamo dorato, lancio trascinando con il mouse.
-// Qualsiasi altra espressione di dadi usa il vecchio percorso con i dadi 3D semplici.
+// Board gotica: feltro, guglie, dado 3D con ricamo dorato, lancio trascinando col mouse.
+//  - Attacco (Mob*): lanci il d20; se COLPISCI devi lanciare anche il dado del danno
+//    (con un colpo critico i dadi del danno sono il doppio, e li lanci uno dopo l'altro).
+//  - Tiro libero (DiceExpr): lanci d4/d6/d8/d10/d12/d20, uno per volta fino a NdX.
 class DiceRollState : public GameState {
 public:
-    // Tiro di attacco d20 (+ eventuale danno) contro un bersaglio
+    // Tiro di attacco d20 contro un bersaglio (+ dado del danno se colpisce)
     DiceRollState(Game* game, Mob* target);
 
     // Tiro libero: 1d4, 2d6, 1d8, 1d10, 1d12, 1d20, ...
@@ -40,16 +41,23 @@ public:
     void HandleInput() override;
 
 private:
-    // --- board gotica (d20) ---
+    enum class Phase { Attack, Damage, Free };      // a cosa serve il dado che hai davanti
+    enum class Pending { None, ReArm, ToDamage };   // piccola pausa tra un lancio e il successivo
+
+    // --- board gotica ---
     void SetupGothicBoard();
-    core::CombatRoll ThrowGothicDie();   // chiamata dal DiceRoller quando lanci il dado
+    core::CombatRoll ThrowGothicDie();              // chiamata dal DiceRoller quando lanci il dado
+    void OnThrowResolved(const core::CombatRoll& r);
+    void BeginPool(const core::DiceExpr& pool);     // mette sul feltro il dado giusto, pronto da lanciare
+    core::DiceExpr DamagePool() const;
+    void FinishDamage();
     Rectangle Board() const;
     Rectangle Felt() const;
     void UpdateGothic(float deltaTime);
     void RenderGothic();
     void HandleInputGothic();
 
-    // --- dadi semplici (tutto il resto) ---
+    // --- dadi semplici ---
     void InitDicePhysics();
     void UpdateSimple(float deltaTime);
     void RenderSimple();
@@ -66,12 +74,18 @@ private:
     core::DamageRollResult m_damageResult{};
     bool m_isCombatRoll = false;
     bool m_attackRolled = false;    // l'attacco e' stato lanciato davvero
-    bool m_damageRolled = false;
+    bool m_damageRolled = false;    // tutti i dadi del danno sono stati lanciati
     bool m_damageApplied = false;
-    bool m_combatDone = false;      // un attacco si lancia una volta sola
+    bool m_combatDone = false;      // un attacco (con il suo danno) si lancia una volta sola
 
     // board gotica
     bool m_gothic = false;
+    Phase m_phase = Phase::Free;
+    Pending m_pending = Pending::None;
+    float m_pendingTimer = 0.0f;
+    core::DiceExpr m_pool{ 1, 20 };          // dadi del lancio in corso
+    std::vector<int> m_poolValues;           // quelli gia' lanciati
+    bool m_poolDone = false;
     ui::DiceRoller m_dice;
     core::CombatRoll m_result{};
     bool m_showResult = false;

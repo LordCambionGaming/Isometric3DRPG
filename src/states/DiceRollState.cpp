@@ -6,12 +6,27 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
+#include <algorithm>
 #include <cmath>
 #include <memory>
+#include <string>
 
 using namespace ui::theme;
 
 namespace {
+
+// Regole del colpo (per ora fisse: quando ci sara' un'arma equipaggiata andranno lette da li)
+const core::DiceExpr kWeaponDice{ 1, 6 };
+constexpr int   kAttackBonus    = 0;
+constexpr int   kDamageModifier = 2;
+constexpr int   kMaxPoolDice    = 8;      // oltre, i dadi si tirano col vecchio percorso semplice
+constexpr float kPendingDelay   = 1.1f;   // pausa per leggere il risultato prima del dado successivo
+
+std::string JoinValues(const std::vector<int>& v) {
+    std::string s;
+    for (size_t i = 0; i < v.size(); ++i) s += (i ? " + " : "") + std::to_string(v[i]);
+    return s;
+}
 
 Rectangle Inset(Rectangle r, float d) {
     return { r.x + d, r.y + d, r.width - 2 * d, r.height - 2 * d };
@@ -68,43 +83,112 @@ DiceRollState::DiceRollState(Game* game, core::DiceExpr expr)
 
 DiceRollState::~DiceRollState() = default;
 
-// Un singolo d20 -> board gotica. Tutto il resto -> dadi semplici.
+// d4/d6/d8/d10/d12/d20 (fino a kMaxPoolDice dadi) -> board gotica. Il resto -> dadi semplici.
 void DiceRollState::SetupGothicBoard() {
-    m_gothic = (m_diceExpr.count == 1 && m_diceExpr.sides == 20);
-    if (m_gothic) {
-        m_dice.SetRollProvider([this]() -> core::CombatRoll { return ThrowGothicDie(); });
-    }
+    m_gothic = ui::IsSupportedDie(m_diceExpr.sides) &&
+               m_diceExpr.count >= 1 && m_diceExpr.count <= kMaxPoolDice;
+    if (!m_gothic) return;
+
+    m_phase = IsCombat() ? Phase::Attack : Phase::Free;
+    m_pool = m_diceExpr;
+    m_dice.SetSides(m_pool.sides);
+    m_dice.SetRollProvider([this]() -> core::CombatRoll { return ThrowGothicDie(); });
 }
 
 // Il vero tiro viene deciso qui, nell'istante in cui lanci il dado; la faccia finale lo mostra.
 core::CombatRoll DiceRollState::ThrowGothicDie() {
     core::CombatRoll roll;
-    core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
 
-    if (IsCombat() && cs) {
-        m_attackResult = cs->RollAttack(0, m_target->GetArmorClass());
-        m_attackRolled = true;
-        m_damageRolled = false;
-        m_damageResult = core::DamageRollResult{};
-        if (m_attackResult.isHit) {
-            m_damageResult = cs->RollDamage({ 1, 6 }, 2,
-                m_attackResult.resultType == core::CombatResult::CriticalSuccess);
-            m_damageRolled = true;
+    if (m_phase == Phase::Attack) {
+        core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
+        if (cs) {
+            m_attackResult = cs->RollAttack(kAttackBonus, m_target->GetArmorClass());
+            m_attackRolled = true;
+            roll.rollValue = m_attackResult.d20Roll;
+            roll.result = m_attackResult.resultType;
+            roll.description = m_attackResult.log;
+            return roll;
         }
-        roll.rollValue = m_attackResult.d20Roll;
-        roll.result = m_attackResult.resultType;
-        roll.description = m_attackResult.log;
-        return roll;
     }
 
-    const int v = core::RollDie(20);
-    m_diceResult.dice = { v };
-    m_diceResult.total = v;
+    // un tiro libero gia' completato, se lo rilanci, ricomincia da capo
+    if (m_phase == Phase::Free && m_poolDone) {
+        m_poolValues.clear();
+        m_poolDone = false;
+    }
+
+    const int v = core::RollDie(m_pool.sides);
     roll.rollValue = v;
-    roll.result = (v == 1)  ? core::CombatResult::CriticalFailure
-                : (v == 20) ? core::CombatResult::CriticalSuccess
-                            : core::CombatResult::Normal;
+    roll.result = core::CombatResult::Normal;
+    if (m_pool.sides == 20) {
+        if (v == 1)  roll.result = core::CombatResult::CriticalFailure;
+        if (v == 20) roll.result = core::CombatResult::CriticalSuccess;
+    }
     return roll;
+}
+
+core::DiceExpr DiceRollState::DamagePool() const {
+    const bool crit = m_attackRolled && m_attackResult.resultType == core::CombatResult::CriticalSuccess;
+    return core::DiceExpr{ kWeaponDice.count * (crit ? 2 : 1), kWeaponDice.sides };
+}
+
+// Mette sul feltro il dado giusto (cambia solido e atlas se serve), pronto per essere afferrato.
+void DiceRollState::BeginPool(const core::DiceExpr& pool) {
+    m_pool = pool;
+    m_poolValues.clear();
+    m_poolDone = false;
+    m_dice.SetSides(pool.sides);
+    m_dice.Reset();
+    m_showResult = false;
+}
+
+void DiceRollState::FinishDamage() {
+    core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
+    if (cs) {
+        m_damageResult = cs->ResolveDamage(kWeaponDice, m_poolValues, kDamageModifier);
+        m_damageRolled = true;
+    }
+    m_combatDone = true;
+}
+
+// Chiamata quando il dado si e' fermato E allineato sulla faccia: decide cosa succede dopo.
+void DiceRollState::OnThrowResolved(const core::CombatRoll& r) {
+    m_result = r;
+    m_showResult = true;
+
+    switch (m_phase) {
+        case Phase::Attack:
+            if (m_attackRolled && m_attackResult.isHit) {
+                m_pending = Pending::ToDamage;      // colpito: ora si tira il dado del danno
+                m_pendingTimer = 0.0f;
+            } else {
+                m_combatDone = true;                // mancato / fallimento critico: finito
+            }
+            break;
+
+        case Phase::Damage:
+            m_poolValues.push_back(r.rollValue);
+            if ((int)m_poolValues.size() < m_pool.count) {
+                m_pending = Pending::ReArm;         // colpo critico: altro dado del danno
+                m_pendingTimer = 0.0f;
+            } else {
+                FinishDamage();
+            }
+            break;
+
+        case Phase::Free:
+            m_poolValues.push_back(r.rollValue);
+            if ((int)m_poolValues.size() < m_pool.count) {
+                m_pending = Pending::ReArm;         // NdX: prossimo dado
+                m_pendingTimer = 0.0f;
+            } else {
+                m_poolDone = true;
+                m_diceResult.dice = m_poolValues;
+                m_diceResult.total = 0;
+                for (int v : m_poolValues) m_diceResult.total += v;
+            }
+            break;
+    }
 }
 
 Rectangle DiceRollState::Board() const {
@@ -127,11 +211,12 @@ void DiceRollState::Enter() {
     if (m_gothic) {
         DiceFont();                         // carica il font dei dadi ora, non a meta' frame
         m_dice.SetBounds(Felt());
-        m_dice.Reset();
         m_result = core::CombatRoll{};
-        m_showResult = false;
         m_time = 0.0f;
         m_attackRolled = m_damageRolled = m_damageApplied = m_combatDone = false;
+        m_pending = Pending::None;
+        m_phase = IsCombat() ? Phase::Attack : Phase::Free;
+        BeginPool(m_diceExpr);
         return;
     }
 
@@ -147,8 +232,22 @@ void DiceRollState::Enter() {
 }
 
 void DiceRollState::Exit() {
-    // Il danno si applica una sola volta, e solo se l'attacco e' stato davvero lanciato e ha colpito.
-    if (IsCombat() && m_attackRolled && m_attackResult.isHit && m_damageRolled && !m_damageApplied) {
+    // Il danno si applica una sola volta, e solo se l'attacco e' stato lanciato davvero e ha colpito.
+    if (!(IsCombat() && m_attackRolled && m_attackResult.isHit) || m_damageApplied) return;
+
+    if (!m_damageRolled) {
+        // Hai chiuso la board dopo aver colpito ma prima di aver lanciato tutti i dadi del danno:
+        // un colpo a segno non si perde, i dadi che mancano li tira il gioco.
+        core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
+        if (cs) {
+            const core::DiceExpr pool = DamagePool();
+            std::vector<int> dice = (m_phase == Phase::Damage) ? m_poolValues : std::vector<int>{};
+            while ((int)dice.size() < pool.count) dice.push_back(core::RollDie(pool.sides));
+            m_damageResult = cs->ResolveDamage(kWeaponDice, dice, kDamageModifier);
+            m_damageRolled = true;
+        }
+    }
+    if (m_damageRolled) {
         m_damageApplied = true;
         m_target->TakeDamage(m_damageResult.totalDamage);
     }
@@ -170,21 +269,33 @@ void DiceRollState::HandleInput() {
 }
 
 // ---------------------------------------------------------------------------
-// Board gotica (il tuo d20 originale)
+// Board gotica
 // ---------------------------------------------------------------------------
 
 void DiceRollState::UpdateGothic(float deltaTime) {
     m_time += deltaTime;
     m_dice.Update(deltaTime);
 
+    // pausa tra un lancio e il successivo, poi si prepara il dado giusto
+    if (m_pending != Pending::None) {
+        m_pendingTimer += deltaTime;
+        if (m_pendingTimer >= kPendingDelay && !m_dice.IsBusy()) {
+            const Pending p = m_pending;
+            m_pending = Pending::None;
+            if (p == Pending::ToDamage) {
+                m_phase = Phase::Damage;
+                BeginPool(DamagePool());            // d6 del danno (due se critico)
+            } else {
+                m_dice.Reset();                     // stesso tipo di dado, lancio successivo
+                m_showResult = false;
+            }
+        }
+    }
+
     if (m_dice.IsBusy()) m_showResult = false;
 
     core::CombatRoll r;
-    if (m_dice.ConsumeResult(r)) {
-        m_result = r;
-        m_showResult = true;
-        if (IsCombat()) m_combatDone = true;   // l'attacco e' stato mostrato: niente secondo lancio
-    }
+    if (m_dice.ConsumeResult(r)) OnThrowResolved(r);
 }
 
 void DiceRollState::RenderGothic() {
@@ -256,37 +367,85 @@ void DiceRollState::RenderGothic() {
     DrawCornerGem({ b.x + b.width - 14.0f, b.y + b.height - 14.0f });
 
     // --- messaggio (nessun titolo) ---------------------------------------
+    const int have = (int)m_poolValues.size();
     const char* banner = "";
     Color bannerColor = kBone;
+    std::string subline;
+
     if (m_showResult) {
-        const char* label = "Tiro normale";
-        if (m_result.result == core::CombatResult::CriticalSuccess) {
-            label = "Successo critico!"; bannerColor = kGoldBright;
-        } else if (m_result.result == core::CombatResult::CriticalFailure) {
-            label = "Fallimento critico!"; bannerColor = kBlood;
-        }
-        if (IsCombat() && m_attackRolled) {
-            // esito dell'attacco calcolato da CombatSystem (Colpito! / Mancato! / critici)
-            label = m_attackResult.log.c_str();
-            if (m_result.result == core::CombatResult::Normal && !m_attackResult.isHit) {
-                bannerColor = Fade(kBone, 0.6f);
+        switch (m_phase) {
+            case Phase::Attack: {
+                const char* label = "Tiro normale";
+                if (m_result.result == core::CombatResult::CriticalSuccess) {
+                    label = "Successo critico!"; bannerColor = kGoldBright;
+                } else if (m_result.result == core::CombatResult::CriticalFailure) {
+                    label = "Fallimento critico!"; bannerColor = kBlood;
+                }
+                if (m_attackRolled) {
+                    // esito dell'attacco calcolato da CombatSystem (Colpito! / Mancato! / critici)
+                    label = m_attackResult.log.c_str();
+                    if (m_result.result == core::CombatResult::Normal && !m_attackResult.isHit) {
+                        bannerColor = Fade(kBone, 0.6f);
+                    }
+                }
+                banner = TextFormat("%d  -  %s", m_result.rollValue, label);
+                if (m_pending == Pending::ToDamage) subline = "Ora tira il dado del danno";
+                break;
             }
+            case Phase::Damage:
+                if (m_damageRolled) {
+                    banner = TextFormat("%s", m_damageResult.log.c_str());
+                    bannerColor = kGoldBright;
+                    subline = "Dadi: " + JoinValues(m_poolValues) + "   Modificatore: +" + std::to_string(kDamageModifier);
+                } else {
+                    banner = TextFormat("Dado %d/%d:  %d", have, m_pool.count, m_result.rollValue);
+                    subline = "Dadi: " + JoinValues(m_poolValues);
+                }
+                break;
+            case Phase::Free:
+                if (m_pool.count == 1) {
+                    if (m_pool.sides == 20) {
+                        const char* label = "Tiro normale";
+                        if (m_result.result == core::CombatResult::CriticalSuccess) {
+                            label = "Successo critico!"; bannerColor = kGoldBright;
+                        } else if (m_result.result == core::CombatResult::CriticalFailure) {
+                            label = "Fallimento critico!"; bannerColor = kBlood;
+                        }
+                        banner = TextFormat("%d  -  %s", m_result.rollValue, label);
+                    } else {
+                        banner = TextFormat("%d  -  d%d", m_result.rollValue, m_pool.sides);
+                    }
+                } else if (m_poolDone) {
+                    banner = TextFormat("Risultato %s: %d", core::ToString(m_pool).c_str(), m_diceResult.total);
+                    bannerColor = kGoldBright;
+                    subline = "Dadi: " + JoinValues(m_poolValues);
+                } else {
+                    banner = TextFormat("Dado %d/%d:  %d", have, m_pool.count, m_result.rollValue);
+                    subline = "Dadi: " + JoinValues(m_poolValues);
+                }
+                break;
         }
-        banner = TextFormat("%d  -  %s", m_result.rollValue, label);
     } else {
+        const int next = (m_phase == Phase::Free && m_poolDone) ? 1 : have + 1;
         switch (m_dice.GetState()) {
-            case ui::DiceRoller::State::Idle:     banner = "Afferra il dado e scaglialo sul feltro"; break;
-            case ui::DiceRoller::State::Dragging: banner = "Lascia andare con uno scatto!";          break;
-            default:                              banner = "Il destino rotola...";                   break;
+            case ui::DiceRoller::State::Idle:
+                if (m_phase == Phase::Damage) {
+                    banner = (m_pool.count == 1) ? "Colpito! Lancia il dado del danno"
+                                                 : TextFormat("Lancia il dado del danno (%d/%d)", next, m_pool.count);
+                } else if (m_phase == Phase::Free && m_pool.count > 1) {
+                    banner = TextFormat("Lancia il dado (%d/%d)", next, m_pool.count);
+                } else {
+                    banner = "Afferra il dado e scaglialo sul feltro";
+                }
+                break;
+            case ui::DiceRoller::State::Dragging: banner = "Lascia andare con uno scatto!"; break;
+            default:                              banner = "Il destino rotola...";          break;
         }
         bannerColor = Fade(kBone, 0.75f);
+        if (m_phase != Phase::Attack && have > 0 && !m_poolDone) subline = "Dadi: " + JoinValues(m_poolValues);
     }
     DrawTextCentered(font, banner, cx, b.y + 30.0f, 32.0f, bannerColor);
-
-    // danno dell'attacco, sotto al messaggio (solo se ha colpito)
-    if (m_showResult && IsCombat() && m_damageRolled) {
-        DrawTextCentered(font, m_damageResult.log.c_str(), cx, b.y + 62.0f, 20.0f, kGold);
-    }
+    if (!subline.empty()) DrawTextCentered(font, subline.c_str(), cx, b.y + 62.0f, 20.0f, kGold);
 
     // --- dado ------------------------------------------------------------
     m_dice.Render();
@@ -296,8 +455,10 @@ void DiceRollState::RenderGothic() {
 }
 
 void DiceRollState::HandleInputGothic() {
-    // Un attacco si lancia una sola volta: dopo il risultato il dado non si puo' riafferrare.
-    if (!(IsCombat() && m_combatDone)) {
+    // Durante la pausa tra due lanci e dopo la fine di un attacco il dado non si puo' afferrare
+    // (un attacco si lancia una volta sola: niente rilanci finche' non colpisci).
+    const bool locked = (m_pending != Pending::None) || (IsCombat() && m_combatDone);
+    if (!locked) {
         m_dice.HandleInput();
     }
 

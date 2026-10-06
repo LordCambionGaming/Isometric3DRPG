@@ -9,18 +9,19 @@ namespace ui {
 
 namespace {
 
-constexpr float kRadius        = 46.0f;    
-constexpr float kDrawScale     = 2.6f;     
+constexpr float kRadius        = 46.0f;    // raggio fisico / di presa
+constexpr float kDrawScale     = 2.6f;     // lato della texture = kRadius * kDrawScale
 constexpr float kMinThrowSpeed = 300.0f;
 constexpr float kMaxThrowSpeed = 2600.0f;
 constexpr float kFriction      = 2.2f;
 constexpr float kBounce        = 0.70f;
 constexpr float kStopSpeed     = 60.0f;
-constexpr float kAlignSpeed    = 500.0f;   
-constexpr float kRollFactor    = 0.35f;    
+constexpr float kAlignSpeed    = 500.0f;   // sotto questa velocita' il dado inizia ad allinearsi
+constexpr float kRollFactor    = 0.35f;    // quanto "rotola" rispetto alla velocita'
 
-constexpr int   kCell   = 192;             
-constexpr float kTriR   = 86.0f;           
+constexpr int   kCell   = 192;             // cella dell'atlas per faccia
+constexpr int   kCols   = 5;
+constexpr int   kRows   = 4;
 constexpr int   kRTSize = 384;
 
 const Vector3 kIdleSpin{ 0.35f, 0.8f, 0.15f };
@@ -34,9 +35,18 @@ Quaternion SlerpShortest(Quaternion a, Quaternion b, float t) {
     return QuaternionNormalize(QuaternionSlerp(a, b, t));
 }
 
+// Rotolamento: dalla velocita' sullo schermo (y verso il basso) alla velocita' angolare
 Vector3 Rolling(Vector2 v) {
     const float k = kRollFactor / kRadius;
     return { v.y * k, v.x * k, 0.0f };
+}
+
+// UV (0..1) del vertice k della faccia nell'atlas. Il contorno 2D di ogni faccia e' calcolato in DiceGeometry.
+Vector2 FaceUV(const DiceFace& face, int faceIndex, int k) {
+    const float W = (float)(kCell * kCols), H = (float)(kCell * kRows);
+    const float cx = (faceIndex % kCols) * kCell + kCell / 2.0f;
+    const float cy = (faceIndex / kCols) * kCell + kCell / 2.0f;
+    return { (cx + face.poly[k].x) / W, (cy + face.poly[k].y) / H };
 }
 
 unsigned char Clamp8(int v) { return (unsigned char)std::max(0, std::min(255, v)); }
@@ -47,11 +57,13 @@ void ImageThickLine(Image* img, Vector2 a, Vector2 b, int thick, Color c) {
     if (len < 1.0f) return;
     const Vector2 nrm = { -d.y / len, d.x / len };
     for (int i = -thick / 2; i <= thick / 2; ++i) {
-        ImageDrawLine(img, (int)(a.x + nrm.x * i), (int)(a.y + nrm.y * i),
-                           (int)(b.x + nrm.x * i), (int)(b.y + nrm.y * i), c);
+        ImageDrawLine(img,
+            (int)(a.x + nrm.x * i), (int)(a.y + nrm.y * i),
+            (int)(b.x + nrm.x * i), (int)(b.y + nrm.y * i), c);
     }
 }
 
+// Linea tratteggiata: i "punti" del ricamo
 void ImageDashedLine(Image* img, Vector2 a, Vector2 b, float dash, float gap, int thick, Color c) {
     const Vector2 d = Vector2Subtract(b, a);
     const float len = Vector2Length(d);
@@ -59,16 +71,20 @@ void ImageDashedLine(Image* img, Vector2 a, Vector2 b, float dash, float gap, in
     const Vector2 dir = Vector2Scale(d, 1.0f / len);
     for (float t = 0.0f; t < len; t += dash + gap) {
         const float e = std::min(t + dash, len);
-        ImageThickLine(img, Vector2Add(a, Vector2Scale(dir, t)), Vector2Add(a, Vector2Scale(dir, e)), thick, c);
+        ImageThickLine(img, Vector2Add(a, Vector2Scale(dir, t)),
+                            Vector2Add(a, Vector2Scale(dir, e)), thick, c);
     }
 }
 
+// Punto a croce (cross-stitch)
 void ImageCrossStitch(Image* img, Vector2 c, float s, Color col) {
     ImageThickLine(img, { c.x - s, c.y - s }, { c.x + s, c.y + s }, 2, col);
     ImageThickLine(img, { c.x - s, c.y + s }, { c.x + s, c.y - s }, 2, col);
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
 
 DiceRoller::DiceRoller() {
     BuildGeometry();
@@ -84,167 +100,85 @@ DiceRoller::~DiceRoller() {
     }
 }
 
-void DiceRoller::SetSides(int sides) {
-    if (m_sides == sides) return;
-    m_sides = sides;
-    if (m_ready && IsWindowReady()) {
-        UnloadTexture(m_atlas);
-        m_atlas.id = 0;
-    }
-    m_ready = false;
-    BuildGeometry();
-}
-
 void DiceRoller::BuildGeometry() {
-    m_v.clear(); 
-    m_faces.clear();
-    m_faceOfNumber.assign(m_sides + 1, 0);
-
-    if (m_sides == 4) { // D4 (Tetraedro)
-        m_v = {{1,1,1}, {1,-1,-1}, {-1,1,-1}, {-1,-1,1}};
-        int f[4][3] = {{0,2,1}, {0,1,3}, {0,3,2}, {1,2,3}};
-        for(auto& arr : f) m_faces.push_back({{arr[0], arr[1], arr[2]}, {0,0,0}, 0});
-    }
-    else if (m_sides == 6) { // D6 (Cubo)
-        m_v = {{-1,-1,-1}, {1,-1,-1}, {1,1,-1}, {-1,1,-1}, {-1,-1,1}, {1,-1,1}, {1,1,1}, {-1,1,1}};
-        int f[6][4] = {{0,3,2,1}, {5,6,7,4}, {1,2,6,5}, {4,7,3,0}, {3,7,6,2}, {4,0,1,5}};
-        for(auto& arr : f) m_faces.push_back({{arr[0], arr[1], arr[2], arr[3]}, {0,0,0}, 0});
-    }
-    else if (m_sides == 8) { // D8 (Ottaedro)
-        m_v = {{1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}};
-        int f[8][3] = {{0,4,2}, {2,4,1}, {1,4,3}, {3,4,0}, {0,2,5}, {2,1,5}, {1,3,5}, {3,0,5}};
-        for(auto& arr : f) m_faces.push_back({{arr[0], arr[1], arr[2]}, {0,0,0}, 0});
-    }
-    else if (m_sides == 10) { // D10 (Trapezoedro Pentagonale)
-        m_v.push_back({0, 1, 0}); m_v.push_back({0, -1, 0});
-        for(int i=0; i<10; ++i) {
-            float a = i * PI / 5.0f;
-            float y = (i % 2 == 0) ? 0.2f : -0.2f;
-            m_v.push_back({std::cos(a), y, std::sin(a)});
-        }
-        for(int i=0; i<10; ++i) {
-            if (i % 2 == 0) m_faces.push_back({{0, 2+i, 2+(i+1)%10, 2+(i+9)%10}, {0,0,0}, 0});
-            else m_faces.push_back({{1, 2+i, 2+(i+1)%10, 2+(i+9)%10}, {0,0,0}, 0});
-        }
-    }
-    else if (m_sides == 12) { // D12 (Dodecaedro)
-        const float p = 1.6180339887f, q = 1.0f/p;
-        m_v = {{-1,-1,-1}, {1,-1,-1}, {1,1,-1}, {-1,1,-1}, {-1,-1,1}, {1,-1,1}, {1,1,1}, {-1,1,1},
-               {0,-q,-p}, {0,q,-p}, {0,-q,p}, {0,q,p}, {-p,0,-q}, {p,0,-q}, {-p,0,q}, {p,0,q},
-               {-q,-p,0}, {q,-p,0}, {-q,p,0}, {q,p,0}};
-        int f[12][5] = {{9,8,1,13,2}, {8,9,3,12,0}, {10,11,7,14,4}, {11,10,5,15,6}, {12,14,7,18,3}, {14,12,0,16,4},
-                        {15,13,1,17,5}, {13,15,6,19,2}, {16,17,1,8,0}, {17,16,4,10,5}, {18,19,2,9,3}, {19,18,7,11,6}};
-        for(auto& arr : f) m_faces.push_back({{arr[0], arr[1], arr[2], arr[3], arr[4]}, {0,0,0}, 0});
-    }
-    else { // D20 (Icosaedro) - Default
-        m_sides = 20;
-        const float t = (1.0f + std::sqrt(5.0f)) * 0.5f;
-        m_v = {{-1, t, 0}, { 1, t, 0}, {-1,-t, 0}, { 1,-t, 0}, { 0,-1, t}, { 0, 1, t}, { 0,-1,-t}, { 0, 1,-t}, { t, 0,-1}, { t, 0, 1}, {-t, 0,-1}, {-t, 0, 1}};
-        int f[20][3] = {{0,11,5},{0,5,1},{0,1,7},{0,7,10},{0,10,11},{1,5,9},{5,11,4},{11,10,2},{10,7,6},{7,1,8},{3,9,4},{3,4,2},{3,2,6},{3,6,8},{3,8,9},{4,9,5},{2,4,11},{6,2,10},{8,6,7},{9,8,1}};
-        for(auto& arr : f) m_faces.push_back({{arr[0], arr[1], arr[2]}, {0,0,0}, 0});
-    }
-
-    for(auto& v : m_v) v = Vector3Normalize(v); // normalizza per farlo rotolare fluido
-
-    for (auto& face : m_faces) {
-        Vector3 a = m_v[face.v[0]], b = m_v[face.v[1]], c = m_v[face.v[2]];
-        Vector3 n = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
-        
-        Vector3 center = {0,0,0};
-        for(int idx : face.v) center = Vector3Add(center, m_v[idx]);
-        
-        if (Vector3DotProduct(n, center) < 0) { // assicura orientamento all'esterno
-            std::reverse(face.v.begin(), face.v.end());
-            n = { -n.x, -n.y, -n.z };
-        }
-        face.n = n;
-    }
-
-    // Numerazione: le facce opposte (se parallele) sommano sides + 1
-    int number = 1;
-    for (int i = 0; i < m_sides; ++i) {
-        if (m_faces[i].number != 0) continue;
-        m_faces[i].number = number;
-        for (int j = i + 1; j < m_sides; ++j) {
-            if (m_faces[j].number == 0 && Vector3DotProduct(m_faces[i].n, m_faces[j].n) < -0.95f) {
-                m_faces[j].number = m_sides + 1 - number;
-                break;
-            }
-        }
-        number++;
-    }
-    // Riempi eventuali buchi (es. il D4 non ha facce parallele opposte)
-    number = 1;
-    for (int i = 0; i < m_sides; ++i) {
-        if (m_faces[i].number == 0) {
-            while(std::find_if(m_faces.begin(), m_faces.end(), [&](const Polygon& p){return p.number == number;}) != m_faces.end()) number++;
-            m_faces[i].number = number++;
-        }
-        m_faceOfNumber[m_faces[i].number] = i;
-    }
-}
-
-Vector2 DiceRoller::FaceUV(int face, int k) const {
-    int vCount = m_faces[face].v.size();
-    const float W = (float)(kCell * m_atlasCols), H = (float)(kCell * m_atlasRows);
-    const float cx = (face % m_atlasCols) * kCell + kCell / 2.0f;
-    const float cy = (face / m_atlasCols) * kCell + kCell / 2.0f;
-    float a = k * (2.0f * PI / vCount) - PI / 2.0f;
-    Vector2 p = { cx + std::cos(a) * kTriR, cy + std::sin(a) * kTriR };
-    return { p.x / W, p.y / H };
+    m_shape = BuildDiceShape(m_sides);
 }
 
 void DiceRoller::BuildAtlas() {
-    m_atlasCols = std::ceil(std::sqrt(m_sides));
-    m_atlasRows = std::ceil((float)m_sides / m_atlasCols);
-
-    const Color obsidian = { 32, 29, 40, 255 };
-    Image img = GenImageColor(kCell * m_atlasCols, kCell * m_atlasRows, obsidian);
+    const Color obsidian = { 32, 29, 40, 255 };   // nero con riflesso viola
+    Image img = GenImageColor(kCell * kCols, kCell * kRows, obsidian);
     const Font font = theme::DiceFont();
 
-    const Color thread  = theme::kGold;           
-    const Color threadD = theme::kGoldDim;        
+    const Color thread  = theme::kGold;           // filo d'oro
+    const Color threadD = theme::kGoldDim;        // filo piu' scuro
 
-    for (int f = 0; f < m_sides; ++f) {
-        const int ox = (f % m_atlasCols) * kCell;
-        const int oy = (f / m_atlasCols) * kCell;
+    for (int f = 0; f < m_shape.faceCount; ++f) {
+        const DiceFace& face = m_shape.face[f];
+        const int cnt = face.count;               // 3 (triangolo), 4 (quadrato/aquilone), 5 (pentagono)
+        const int ox = (f % kCols) * kCell;
+        const int oy = (f / kCols) * kCell;
+
+        // nero, con leggerissima variazione per faccia
         const int var = ((f * 37) % 9) - 4;
-        const Color base = { Clamp8(obsidian.r + var), Clamp8(obsidian.g + var), Clamp8(obsidian.b + var), 255 };
+        const Color base = { Clamp8(obsidian.r + var), Clamp8(obsidian.g + var),
+                             Clamp8(obsidian.b + var), 255 };
         ImageDrawRectangle(&img, ox, oy, kCell, kCell, base);
 
         const Vector2 c = { ox + kCell / 2.0f, oy + kCell / 2.0f };
-        int vCount = m_faces[f].v.size();
 
-        auto poly = [&](float s, std::vector<Vector2>& out) {
-            for(int i = 0; i < vCount; ++i) {
-                float a = i * (2.0f * PI / vCount) - PI / 2.0f;
-                out.push_back({ c.x + std::cos(a) * kTriR * s, c.y + std::sin(a) * kTriR * s });
-            }
+        // contorno della faccia scalato attorno al centro
+        auto poly = [&](float s, Vector2 out[5]) {
+            for (int i = 0; i < cnt; ++i)
+                out[i] = { c.x + face.poly[i].x * s, c.y + face.poly[i].y * s };
         };
 
-        std::vector<Vector2> outer, mid, inner, orn;
-        poly(1.00f, outer); poly(0.88f, mid); poly(0.76f, inner); poly(0.60f, orn);
+        Vector2 outer[5], mid[5], inner[5], orn[5];
+        poly(1.00f, outer);
+        poly(0.88f, mid);
+        poly(0.76f, inner);
+        poly(cnt == 3 ? 0.60f : 0.80f, orn);      // sulle facce piu' grandi le perle stanno piu' fuori, lontane dal numero
 
-        for (int i = 0; i < vCount; ++i) {
-            int next = (i + 1) % vCount;
-            ImageThickLine(&img, outer[i], outer[next], 6, threadD);
-            ImageThickLine(&img, mid[i], mid[next], 2, thread);
-            ImageDashedLine(&img, inner[i], inner[next], 7.0f, 5.0f, 2, threadD);
+        // 1) bordo: cordoncino dorato lungo lo spigolo della faccia
+        for (int i = 0; i < cnt; ++i) ImageThickLine(&img, outer[i], outer[(i + 1) % cnt], 6, threadD);
 
+        // 2) filo continuo sottile
+        for (int i = 0; i < cnt; ++i) ImageThickLine(&img, mid[i], mid[(i + 1) % cnt], 2, thread);
+
+        // 3) punti di cucitura tratteggiati
+        for (int i = 0; i < cnt; ++i)
+            ImageDashedLine(&img, inner[i], inner[(i + 1) % cnt], 7.0f, 5.0f, 2, threadD);
+
+        // 4) ornamenti ai vertici: perla con anello
+        for (int i = 0; i < cnt; ++i) {
             ImageDrawCircle(&img, (int)orn[i].x, (int)orn[i].y, 3, thread);
             ImageDrawCircleLines(&img, (int)orn[i].x, (int)orn[i].y, 7, threadD);
+        }
 
-            const Vector2 m = Vector2Scale(Vector2Add(mid[i], mid[next]), 0.5f);
+        // 5) punto a croce a meta' di ogni lato, verso l'interno
+        for (int i = 0; i < cnt; ++i) {
+            const Vector2 m = Vector2Scale(Vector2Add(mid[i], mid[(i + 1) % cnt]), 0.5f);
             const Vector2 toC = Vector2Normalize(Vector2Subtract(c, m));
             ImageCrossStitch(&img, Vector2Add(m, Vector2Scale(toC, 9.0f)), 3.0f, thread);
         }
 
-        const int n = m_faces[f].number;
-        const char* txt = (n == 6 || n == 9) ? TextFormat("%d.", n) : TextFormat("%d", n);
-        const float size = 72.0f;
-        const float spacing = size / 14.0f;
-        const Vector2 mText = MeasureTextEx(font, txt, size, spacing);
-        const Vector2 pos = { c.x - mText.x / 2.0f, c.y - mText.y / 2.0f + 3.0f };
+        // 6) numero: font gotico, oro con ombra nera. 6 e 9 hanno il puntino quando il dado ha entrambi.
+        const int n = face.number;
+        const bool dotted = (m_sides >= 9) && (n == 6 || n == 9);
+        const char* txt = dotted ? TextFormat("%d.", n) : TextFormat("%d", n);
+
+        // il d20 resta identico all'originale (72 px); gli altri dadi dimensionano il numero sulla faccia
+        float size = (m_sides == 20) ? 72.0f : std::min(1.67f * face.inRadius, 88.0f);
+        float spacing = size / 14.0f;
+        Vector2 m = MeasureTextEx(font, txt, size, spacing);
+        if (m_sides != 20) {
+            const float maxW = 1.5f * face.inRadius;       // i numeri a due cifre si restringono per stare nella faccia
+            if (m.x > maxW) {
+                size *= maxW / m.x;
+                spacing = size / 14.0f;
+                m = MeasureTextEx(font, txt, size, spacing);
+            }
+        }
+        const Vector2 pos = { c.x - m.x / 2.0f, c.y - m.y / 2.0f + 3.0f };
         ImageDrawTextEx(&img, font, txt, { pos.x + 2, pos.y + 2 }, size, spacing, { 0, 0, 0, 255 });
         ImageDrawTextEx(&img, font, txt, pos, size, spacing, theme::kGoldBright);
     }
@@ -257,13 +191,14 @@ void DiceRoller::BuildAtlas() {
 void DiceRoller::EnsureResources() {
     if (m_ready) return;
     BuildAtlas();
-    if (m_rt.id == 0) m_rt = LoadRenderTexture(kRTSize, kRTSize);
+    m_rt = LoadRenderTexture(kRTSize, kRTSize);
     SetTextureFilter(m_rt.texture, TEXTURE_FILTER_BILINEAR);
     m_ready = true;
 }
 
 Vector2 DiceRoller::RestPos() const {
-    return { m_bounds.x + m_bounds.width / 2.0f, m_bounds.y + m_bounds.height - kRadius - 20.0f };
+    return { m_bounds.x + m_bounds.width / 2.0f,
+             m_bounds.y + m_bounds.height - kRadius - 20.0f };
 }
 
 void DiceRoller::Reset() {
@@ -277,14 +212,31 @@ void DiceRoller::Reset() {
     m_aligned = false;
 }
 
+void DiceRoller::SetSides(int sides) {
+    if (!IsSupportedDie(sides) || sides == m_sides) return;
+    m_sides = sides;
+    BuildGeometry();
+
+    // L'atlas dipende dalla forma: se la GPU e' gia' pronta lo ricostruisco ora,
+    // altrimenti ci pensa EnsureResources() al primo Render.
+    if (m_ready && IsWindowReady()) {
+        UnloadTexture(m_atlas);
+        BuildAtlas();
+    }
+    m_hasResult = false;
+    m_aligned = false;
+}
+
 Quaternion DiceRoller::TargetFor(int face) const {
     const Vector3 z = { 0, 0, 1 };
-    const Vector3 n = m_faces[face].n;
+    const DiceFace& F = m_shape.face[face];
+    const Vector3 n = F.normal;
+
+    // 1) porta la normale della faccia verso la camera (+z)
     const Quaternion q1 = QuaternionFromVector3ToVector3(n, z);
 
-    const Vector3 a = m_v[m_faces[face].v[0]];
-    Vector3 apex = Vector3Subtract(a, Vector3Scale(n, Vector3DotProduct(a, n)));
-    apex = Vector3RotateByQuaternion(apex, q1);
+    // 2) ruota attorno a z finche' la direzione "alto" del numero punta in alto
+    const Vector3 apex = Vector3RotateByQuaternion(F.up, q1);
     const float ang = std::atan2(apex.x, apex.y);
     const Quaternion q2 = QuaternionFromAxisAngle(z, ang);
 
@@ -298,12 +250,15 @@ void DiceRoller::Integrate(float dt) {
     m_orient = QuaternionNormalize(QuaternionMultiply(dq, m_orient));
 }
 
+// ---------------------------------------------------------------------------
+
 void DiceRoller::HandleInput() {
     const Vector2 mouse = GetMousePosition();
     const float dt = std::max(GetFrameTime(), 0.0001f);
 
     if (m_state == State::Idle || m_state == State::Settled) {
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && Vector2Distance(mouse, m_pos) <= kRadius * 1.15f) {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+            Vector2Distance(mouse, m_pos) <= kRadius * 1.15f) {
             m_state = State::Dragging;
             m_grab = Vector2Subtract(m_pos, mouse);
             m_vel = { 0, 0 };
@@ -323,11 +278,13 @@ void DiceRoller::HandleInput() {
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
             float speed = Vector2Length(m_vel);
             if (speed >= kMinThrowSpeed) {
-                if (speed > kMaxThrowSpeed) m_vel = Vector2Scale(m_vel, kMaxThrowSpeed / speed);
-                
+                if (speed > kMaxThrowSpeed) {
+                    m_vel = Vector2Scale(m_vel, kMaxThrowSpeed / speed);
+                }
+                // tiro VERO deciso qui; la faccia finale lo mostrera'
                 m_pending = m_provider ? m_provider() : core::CombatRoll{};
                 const int val = std::max(1, std::min(m_sides, m_pending.rollValue));
-                m_target = TargetFor(m_faceOfNumber[val]);
+                m_target = TargetFor(m_shape.faceOfNumber[val]);
                 m_state = State::Flying;
             } else {
                 m_state = State::Idle;
@@ -362,6 +319,7 @@ void DiceRoller::Update(float dt) {
         if (m_pos.y < t) { m_pos.y = t; m_vel.y = -m_vel.y * kBounce; }
         if (m_pos.y > b) { m_pos.y = b; m_vel.y = -m_vel.y * kBounce; }
 
+        // il dado rotola in base alla velocita'; quando rallenta si allinea alla faccia del tiro
         const float speed = Vector2Length(m_vel);
         const float k = (speed < kAlignSpeed) ? 1.0f - speed / kAlignSpeed : 0.0f;
         m_angVel = Vector3Scale(Rolling(m_vel), 1.0f - k);
@@ -397,6 +355,8 @@ bool DiceRoller::ConsumeResult(core::CombatRoll& out) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+
 void DiceRoller::DrawDie3D() {
     Camera3D cam{};
     cam.position = { 0.0f, 0.0f, 4.0f };
@@ -405,6 +365,7 @@ void DiceRoller::DrawDie3D() {
     cam.fovy = 32.0f;
     cam.projection = CAMERA_PERSPECTIVE;
 
+    // luce principale (alto-sinistra) e luce rossastra di riempimento (basso-destra)
     const Vector3 keyDir  = Vector3Normalize({ -0.5f,  0.8f, 0.6f });
     const Vector3 fillDir = Vector3Normalize({  0.7f, -0.5f, 0.4f });
 
@@ -413,33 +374,34 @@ void DiceRoller::DrawDie3D() {
     BeginMode3D(cam);
 
     rlDisableBackfaceCulling();
+    // ATTENZIONE: rlBegin() cambia modo (QUADS -> TRIANGLES) e riporta la texture
+    // a quella bianca di default. rlSetTexture va quindi chiamata DOPO rlBegin.
     rlBegin(RL_TRIANGLES);
     rlSetTexture(m_atlas.id);
 
-    for (size_t f = 0; f < m_faces.size(); ++f) {
-        const Vector3 n = Vector3RotateByQuaternion(m_faces[f].n, m_orient);
-        if (n.z < -0.2f) continue; 
+    for (int f = 0; f < m_shape.faceCount; ++f) {
+        const DiceFace& face = m_shape.face[f];
+        const Vector3 n = Vector3RotateByQuaternion(face.normal, m_orient);
+        if (n.z < -0.2f) continue;               // faccia sul retro, inutile disegnarla
 
         const float d1 = std::max(0.0f, Vector3DotProduct(n, keyDir));
         const float d2 = std::max(0.0f, Vector3DotProduct(n, fillDir));
+        // luci piu' alte: su un dado nero servono per far leggere volume e oro
         const float cr = 0.55f + 1.10f * d1 + 0.35f * d2;
         const float cg = 0.55f + 1.05f * d1 + 0.10f * d2;
         const float cb = 0.62f + 1.05f * d1 + 0.10f * d2;
         rlColor4ub(Clamp8((int)(cr * 255)), Clamp8((int)(cg * 255)), Clamp8((int)(cb * 255)), 255);
 
-        // Triangolazione a ventaglio valida per QUALSIASI poligono (quadrato, pentagono...)
-        for (size_t k = 1; k < m_faces[f].v.size() - 1; ++k) {
-            Vector2 uv0 = FaceUV(f, 0);
-            Vector3 p0 = Vector3RotateByQuaternion(m_v[m_faces[f].v[0]], m_orient);
-            rlTexCoord2f(uv0.x, uv0.y); rlVertex3f(p0.x, p0.y, p0.z);
-
-            Vector2 uvK = FaceUV(f, k);
-            Vector3 pK = Vector3RotateByQuaternion(m_v[m_faces[f].v[k]], m_orient);
-            rlTexCoord2f(uvK.x, uvK.y); rlVertex3f(pK.x, pK.y, pK.z);
-
-            Vector2 uvK1 = FaceUV(f, k+1);
-            Vector3 pK1 = Vector3RotateByQuaternion(m_v[m_faces[f].v[k+1]], m_orient);
-            rlTexCoord2f(uvK1.x, uvK1.y); rlVertex3f(pK1.x, pK1.y, pK1.z);
+        // la faccia e' un ventaglio di triangoli (0, t, t+1): 1 per i triangoli, 2 per i quadrati, 3 per i pentagoni
+        for (int t = 1; t + 1 < face.count; ++t) {
+            const int corner[3] = { 0, t, t + 1 };
+            for (int q = 0; q < 3; ++q) {
+                const int k = corner[q];
+                const Vector3 p = Vector3RotateByQuaternion(m_shape.v[face.v[k]], m_orient);
+                const Vector2 uv = FaceUV(face, f, k);
+                rlTexCoord2f(uv.x, uv.y);
+                rlVertex3f(p.x, p.y, p.z);
+            }
         }
     }
 
@@ -454,17 +416,19 @@ void DiceRoller::DrawDie3D() {
 void DiceRoller::Render() {
     EnsureResources();
 
+    // anello di partenza
     const Vector2 rest = RestPos();
     DrawRing(rest, kRadius + 12.0f, kRadius + 15.0f, 0.0f, 360.0f, 48, Fade(theme::kGold, 0.45f));
 
     float scale = 1.0f;
     if (m_state == State::Flying) {
-        scale += 0.25f * std::min(Vector2Length(m_vel) / 1500.0f, 1.0f);
+        scale += 0.25f * std::min(Vector2Length(m_vel) / 1500.0f, 1.0f);   // finta altezza
     } else if (m_state == State::Dragging) {
         scale = 1.12f;
     }
     const float size = kRadius * kDrawScale * scale;
 
+    // ombra sul feltro
     DrawEllipse((int)(m_pos.x + 8.0f * scale), (int)(m_pos.y + 14.0f * scale),
                 kRadius * 0.95f, kRadius * 0.75f, Fade(BLACK, 0.45f));
 
