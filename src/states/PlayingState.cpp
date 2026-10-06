@@ -86,18 +86,16 @@ void PlayingState::HandleInput() {
 
         if (targetMob && targetMob->IsAttackable()) {
             const auto& chr = player->GetCharacter();
-            if (!chr.HasEquippedWeapon()) {
-                TraceLog(LOG_INFO, "[COMBAT] Nessuna arma equipaggiata: premi I per equipaggiarne una");
-            } else {
-                const core::WeaponDef& weapon = chr.ownedWeapons[chr.equippedWeapon];
-                const float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
+            const float range = chr.HasEquippedWeapon()
+                ? chr.ownedWeapons[chr.equippedWeapon].range
+                : 1.5f;   // pugno
+            const float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
 
-                if (dist <= weapon.range) {
-                    m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
-                    return;
-                }
-                TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio arma: %.2fm)", dist, weapon.range);
+            if (dist <= range) {
+                m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
+                return;
             }
+            TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio: %.2fm)", dist, range);
         }
     }
 

@@ -60,7 +60,7 @@ AbilityScores StandardArray() {
 WeaponDef StartingWeapon(CharacterClass cls) {
     switch (cls) {
         case CharacterClass::Warrior: return { "Longsword", { 1, 8 } };
-        case CharacterClass::Ranger:  return { "Bow",       { 1, 8 } };
+        case CharacterClass::Ranger:  return { "Bow",       { 1, 8 },8.0f };
         case CharacterClass::Rogue:   return { "Dagger",    { 1, 4 } };
     }
     return {};

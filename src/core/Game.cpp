@@ -335,6 +335,7 @@ void Game::Render() {
         }
 
         if (m_testMob) {
+            m_testMob->SetHovered(m_hoveredMob == m_testMob.get());
             m_testMob->Render(camera);
         }
         if (m_hoveredMob) DrawBoundingBox(m_hoveredMob->GetBounds(), YELLOW);
@@ -359,6 +360,9 @@ void Game::Render() {
         }
 
         m_renderer->EndMode3D();
+         if (m_testMob) {
+            m_testMob->RenderOverlay(camera);
+        }
 
         if (m_hud && m_player) {
             m_hud->Render(*m_player, camera);

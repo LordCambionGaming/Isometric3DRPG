@@ -16,6 +16,7 @@ public:
 
     virtual void Update(float dt);
     virtual void Render(const Camera3D& camera);
+    virtual void RenderOverlay(const Camera3D& camera); 
 
     const std::string& GetName() const { return m_name; }
     MobType GetType() const { return m_type; }
@@ -29,6 +30,7 @@ public:
 
     bool IsAlive() const { return m_currentHP > 0; }
     bool IsAttackable() const { return m_type != MobType::Pacific && IsAlive(); }
+    void SetHovered(bool hovered) { m_hovered = hovered; }
 
     virtual void TakeDamage(int damage) {
         m_currentHP = std::max(0, m_currentHP - damage);
@@ -50,6 +52,7 @@ protected:
     int m_currentHP;
     int m_armorClass;
     Color m_color;
+    bool m_hovered = false;
 };
 
 // --- Nemico Ostile ---

@@ -16,22 +16,30 @@ using namespace ui::theme;
 namespace {
 
 // Regole del colpo (per ora fisse: quando ci sara' un'arma equipaggiata andranno lette da li)
+// Arma in uso: quella equipaggiata, altrimenti il pugno (danno fisso 1, mischia).
 core::WeaponDef CurrentWeapon(const Game* game) {
-    if (game) {
-        if (const Player* p = game->GetPlayer()) {
-            const core::Character& c = p->GetCharacter();
-            if (c.HasEquippedWeapon()) return c.ownedWeapons[c.equippedWeapon];
-        }
+    const Player* p = game ? game->GetPlayer() : nullptr;
+    if (p && p->GetCharacter().HasEquippedWeapon()) {
+        const core::Character& c = p->GetCharacter();
+        return c.ownedWeapons[c.equippedWeapon];
     }
-    return core::WeaponDef{};   // non raggiungibile in combattimento: PlayingState blocca l'attacco da disarmati
+    core::WeaponDef fist;
+    fist.name   = "Pugno";
+    fist.damage = core::DiceExpr{ 1, 1 };   // 1d1 = danno fisso 1
+    fist.range  = 1.5f;
+    return fist;
 }
 
-// Caratteristica usata dall'arma: a distanza DEX, in mischia STR.
+bool IsUnarmed(const Game* game) {
+    const Player* p = game ? game->GetPlayer() : nullptr;
+    return p != nullptr && !p->GetCharacter().HasEquippedWeapon();
+}
+
+// Mischia (portata <= 2 m): STR. A distanza: DEX.
 int WeaponAbilityModifier(const Game* game) {
     const Player* p = game ? game->GetPlayer() : nullptr;
     if (!p) return 0;
-    const core::WeaponDef w = CurrentWeapon(game);
-    const core::Ability a = (w.range > 2.0f) ? core::Ability::Dex : core::Ability::Str;
+    const core::Ability a = (CurrentWeapon(game).range > 2.0f) ? core::Ability::Dex : core::Ability::Str;
     return p->GetCharacter().Modifier(a);
 }
 
@@ -187,8 +195,13 @@ void DiceRollState::OnThrowResolved(const core::CombatRoll& r) {
     switch (m_phase) {
         case Phase::Attack:
             if (m_attackRolled && m_attackResult.isHit) {
-                m_pending = Pending::ToDamage;      // colpito: ora si tira il dado del danno
-                m_pendingTimer = 0.0f;
+                if (IsUnarmed(m_game)) {
+                    m_poolValues = std::vector<int>{ 1 };   // pugno: niente dado da tirare
+                    FinishDamage();                         // 1 + modificatore, attacco concluso
+                } else {
+                    m_pending = Pending::ToDamage;
+                    m_pendingTimer = 0.0f;
+                }
             } else {
                 m_combatDone = true;                // mancato / fallimento critico: finito
             }
@@ -421,6 +434,7 @@ void DiceRollState::RenderGothic() {
                 }
                 banner = TextFormat("%d  -  %s", m_result.rollValue, label);
                 if (m_pending == Pending::ToDamage) subline = "Ora tira il dado del danno";
+                else if (m_damageRolled)            subline = m_damageResult.log;
                 break;
             }
             case Phase::Damage:
@@ -482,8 +496,9 @@ void DiceRollState::RenderGothic() {
     // --- dado ------------------------------------------------------------
     m_dice.Render();
 
-    // --- pie' di pagina --------------------------------------------------
-    DrawTextCentered(font, "INVIO / ESC : chiudi", cx, b.y + b.height + 14.0f, 22.0f, Fade(kBone, 0.7f));
+    const bool mustRollDamage = IsCombat() && m_attackRolled && m_attackResult.isHit && !m_damageRolled;
+    if (!mustRollDamage)
+        DrawTextCentered(font, "INVIO / ESC : chiudi", cx, b.y + b.height + 14.0f, 22.0f, Fade(kBone, 0.7f));
 }
 
 void DiceRollState::HandleInputGothic() {
@@ -494,8 +509,9 @@ void DiceRollState::HandleInputGothic() {
     if (!locked) {
         m_dice.HandleInput();
     }
+    const bool mustRollDamage = IsCombat() && m_attackRolled && m_attackResult.isHit && !m_damageRolled;
 
-    if (!m_dice.IsBusy() && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE))) {
+    if (!m_dice.IsBusy() && !mustRollDamage && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE))) {
         // Lo stato di destinazione si costruisce PRIMA di SetState: SetState distrugge questo oggetto.
         std::unique_ptr<GameState> next;
         if (m_opts.onFinish) next = m_opts.onFinish(m_poolDone ? m_poolValues : std::vector<int>{}, m_poolDone);
