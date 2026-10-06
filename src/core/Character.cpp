@@ -57,13 +57,13 @@ AbilityScores StandardArray() {
     return { 15, 14, 13, 12, 10, 8 };
 }
 
-WeaponDef StartingWeapon(CharacterClass cls) {
+ItemId StartingWeaponId(CharacterClass cls) {
     switch (cls) {
-        case CharacterClass::Warrior: return { "Longsword", { 1, 8 } };
-        case CharacterClass::Ranger:  return { "Bow",       { 1, 8 },8.0f };
-        case CharacterClass::Rogue:   return { "Dagger",    { 1, 4 } };
+        case CharacterClass::Warrior: return items::Longsword;
+        case CharacterClass::Ranger:  return items::Bow;
+        case CharacterClass::Rogue:   return items::Dagger;
     }
-    return {};
+    return items::Dagger;
 }
 
 Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
@@ -73,10 +73,25 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
     c.level = 1;
     c.xp = 0;
     c.abilities = abilities;
-    c.ownedWeapons.push_back(StartingWeapon(cls));
-    c.equippedWeapon = -1;   // posseduta, non equipaggiata: si parte disarmati
+    c.inventory.push_back({ StartingWeaponId(cls), 1 });
+    // equipment starts empty (all slots kNoItem by default)
     c.vitals.currentHP = c.MaxHP();
     return c;
+}
+
+WeaponDef Character::ActiveWeapon() const {
+    return ResolveWeapon(equipment.rightHand);
+}
+
+void Character::AddItem(ItemId id, int count) {
+    if (count <= 0) return;
+    for (auto& stack : inventory) {
+        if (stack.id == id) {
+            stack.count += count;
+            return;
+        }
+    }
+    inventory.push_back({ id, count });
 }
 
 } // namespace core

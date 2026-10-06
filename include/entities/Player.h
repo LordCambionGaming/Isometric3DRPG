@@ -1,5 +1,6 @@
 #pragma once
 #include <raylib.h>
+#include <array>
 #include <vector>
 #include "core/Character.h"
 #include <algorithm>
@@ -41,11 +42,17 @@ public:
     // not match the model the player keeps rendering the static pose (it still turns to face its direction).
     void SetAnimations(ModelAnimation* anims, int count);
 
-    // Visual only: turns toward targetWorld (XZ) and plays the Attack clip once, then returns to Walk/Idle.
-    // Returns false and does nothing if there are no valid clips or an attack is already playing.
+    // Visual only: turns toward targetWorld (XZ) and plays the attack clip of the EQUIPPED weapon once
+    // (no weapon: Attack, one hand: Attack1H, two hands: Attack2H, bow: Bow), then returns to Walk/Idle.
+    // Returns false and does nothing if there are no valid clips, or an attack / hurt clip is already playing.
     // Movement, pathfinding and combat rules are not touched.
     bool StartAttack(Vector3 targetWorld);
     bool IsAttacking() const { return m_animState == AnimState::Attack; }
+
+    // Visual only: plays the Hurt (damage received) clip once. It interrupts an attack in progress.
+    // TakeDamage() calls it; it does nothing if the loaded model has no Hurt clip.
+    void PlayHurt();
+    bool IsHurt() const { return m_animState == AnimState::Hurt; }
 
     // Character sheet (gameplay data, no visuals). Filled once by the Character Creation flow.
     // The Player is rebuilt by Game::CreateGameSession(), so a new game never inherits an old sheet.
@@ -56,6 +63,7 @@ public:
     void TakeDamage(int amount) {
         m_character.vitals.currentHP =
             std::max(0, m_character.vitals.currentHP - amount);
+        if (amount > 0) PlayHurt();   // visual flinch only
     }
 
     void Heal(int amount) {
@@ -65,7 +73,7 @@ public:
     bool IsAlive() const { return m_character.vitals.currentHP > 0; }
 
 private:
-    enum class AnimState { Idle, Walk, Attack };
+    enum class AnimState { Idle, Walk, Attack, Hurt };
 
     std::vector<PathNode> m_path;
     size_t m_pathIndex;
@@ -82,13 +90,23 @@ private:
     Model* m_model = nullptr;
     BoundingBox m_modelBounds = { { 0, 0, 0 }, { 0, 0, 0 } }; // local-space, measured once in SetModel
 
-    // Clip indices inside player_animated.glb (read from the file: 0 Idle, 1 Walk, 2 Attack).
+    // Clip indices inside player_animated.glb (read from the file's animation list).
     static constexpr int kAnimIdle = 0;
     static constexpr int kAnimWalk = 1;
-    static constexpr int kAnimAttack = 2;
-    static constexpr int kAnimClipCount = 3;
-    static constexpr float kIdleDurationSec = 2.4f;    // Idle loop length in the GLB
-    static constexpr float kAttackDurationSec = 0.8f;  // Attack clip length in the GLB
+    static constexpr int kAnimAttack = 2;     // unarmed
+    static constexpr int kAnimHurt = 3;       // damage received
+    static constexpr int kAnimAttack1H = 4;   // one-handed weapon (impact at 0.30 s)
+    static constexpr int kAnimAttack2H = 5;   // two-handed weapon (impact at 0.50 s)
+    static constexpr int kAnimBow = 6;        // bow (release at 1.02 s)
+    static constexpr int kAnimClipCount = 7;      // clips in the file
+    static constexpr int kAnimRequiredCount = 3;  // Idle, Walk, Attack must exist and match the model; the others are optional
+    // Clip lengths in seconds, as written in the GLB. The one-shot clips are played by time.
+    static constexpr float kIdleDurationSec = 2.4f;
+    static constexpr float kAttackDurationSec = 0.8f;
+    static constexpr float kHurtDurationSec = 0.7f;
+    static constexpr float kAttack1HDurationSec = 0.75f;
+    static constexpr float kAttack2HDurationSec = 1.1f;
+    static constexpr float kBowDurationSec = 1.7f;
     // Metres the body travels during one full Walk cycle (two steps) at model scale 1.0, measured from the
     // GLB (stance foot travels 0.699 m per half cycle). The Walk phase advances with the distance really
     // covered each frame, so foot speed follows ground speed whatever m_speed or the slope is.
@@ -100,7 +118,9 @@ private:
     ModelAnimation* m_anims = nullptr; // non-owning (AssetManager)
     int m_animCount = 0;
     bool m_animsValid = false;
+    std::array<bool, kAnimClipCount> m_clipOk{};  // clip exists and matches the model
     AnimState m_animState = AnimState::Idle;
+    int m_playClip = kAnimAttack;  // clip of the current one-shot (Attack or Hurt)
     float m_animPhase = 0.0f;  // 0..1 inside the current clip
     int m_appliedClip = -1;    // last pose uploaded to the shared model
     int m_appliedFrame = -1;
@@ -111,6 +131,9 @@ private:
 
     void UpdateVisual(float dt, const Vector3& posBefore);
     void ApplyClipPose(int clip, float phase);
+    bool HasClip(int clip) const { return clip >= 0 && clip < kAnimClipCount && m_clipOk[static_cast<size_t>(clip)]; }
+    int AttackClipFor(core::WeaponGrip grip) const;   // clip for the weapon grip, falling back to the unarmed Attack
+    static float ClipDuration(int clip);
     void RotateToward(float targetYaw, float maxStep);
     float ModelScale() const;
 };

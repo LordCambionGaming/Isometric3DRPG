@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <vector>
 #include "core/Dice.h"
+#include "core/Items.h"
 
 namespace core {
 
@@ -33,13 +34,7 @@ AbilityScores RollAbilityPool();
 // Alternativa D&D 5e al tirare i dadi: l'array standard 15, 14, 13, 12, 10, 8.
 AbilityScores StandardArray();
 
-struct WeaponDef {
-    const char* name = "";
-    DiceExpr damage{ 1, 8 };  // Default: 1d8
-    float range = 1.5f;       // Portata in metri (1.5m = mischia, 8m = distanza)
-};
-
-WeaponDef StartingWeapon(CharacterClass cls);
+ItemId StartingWeaponId(CharacterClass cls);
 
 
 
@@ -51,14 +46,23 @@ struct Vitals {
     bool IsAlive() const { return currentHP > 0; }
 };
 
+struct Equipment {
+    ItemId head = kNoItem;
+    ItemId body = kNoItem;
+    ItemId legs = kNoItem;
+    ItemId feet = kNoItem;
+    ItemId rightHand = kNoItem;
+    ItemId leftHand = kNoItem;
+};
+
 struct Character {
     Race race = Race::Human;
     CharacterClass characterClass = CharacterClass::Warrior;
     int level = 1;
     int xp = 0;
     AbilityScores abilities{};                 // valorizzato da CreateCharacter()
-    std::vector<WeaponDef> ownedWeapons;       // armi possedute
-    int equippedWeapon = -1;                   // indice in ownedWeapons; -1 = disarmato
+    std::vector<ItemStack> inventory;
+    Equipment equipment;
 
     Vitals vitals{};
     int HitDie()const {
@@ -92,8 +96,10 @@ struct Character {
     int Score(Ability a) const { return abilities[static_cast<std::size_t>(a)]; }
     int Modifier(Ability a) const { return AbilityModifier(Score(a)); }
     bool HasEquippedWeapon() const {
-        return equippedWeapon >= 0 && equippedWeapon < static_cast<int>(ownedWeapons.size());
+        return equipment.rightHand != kNoItem || equipment.leftHand != kNoItem;
     }
+    WeaponDef ActiveWeapon() const;
+    void AddItem(ItemId id, int count = 1);
 };
 
 // Human, livello 1, XP 0, possiede l'arma iniziale della classe ma non la equipaggia.

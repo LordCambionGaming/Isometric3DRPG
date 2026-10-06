@@ -1,4 +1,4 @@
-#include "world/World.h"
+ï»¿#include "world/World.h"
 #include "world/Chunk.h"
 #include "world/TerrainGenerator.h"
 #include <iostream>
@@ -17,6 +17,14 @@ World::World()
 }
 
 World::~World() {
+}
+void World::SetGlobalShader(Shader shader) {
+    m_globalShader = shader;
+    m_hasGlobalShader = true;
+    for (auto& pair : m_chunks) {
+        if (pair.second) pair.second->SetShader(shader);
+    }
+
 }
 
 bool World::Initialize(const WorldConfig& config) {
@@ -119,6 +127,7 @@ void World::LoadChunkAt(int x, int z) {
 
     auto startGen = std::chrono::high_resolution_clock::now();
     auto chunk = std::make_unique<Chunk>(x, z, m_config.chunkSize, m_config.tileSize);
+    if (m_hasGlobalShader) { chunk->SetShader(m_globalShader); }
     chunk->Generate(*m_terrainGenerator, this);
 
     auto endGen = std::chrono::high_resolution_clock::now();
@@ -150,6 +159,7 @@ void World::ProcessPendingChunks() {
         std::cout << "[CHUNK LOAD] chunk=(" << k.x << "," << k.z << ")" << std::endl;
         auto genStart = std::chrono::high_resolution_clock::now();
         auto chunk = std::make_unique<Chunk>(k.x, k.z, m_config.chunkSize, m_config.tileSize);
+        if (m_hasGlobalShader) { chunk->SetShader(m_globalShader); }
         chunk->Generate(*m_terrainGenerator, this);
         auto genEnd = std::chrono::high_resolution_clock::now();
         long genMs = std::chrono::duration_cast<std::chrono::milliseconds>(genEnd - genStart).count();
@@ -268,7 +278,7 @@ void World::UpdateChunkStreaming(Vector3 centerPosition) {
         }
     }
 
-    // 4. Sort by distance to center (ascending) — closest first
+    // 4. Sort by distance to center (ascending) ï¿½ closest first
     std::sort(pendingChunks.begin(), pendingChunks.end(),
         [centerChunkX, centerChunkZ](const ChunkKey& a, const ChunkKey& b) {
             int da = (a.x - centerChunkX)*(a.x - centerChunkX) + (a.z - centerChunkZ)*(a.z - centerChunkZ);

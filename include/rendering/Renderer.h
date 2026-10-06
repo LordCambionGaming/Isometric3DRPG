@@ -22,6 +22,7 @@ public:
 
     void SetWorld(World* world) { m_world = world; }
     void SetCamera(Camera3DController* camera) { m_camera = camera; }
+    void SetClearColor(Color c) { m_clearColor = c; }
 
     void RenderWorld();
     void RenderUI();
@@ -38,4 +39,5 @@ private:
     bool m_initialized;
     bool m_showGrid;
     bool m_showCoordinates;
+    Color m_clearColor = SKYBLUE;
 };

@@ -5,7 +5,7 @@ Procedural low-poly fantasy RPG player (1.8 m tall, <= 0.6 m footprint), static 
 Usage (static mesh, identical geometry, no rig - works inside Blender or with plain Python):
     python3 tools/generate_player.py --out assets/models/player/player.glb
 
-Usage (rigged mesh with Idle / Walk / Attack, pure Python, no Blender needed):
+Usage (rigged mesh with Idle / Walk / Attack / Hurt / Attack1H / Attack2H / Bow, pure Python, no Blender needed):
     python3 tools/generate_player.py --animated --out assets/models/player/player_animated.glb
 
 Conventions
@@ -24,6 +24,13 @@ Rig (17 joints, rigid 1-bone-per-part skinning, one skin)
         0 Idle    2.4 s  loop
         1 Walk    1.0 s  loop (two steps), feet kept on the ground by a small FK solver
         2 Attack  0.8 s  one-shot, right-hand overhead strike, impact at 0.34 s, ends back in the Idle pose
+        3 Hurt    0.7 s  one-shot, damage received from the front (flinch, buckle, recover)
+        4 Attack1H 0.75 s one-shot, one-handed weapon (Hand.R): diagonal slash + step, impact at 0.30 s
+        5 Attack2H 1.1 s one-shot, two-handed weapon (both hands on the grip): overhead wind-up and
+                         crushing lunge, impact at 0.50 s
+        6 Bow     1.7 s  one-shot, bow in Hand.L / string in Hand.R: side-on stance, draw, release at 1.02 s
+    Every one-shot animation starts and ends on the Idle pose; extras carry hit_time / release_time.
+    Pose parameters roll (arm twist) and legs_yaw (leg/feet yaw) were added to the solver for the bow.
 """
 import math
 import struct
@@ -481,11 +488,15 @@ def solve(P):
     r["Neck"] = qx(D(g("neck_pitch")))
     r["Head"] = qmul(qy(D(g("head_yaw"))), qx(D(g("head_pitch"))))
     for s, sign in (("L", 1.0), ("R", -1.0)):
-        r["UpperArm." + s] = qmul(qz(sign * D(g(s + "abd"))), qx(-D(g(s + "swing"))))
+        # roll = twist of the upper arm about its own axis (applied first): it re-aims the elbow's
+        # bend direction (negative = forearm folds toward the body midline, positive = outward).
+        r["UpperArm." + s] = qmul(qmul(qz(sign * D(g(s + "abd"))), qx(-D(g(s + "swing")))),
+                                  qy(sign * D(g(s + "roll"))))
         r["Forearm." + s] = qx(-D(g(s + "elbow")))
         r["Hand." + s] = qx(D(g(s + "hand")))
         a1, k, f = angs[s]
-        r["Thigh." + s] = qmul(qy(-D(g("hips_yaw"))), qx(-a1))
+        # legs_yaw = world yaw of the legs/feet (0 = feet always face front, whatever the hips do)
+        r["Thigh." + s] = qmul(qy(D(g("legs_yaw")) - D(g("hips_yaw"))), qx(-a1))
         r["Shin." + s] = qx(k)
         r["Foot." + s] = qx(a1 - k - f)
     return r, (g("hips_dx"), hips_y, g("hips_dz"))
@@ -565,23 +576,131 @@ ATTACK_KEYS = [
 ]
 
 
-def pose_attack(t):
-    keys = ATTACK_KEYS
-    t = min(max(t, keys[0][0]), keys[-1][0])
-    for i in range(len(keys) - 1):
-        t0, _, a = keys[i]
-        t1, ease, b = keys[i + 1]
-        if t <= t1:
-            e = ease((t - t0) / (t1 - t0))
-            names = set(a) | set(b)
-            return {n: a.get(n, 0.0) + (b.get(n, 0.0) - a.get(n, 0.0)) * e for n in names}
-    return dict(keys[-1][2])
+def _pose_from_keys(keys):
+    """Build a pose function from [(time, easing_into_this_key, pose_dict), ...]."""
+    def fn(t):
+        t = min(max(t, keys[0][0]), keys[-1][0])
+        for i in range(len(keys) - 1):
+            t0, _, a = keys[i]
+            t1, ease, b = keys[i + 1]
+            if t <= t1:
+                e = ease((t - t0) / (t1 - t0))
+                names = set(a) | set(b)
+                return {n: a.get(n, 0.0) + (b.get(n, 0.0) - a.get(n, 0.0)) * e for n in names}
+        return dict(keys[-1][2])
+    return fn
+
+
+pose_attack = _pose_from_keys(ATTACK_KEYS)
+
+
+# ----------------------------------------------------------------------------------------------
+# Extra combat animations.  Pose vocabulary (degrees):
+#   Lswing/Rswing  arm forward(+)/back(-)    Labd/Rabd  arm out to the side(+)
+#   Lelbow/Relbow  forearm bend              Lroll/Rroll  upper-arm twist (neg = forearm folds inward)
+#   Lthigh/Rthigh  leg forward(+)            Lknee/Rknee  knee bend      spine/chest/neck/head_pitch  lean forward(+)
+#   hips/spine/chest/head_yaw  turn left(+)  legs_yaw  world yaw of the legs (0 = feet face front)
+#   hips_dx / hips_dz  sideways / forward(+) offset of the whole body in metres
+# Arm angles of the two-hand and bow poses were solved with a small IK so the hands really meet on
+# the weapon grip / bowstring; the numbers below are the baked result.
+# ----------------------------------------------------------------------------------------------
+
+# --- Hurt: hit received from the front. Impact flinch at 0.07 s, buckle, recover.
+HURT_KEYS = [
+    (0.00, _smooth,   _K()),
+    (0.07, _ease_out, _K(hips_dz=-0.07, spine_pitch=-16, chest_pitch=-10, neck_pitch=-10, head_pitch=-14,
+                         head_yaw=14, hips_yaw=8, spine_yaw=6, chest_yaw=12,
+                         Lswing=28, Rswing=34, Labd=26, Rabd=30, Lelbow=38, Relbow=44,
+                         Lthigh=6, Lknee=16, Rthigh=-8, Rknee=18)),
+    (0.20, _smooth,   _K(hips_dz=-0.04, spine_pitch=8, chest_pitch=6, neck_pitch=4, head_pitch=8,
+                         head_yaw=8, hips_yaw=4, chest_yaw=7,
+                         Lswing=12, Rswing=14, Labd=16, Rabd=18, Lelbow=30, Relbow=32,
+                         Lthigh=4, Lknee=26, Rthigh=-6, Rknee=28)),
+    (0.42, _smooth,   _K(hips_dz=-0.01, spine_pitch=3, chest_pitch=2, head_pitch=3, head_yaw=2,
+                         Lknee=12, Rknee=12)),
+    (0.70, _smooth,   _K()),
+]
+
+# --- Attack1H: one-handed weapon (right hand), fast diagonal slash from the right shoulder across the
+#     body, with a forward step. Impact at 0.30 s.
+ATTACK1H_HIT_TIME = 0.30
+ATTACK1H_KEYS = [
+    (0.00, _smooth,   _K()),
+    (0.18, _smooth,   _K(Rswing=30, Rabd=95, Relbow=75, Rroll=15, Lswing=-10, Labd=22, Lelbow=30,
+                         hips_yaw=-22, spine_yaw=-8, chest_yaw=-26, spine_pitch=-3, chest_pitch=-3,
+                         head_yaw=14, Lthigh=-6, Lknee=14, Rthigh=8, Rknee=16)),
+    (0.30, _ease_in,  _K(Rswing=65, Rabd=-8, Relbow=18, Rroll=-10, Lswing=-24, Labd=32, Lelbow=36,
+                         hips_yaw=16, spine_yaw=8, chest_yaw=28, spine_pitch=14, chest_pitch=6,
+                         head_pitch=4, head_yaw=-20,
+                         Lthigh=30, Lknee=26, Rthigh=-20, Rknee=10)),
+    (0.42, _ease_out, _K(Rswing=52, Rabd=-30, Relbow=22, Rroll=-12, Lswing=-26, Labd=34, Lelbow=36,
+                         hips_yaw=20, spine_yaw=10, chest_yaw=34, spine_pitch=15, chest_pitch=7,
+                         head_pitch=4, head_yaw=-26,
+                         Lthigh=30, Lknee=26, Rthigh=-20, Rknee=10)),
+    (0.55, _smooth,   _K(Rswing=30, Rabd=-10, Relbow=25, Lswing=-10, Labd=18, Lelbow=25,
+                         hips_yaw=8, spine_yaw=4, chest_yaw=14, spine_pitch=7, chest_pitch=3,
+                         head_yaw=-10, Lthigh=14, Lknee=16, Rthigh=-10, Rknee=10)),
+    (0.75, _smooth,   _K()),
+]
+
+# --- Attack2H: heavy two-handed weapon. Guard, big overhead wind-up (lean back, crouch), crushing
+#     lunge at 0.50 s, hold, recover. Both hands stay together on the grip.
+ATTACK2H_HIT_TIME = 0.50
+ATTACK2H_KEYS = [
+    (0.00, _smooth,   _K()),
+    (0.18, _smooth,   _K(Rswing=24, Rabd=-28, Relbow=59, Rroll=-7, Lswing=49, Labd=-35, Lelbow=38, Lroll=-11,
+                         Lthigh=14, Lknee=22, Rthigh=-12, Rknee=14, spine_pitch=3)),
+    (0.40, _smooth,   _K(Rswing=129, Rabd=29, Relbow=37, Rroll=-3, Lswing=158, Labd=17,
+                         Lthigh=10, Lknee=20, Rthigh=-14, Rknee=18,
+                         spine_pitch=-8, chest_pitch=-6, neck_pitch=-4, head_pitch=-4,
+                         hips_yaw=-6, chest_yaw=-8)),
+    (0.50, _ease_in,  _K(Rswing=40, Rabd=-9, Relbow=96, Rroll=-18, Lswing=109, Labd=80, Lelbow=14, Lroll=-6,
+                         Lthigh=34, Lknee=40, Rthigh=-24, Rknee=22,
+                         spine_pitch=20, chest_pitch=8, head_pitch=6, hips_yaw=4, chest_yaw=4, hips_dz=0.03)),
+    (0.62, _ease_out, _K(Rswing=41, Rabd=-35, Relbow=59, Rroll=-16, Lswing=64, Labd=-35, Lelbow=25, Lroll=-15,
+                         Lthigh=34, Lknee=40, Rthigh=-24, Rknee=22,
+                         spine_pitch=26, chest_pitch=10, head_pitch=8, hips_dz=0.03)),
+    (0.80, _smooth,   _K(Rswing=41, Rabd=-35, Relbow=59, Rroll=-16, Lswing=64, Labd=-35, Lelbow=25, Lroll=-15,
+                         Lthigh=30, Lknee=36, Rthigh=-22, Rknee=20,
+                         spine_pitch=22, chest_pitch=8, head_pitch=6, hips_dz=0.02)),
+    (1.10, _smooth,   _K()),
+]
+
+# --- Bow: nock + turn side-on (left shoulder to the target, +Z), full draw, aim, release at 1.02 s,
+#     follow-through, lower the bow. The bow is held in Hand.L, the string in Hand.R.
+BOW_RELEASE_TIME = 1.02
+_BOW_STANCE = dict(legs_yaw=-55, Lthigh=10, Lknee=7, Rthigh=-10, Rknee=7, hips_yaw=-65, spine_yaw=-10,
+                   head_yaw=78, head_pitch=2)
+BOW_KEYS = [
+    (0.00, _smooth,   _K()),
+    (0.35, _smooth,   _K(legs_yaw=-30, Lthigh=6, Lknee=5, Rthigh=-6, Rknee=5, hips_yaw=-32, spine_yaw=-6,
+                         chest_yaw=-6, head_yaw=40, spine_pitch=2,
+                         Lswing=10, Labd=70, Lelbow=35, Rswing=60, Rabd=45, Relbow=100, Rroll=-20)),
+    (0.82, _smooth,   _K(chest_yaw=-10, spine_pitch=1, Lswing=6, Labd=93, Lelbow=0,
+                         Rswing=24, Rabd=91, Relbow=145, Rroll=20, **_BOW_STANCE)),
+    (1.00, _smooth,   _K(chest_yaw=-10, spine_pitch=1.3, Lswing=7, Labd=93, Lelbow=0,
+                         Rswing=24, Rabd=91, Relbow=145, Rroll=20, **_BOW_STANCE)),
+    (1.08, _ease_out, _K(chest_yaw=-13, spine_pitch=1.5, Lswing=2, Labd=95, Lelbow=0,
+                         Rswing=11, Rabd=88, Relbow=145, Rroll=19, **_BOW_STANCE)),
+    (1.30, _smooth,   _K(chest_yaw=-13, spine_pitch=1.5, Lswing=2, Labd=95, Lelbow=0,
+                         Rswing=11, Rabd=88, Relbow=140, Rroll=19, **_BOW_STANCE)),
+    (1.70, _smooth,   _K()),
+]
+
+pose_hurt = _pose_from_keys(HURT_KEYS)
+pose_attack_1h = _pose_from_keys(ATTACK1H_KEYS)
+pose_attack_2h = _pose_from_keys(ATTACK2H_KEYS)
+pose_bow = _pose_from_keys(BOW_KEYS)
 
 
 ANIMATIONS = [
-    ("Idle",   2.4, 30, pose_idle,   {"loop": True}),
-    ("Walk",   1.0, 30, pose_walk,   {"loop": True}),
-    ("Attack", 0.8, 60, pose_attack, {"loop": False, "hit_time": ATTACK_HIT_TIME}),
+    ("Idle",     2.4, 30, pose_idle,       {"loop": True}),
+    ("Walk",     1.0, 30, pose_walk,       {"loop": True}),
+    ("Attack",   0.8, 60, pose_attack,     {"loop": False, "hit_time": ATTACK_HIT_TIME}),
+    ("Hurt",     0.7, 60, pose_hurt,       {"loop": False}),
+    ("Attack1H", 0.75, 60, pose_attack_1h, {"loop": False, "hit_time": ATTACK1H_HIT_TIME}),
+    ("Attack2H", 1.1, 60, pose_attack_2h,  {"loop": False, "hit_time": ATTACK2H_HIT_TIME}),
+    ("Bow",      1.7, 60, pose_bow,        {"loop": False, "release_time": BOW_RELEASE_TIME}),
 ]
 
 
@@ -724,7 +843,7 @@ def write_glb(mesh, path, rigged=False):
         f.write(struct.pack("<4sII", b"glTF", 2, total))
         f.write(struct.pack("<I4s", len(js), b"JSON") + js)
         f.write(struct.pack("<I4s", len(blob), b"BIN\x00") + bytes(blob))
-    print("Wrote %s (%d bytes, %s)" % (path, total, "rigged, 3 animations" if rigged else "static"))
+    print("Wrote %s (%d bytes, %s)" % (path, total, "rigged, %d animations" % len(ANIMATIONS) if rigged else "static"))
 
 
 def export_with_blender(mesh, path):

@@ -334,7 +334,8 @@ void CharacterCreationState::Render() {
 
     // --- arma iniziale ---------------------------------------------------
     y += 8.0f;
-    const core::WeaponDef weapon = core::StartingWeapon(m_class);
+    const core::ItemId weaponId = core::StartingWeaponId(m_class);
+    const core::WeaponDef weapon = core::ResolveWeapon(weaponId);
     DrawLabel(font, TextFormat("Arma iniziale: %s %s", weapon.name, core::ToString(weapon.damage).c_str()),
               left, y, 20.0f, Fade(kBone, 0.85f));
     DrawLabel(font, "Posseduta, non equipaggiata", left, y + 24.0f, 18.0f, Fade(kBone, 0.6f));

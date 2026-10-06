@@ -1,4 +1,4 @@
-#include "core/Game.h"
+﻿#include "core/Game.h"
 #include "navigation/NavigationSystem.h"
 #include "states/GameState.h"
 #include "states/PauseState.h"
@@ -30,6 +30,7 @@ Game::Game()
     , m_timer(nullptr)
     , m_hud(nullptr)
     , m_combatSystem(nullptr)
+    , m_lightingSystem(nullptr)
 {
 }
 
@@ -48,11 +49,17 @@ bool Game::Initialize() {
         m_hud = std::make_unique<HUD>();
         m_combatSystem = std::make_unique<core::CombatSystem>();
         m_combatSystem->Initialize();
+        
+        m_lightingSystem = std::make_unique<core::LightingSystem>();
+        // NOTE: LightingSystem::Initialize() (LoadShader) is called AFTER InitWindow below.
 
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
             std::cerr << "Failed to initialize renderer!" << std::endl;
             return false;
         }
+        
+        // Shaders require an active OpenGL context: must be loaded after InitWindow.
+        m_lightingSystem->Initialize();
 
         if (!m_assetManager->Initialize()) {
             std::cerr << "Failed to initialize asset manager!" << std::endl;
@@ -73,6 +80,7 @@ bool Game::Initialize() {
         worldConfig.tileSize = 1.0f;
         worldConfig.renderDistance = 3;
 
+        m_world->SetGlobalShader(m_lightingSystem->GetShader());
         if (!m_world->Initialize(worldConfig)) {
             std::cerr << "Failed to initialize world!" << std::endl;
             return false;
@@ -132,6 +140,7 @@ bool Game::Initialize() {
         }
 
         m_playerModel = m_assetManager->LoadModel("models/player/player_animated.glb");
+        for (int i = 0; i < m_playerModel->materialCount; i++) { m_playerModel->materials[i].shader = m_lightingSystem->GetShader(); }
         if (m_playerModel) {
             m_playerAnims = m_assetManager->LoadAnimations("models/player/player_animated.glb", m_playerAnimCount);
         }
@@ -195,6 +204,10 @@ void Game::Shutdown() {
     if (m_renderer) m_renderer.reset();
     if (m_timer) m_timer.reset();
     if (m_combatSystem) m_combatSystem.reset();
+    if (m_lightingSystem) {
+        m_lightingSystem->Unload();
+        m_lightingSystem.reset();
+    }
 
     m_isRunning = false;
 }
@@ -208,6 +221,7 @@ void Game::CreateGameSession() {
 
     if (!m_world) m_world = std::make_unique<World>();
     if (!m_world->IsInitialized()) {
+        m_world->SetGlobalShader(m_lightingSystem->GetShader());
         m_world->Initialize(worldConfig);
     }
 
@@ -311,11 +325,16 @@ void Game::Update(float deltaTime) {
     if (m_audioManager) {
         m_audioManager->UpdateMusic();
     }
+    
+    if (m_lightingSystem && !frozen) {
+        m_lightingSystem->UpdateTimeOfDay(deltaTime);
+    }
 }
 
 void Game::Render() {
     if (!m_renderer) return;
 
+    if(m_lightingSystem) m_renderer->SetClearColor(m_lightingSystem->GetSkyColor());
     m_renderer->BeginFrame();
 
     const bool worldVisible = m_gameState &&
@@ -328,6 +347,8 @@ void Game::Render() {
 
         m_renderer->BeginMode3D(camera);
 
+        if (m_lightingSystem) m_lightingSystem->BeginLightingMode();
+        
         m_world->Render();
 
         if (m_player) {
@@ -359,13 +380,15 @@ void Game::Render() {
             DrawLine3D(p3, p0, YELLOW);
         }
 
+        if (m_lightingSystem) m_lightingSystem->EndLightingMode();
+
         m_renderer->EndMode3D();
          if (m_testMob) {
             m_testMob->RenderOverlay(camera);
         }
 
         if (m_hud && m_player) {
-            m_hud->Render(*m_player, camera);
+            m_hud->Render(*m_player, camera, m_lightingSystem.get());
         }
     }
 

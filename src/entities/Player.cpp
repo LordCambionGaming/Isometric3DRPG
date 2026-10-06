@@ -2,6 +2,7 @@
 #include <raymath.h>
 #include <cmath>
 #include <algorithm>
+#include <core/Items.h>
 
 Player::Player() {
     m_position.x = 0; m_position.y = 0; m_position.z = 0;
@@ -117,36 +118,73 @@ void Player::SetAnimations(ModelAnimation* anims, int count) {
     m_anims = anims;
     m_animCount = count;
     m_animsValid = false;
+    m_clipOk.fill(false);
     m_animState = AnimState::Idle;
     m_animPhase = 0.0f;
     m_appliedClip = -1;
     m_appliedFrame = -1;
 
-    if (!m_model || !anims || count < kAnimClipCount) {
-        TraceLog(LOG_WARNING, "[PLAYER ANIM] need a model and %d clips (Idle, Walk, Attack), got %d: static pose", kAnimClipCount, count);
+    if (!m_model || !anims || count < kAnimRequiredCount) {
+        TraceLog(LOG_WARNING, "[PLAYER ANIM] need a model and at least %d clips (Idle, Walk, Attack), got %d: static pose", kAnimRequiredCount, count);
         return;
     }
-    for (int i = 0; i < kAnimClipCount; ++i) {
-        if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) {
-            TraceLog(LOG_WARNING, "[PLAYER ANIM] clip %d does not match the player model: static pose", i);
+    for (int i = 0; i < kAnimClipCount && i < count; ++i) {
+        m_clipOk[static_cast<size_t>(i)] = anims[i].frameCount > 0 && IsModelAnimationValid(*m_model, anims[i]);
+    }
+    for (int i = 0; i < kAnimRequiredCount; ++i) {
+        if (!m_clipOk[static_cast<size_t>(i)]) {
+            TraceLog(LOG_WARNING, "[PLAYER ANIM] required clip %d does not match the player model: static pose", i);
             return;
         }
     }
     m_animsValid = true;
-    TraceLog(LOG_INFO, "[PLAYER ANIM] clips ok: Idle=%d, Walk=%d, Attack=%d frames (%d clips in file)",
-             anims[kAnimIdle].frameCount, anims[kAnimWalk].frameCount, anims[kAnimAttack].frameCount, count);
+    TraceLog(LOG_INFO, "[PLAYER ANIM] %d clips in file (Idle=%d Walk=%d Attack=%d frames); Hurt %s, Attack1H %s, Attack2H %s, Bow %s",
+             count, anims[kAnimIdle].frameCount, anims[kAnimWalk].frameCount, anims[kAnimAttack].frameCount,
+             HasClip(kAnimHurt) ? "ok" : "missing", HasClip(kAnimAttack1H) ? "ok" : "missing",
+             HasClip(kAnimAttack2H) ? "ok" : "missing", HasClip(kAnimBow) ? "ok" : "missing");
     ApplyClipPose(kAnimIdle, 0.0f);
 }
 
+float Player::ClipDuration(int clip) {
+    switch (clip) {
+        case kAnimIdle:     return kIdleDurationSec;
+        case kAnimHurt:     return kHurtDurationSec;
+        case kAnimAttack1H: return kAttack1HDurationSec;
+        case kAnimAttack2H: return kAttack2HDurationSec;
+        case kAnimBow:      return kBowDurationSec;
+        default:            return kAttackDurationSec;
+    }
+}
+
+// The grip of the equipped weapon picks the clip. A clip missing from the model falls back to the unarmed Attack.
+int Player::AttackClipFor(core::WeaponGrip grip) const {
+    int clip = kAnimAttack;
+    switch (grip) {
+        case core::WeaponGrip::OneHanded: clip = kAnimAttack1H; break;
+        case core::WeaponGrip::TwoHanded: clip = kAnimAttack2H; break;
+        case core::WeaponGrip::Bow:       clip = kAnimBow;      break;
+        case core::WeaponGrip::Unarmed:   clip = kAnimAttack;   break;
+    }
+    return HasClip(clip) ? clip : kAnimAttack;
+}
+
 bool Player::StartAttack(Vector3 targetWorld) {
-    if (!m_model || !m_animsValid || m_animState == AnimState::Attack) return false;
+    if (!m_model || !m_animsValid || m_animState == AnimState::Attack || m_animState == AnimState::Hurt) return false;
     const float dx = targetWorld.x - m_position.x;
     const float dz = targetWorld.z - m_position.z;
     // Target on top of the player: keep the current facing.
     m_attackYaw = (dx * dx + dz * dz > 1e-6f) ? std::atan2(dx, dz) : m_visualYaw;
+    m_playClip = AttackClipFor(m_character.ActiveWeapon().grip);
     m_animState = AnimState::Attack;
     m_animPhase = 0.0f;
     return true;
+}
+
+void Player::PlayHurt() {
+    if (!m_model || !m_animsValid || !HasClip(kAnimHurt)) return;
+    m_playClip = kAnimHurt;
+    m_animState = AnimState::Hurt;   // interrupts an attack in progress
+    m_animPhase = 0.0f;
 }
 
 void Player::ApplyClipPose(int clip, float phase) {
@@ -184,7 +222,7 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
     // --- Facing (visual yaw only; m_position / m_target are never written here)
     if (m_animState == AnimState::Attack) {
         RotateToward(m_attackYaw, kAttackTurnSpeedDeg * DEG2RAD * dt);
-    } else if (moving) {
+    } else if (moving && m_animState != AnimState::Hurt) {
         const float tx = m_target.x - m_position.x;
         const float tz = m_target.z - m_position.z;
         if (tx * tx + tz * tz > 1e-6f) {
@@ -194,15 +232,15 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
 
     if (!m_animsValid) return; // no clips: static pose, but it still turns
 
-    // --- Animation state machine: Idle <-> Walk, Attack plays once then falls back to Walk/Idle
-    if (m_animState == AnimState::Attack) {
-        m_animPhase += dt / kAttackDurationSec;
+    // --- Animation state machine: Idle <-> Walk; Attack and Hurt play once, then fall back to Walk/Idle
+    if (m_animState == AnimState::Attack || m_animState == AnimState::Hurt) {
+        m_animPhase += dt / ClipDuration(m_playClip);
         if (m_animPhase >= 1.0f) {
             m_animState = moving ? AnimState::Walk : AnimState::Idle;
             m_animPhase = 0.0f;
         }
     }
-    if (m_animState != AnimState::Attack) {
+    if (m_animState != AnimState::Attack && m_animState != AnimState::Hurt) {
         const AnimState wanted = moving ? AnimState::Walk : AnimState::Idle;
         if (wanted != m_animState) {
             m_animState = wanted;
@@ -217,7 +255,8 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
     }
 
     switch (m_animState) {
-        case AnimState::Attack: ApplyClipPose(kAnimAttack, m_animPhase); break;
+        case AnimState::Attack:
+        case AnimState::Hurt:   ApplyClipPose(m_playClip, m_animPhase); break;
         case AnimState::Walk:   ApplyClipPose(kAnimWalk, m_animPhase); break;
         default:                ApplyClipPose(kAnimIdle, m_animPhase); break;
     }

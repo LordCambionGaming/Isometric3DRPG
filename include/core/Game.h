@@ -6,6 +6,7 @@
 #include "navigation/NavigationSystem.h"
 #include "core/CombatSystem.h"
 #include <entities/Mob.h>
+#include "rendering/LightingSystem.h"
 
 
 class GameState;
@@ -43,6 +44,7 @@ public:
     core::CombatSystem* GetCombatSystem() const { return m_combatSystem.get(); }
     Mob* GetHoveredMob() const { return m_hoveredMob; }
     void SetHoveredMob(Mob* mob) { m_hoveredMob = mob; }
+    core::LightingSystem* GetLightingSystem() const { return m_lightingSystem.get(); }
 
 private:
     void Update(float deltaTime);
@@ -70,6 +72,8 @@ private:
     Mob* m_hoveredMob = nullptr;
     int m_hoverTileX = -1;
     int m_hoverTileZ = -1;
+    
+    std::unique_ptr<core::LightingSystem> m_lightingSystem;
 
     static constexpr float MAX_STEP_HEIGHT = 1.5f;
 

@@ -85,10 +85,7 @@ void PlayingState::HandleInput() {
         Mob* targetMob = m_game->GetHoveredMob();
 
         if (targetMob && targetMob->IsAttackable()) {
-            const auto& chr = player->GetCharacter();
-            const float range = chr.HasEquippedWeapon()
-                ? chr.ownedWeapons[chr.equippedWeapon].range
-                : 1.5f;   // pugno
+            const float range = player->GetCharacter().ActiveWeapon().range;   // arma equipaggiata, altrimenti pugni
             const float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
 
             if (dist <= range) {
@@ -100,6 +97,14 @@ void PlayingState::HandleInput() {
     }
 
     if (IsKeyPressed(KEY_I)) { m_game->SetState(std::make_unique<InventoryState>(m_game)); return; }
+
+    // F6 (debug): aggiunge un esemplare di ogni arma del catalogo, per provare le animazioni 1H / 2H / arco
+    if (IsKeyPressed(KEY_F6)) {
+        core::Character& c = player->GetCharacterMutable();
+        for (const core::ItemDef& d : core::AllItems()) {
+            if (d.category == core::ItemCategory::Weapon) c.AddItem(d.id);
+        }
+    }
 
     // Tasti rapidi di test vita/danno giocatore
     if (IsKeyPressed(KEY_H)) player->TakeDamage(1);

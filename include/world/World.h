@@ -27,6 +27,8 @@ public:
     void Update(float deltaTime);
     void Render();
 
+    void SetGlobalShader(Shader shader);
+
     void SetSeed(unsigned int seed);
     unsigned int GetSeed() const { return m_config.seed; }
 
@@ -92,6 +94,9 @@ private:
     int m_lastChunkZ = 0;
     float m_lastUpdateTime;
     bool m_initialized;
+
+    Shader m_globalShader;
+    bool m_hasGlobalShader = false;
 
     // Streaming parameters: generation / render / unload separated for player-centered design
     static constexpr float CHUNK_UPDATE_INTERVAL = 0.5f;

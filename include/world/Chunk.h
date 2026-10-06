@@ -34,6 +34,8 @@ public:
     void Render();
     void Unload();
 
+    void SetShader(Shader shader) { m_shader = shader; m_hasShader = true; }
+
     bool IsGenerated() const { return m_generated; }
     bool HasMesh() const { return m_hasMesh; }
 
@@ -78,6 +80,8 @@ private:
     Model m_model;
     bool m_generated;
     bool m_hasMesh;
+    Shader m_shader;
+    bool m_hasShader = false;
 
     // Terrain generation parameters
     static constexpr float NOISE_SCALE = 0.05f;

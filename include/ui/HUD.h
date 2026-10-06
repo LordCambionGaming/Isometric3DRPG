@@ -1,7 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <raylib.h>
+#include <raymath.h>
 #include "core/Character.h"
+namespace core { class LightingSystem; }
 class Player;
 
 class HUD {
@@ -10,7 +12,7 @@ public:
     ~HUD() = default;
 
     // HUD is rendered after the 3D pass, so every primitive here is screen-space.
-    void Render(const Player& player, const Camera3D& camera);
+    void Render(const Player& player, const Camera3D& camera, const core::LightingSystem* lighting = nullptr);
 
     void SetEnabled(bool enabled) { m_enabled = enabled; }
     bool IsEnabled() const { return m_enabled; }
@@ -34,6 +36,10 @@ private:
                          float x, float y, float w, float h) const;
         // Pannello completo del personaggio (in basso a sinistra)
     void DrawCharacterPanel(const core::Character& c) const;
+        // Bussola visiva (in alto a destra)
+    void DrawCompass(const Camera3D& camera) const;
+        // Orologio solare/lunare (giorno/notte) — senza numeri
+    void DrawDayClock(float timeOfDay) const;
     bool m_enabled = true;
 
 

@@ -21,7 +21,7 @@ core::WeaponDef CurrentWeapon(const Game* game) {
     const Player* p = game ? game->GetPlayer() : nullptr;
     if (p && p->GetCharacter().HasEquippedWeapon()) {
         const core::Character& c = p->GetCharacter();
-        return c.ownedWeapons[c.equippedWeapon];
+        return c.ActiveWeapon();
     }
     core::WeaponDef fist;
     fist.name   = "Pugno";

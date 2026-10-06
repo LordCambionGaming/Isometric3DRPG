@@ -395,6 +395,9 @@ void Chunk::CreateTerrainMesh() {
 
     auto tLoadStart = std::chrono::high_resolution_clock::now();
     m_model = LoadModelFromMesh(m_mesh);
+    if (m_hasShader) {
+        m_model.materials[0].shader = m_shader;
+    }
     auto tLoadEnd = std::chrono::high_resolution_clock::now();
 
     long meshMs = std::chrono::duration_cast<std::chrono::milliseconds>(tMeshEnd - tMeshStart).count();

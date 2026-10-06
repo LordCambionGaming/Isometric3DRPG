@@ -1,4 +1,4 @@
-#include "rendering/Renderer.h"
+ï»¿#include "rendering/Renderer.h"
 #include "rendering/Camera3DController.h"
 #include "world/World.h"
 #include "core/Timer.h"
@@ -28,7 +28,7 @@ bool Renderer::Initialize(int screenWidth, int screenHeight, const char* title) 
         }
 
         SetTargetFPS(60);
-        SetExitKey(KEY_NULL); // ESC non chiude finestra — come puzzle3d
+        SetExitKey(KEY_NULL); // ESC non chiude finestra ï¿½ come puzzle3d
 
         m_initialized = true;
         std::cout << "Renderer initialized: " << screenWidth << "x" << screenHeight << std::endl;
@@ -50,7 +50,7 @@ void Renderer::Shutdown() {
 
 void Renderer::BeginFrame() {
     BeginDrawing();
-    ClearBackground(SKYBLUE);
+    ClearBackground(m_clearColor);
 }
 
 void Renderer::EndFrame() {

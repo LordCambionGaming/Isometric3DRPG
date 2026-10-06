@@ -2,6 +2,7 @@
 #include <raylib.h>
 #include <string>
 #include <algorithm>
+#include "core/Items.h"
 
 enum class MobType {
     Enemy,   // Ostile: attaccabile
@@ -39,6 +40,12 @@ public:
     virtual void Heal(int amount) {
         m_currentHP = std::min(m_maxHP, m_currentHP + amount);
     }
+    // Arma del mob: solo un ItemId, i dati (dadi, portata, impugnatura) stanno nel catalogo Items.cpp.
+    // Senza arma (kNoItem) vale il pugno.
+    void SetWeapon(core::ItemId id) { m_weaponId = core::IsWeapon(id) ? id : core::kNoItem; }
+    core::ItemId GetWeaponId() const { return m_weaponId; }
+    core::WeaponDef ActiveWeapon() const { return core::ResolveWeapon(m_weaponId); }
+
     BoundingBox GetBounds() const {
     return { { m_position.x - 0.4f, m_position.y,        m_position.z - 0.4f },
              { m_position.x + 0.4f, m_position.y + 1.2f, m_position.z + 0.4f } };
@@ -53,6 +60,7 @@ protected:
     int m_armorClass;
     Color m_color;
     bool m_hovered = false;
+    core::ItemId m_weaponId = core::kNoItem;
 };
 
 // --- Nemico Ostile ---

@@ -3,73 +3,318 @@
 #include "core/Game.h"
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
+#include "rendering/LightingSystem.h"
 #include <raylib.h>
+#include <raymath.h>
 #include <memory>
+#include <iostream>
 
 using namespace ui::theme;
 
 InventoryState::InventoryState(Game* game) : GameState(game) {
     m_type = GameStateType::Inventory;
-    if (Player* p = m_game->GetPlayer()) {
-        const auto& c = p->GetCharacter();
-        if (c.HasEquippedWeapon()) m_selected = c.equippedWeapon;
-    }
+    m_isDragging = false;
+    m_draggedItemId = core::kNoItem;
+    m_draggedItemCount = 0;
+    m_dragSource = DRAG_NONE;
+    m_dragSourceIndex = -1;
+    m_scrollOffset = 0;
+    m_maxScroll = 0;
 }
 
-void InventoryState::Close() {
-    m_game->SetState(std::make_unique<PlayingState>(m_game));
+InventoryState::~InventoryState() {
+}
+
+void InventoryState::Enter() {
+    m_previewTexture = LoadRenderTexture(256, 384);
+}
+
+void InventoryState::Exit() {
+    UnloadRenderTexture(m_previewTexture);
 }
 
 void InventoryState::HandleInput() {
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_I)) { Close(); return; }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_E)) { 
+        if (m_isDragging) {
+            m_game->GetPlayer()->GetCharacterMutable().AddItem(m_draggedItemId, m_draggedItemCount);
+            m_isDragging = false;
+        }
+        m_game->SetState(std::make_unique<PlayingState>(m_game));
+        return; 
+    }
 
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0.0f) {
+        m_scrollOffset -= (int)wheel;
+        if (m_scrollOffset < 0) m_scrollOffset = 0;
+        if (m_scrollOffset > m_maxScroll) m_scrollOffset = m_maxScroll;
+    }
+}
+
+void InventoryState::Update(float deltaTime) {
     Player* player = m_game->GetPlayer();
     if (!player) return;
+    
     core::Character& c = player->GetCharacterMutable();
-    const int n = static_cast<int>(c.ownedWeapons.size());
-    if (n == 0) return;
+    Vector2 mousePos = GetMousePosition();
+    
+    const int sw = GetScreenWidth(), sh = GetScreenHeight();
+    const float panelW = 800.0f, panelH = 500.0f;
+    const float px = (sw - panelW) / 2.0f;
+    const float py = (sh - panelH) / 2.0f;
+    
+    const float gridX = px + 450.0f;
+    const float gridY = py + 60.0f;
+    
+    int totalItems = (int)c.inventory.size();
+    int totalRows = (totalItems + GRID_COLS - 1) / GRID_COLS;
+    m_maxScroll = std::max(0, totalRows - GRID_ROWS);
+    if (m_scrollOffset > m_maxScroll) m_scrollOffset = m_maxScroll;
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !m_isDragging) {
+        for (int row = 0; row < GRID_ROWS; ++row) {
+            for (int col = 0; col < GRID_COLS; ++col) {
+                int itemIndex = (m_scrollOffset + row) * GRID_COLS + col;
+                if (itemIndex < totalItems) {
+                    float x = gridX + col * (SLOT_SIZE + SLOT_PADDING);
+                    float y = gridY + row * (SLOT_SIZE + SLOT_PADDING);
+                    Rectangle slotRec = { x, y, SLOT_SIZE, SLOT_SIZE };
+                    
+                    if (CheckCollisionPointRec(mousePos, slotRec)) {
+                        m_isDragging = true;
+                        m_draggedItemId = c.inventory[itemIndex].id;
+                        m_draggedItemCount = c.inventory[itemIndex].count;
+                        m_dragSource = DRAG_GRID;
+                        m_dragSourceIndex = itemIndex;
+                        
+                        c.inventory[itemIndex].id = core::kNoItem;
+                        c.inventory[itemIndex].count = 0;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; };
+        SlotDef equipSlots[] = {
+            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head },
+            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body },
+            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs },
+            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet },
+            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand },
+            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand }
+        };
+        
+        for (const auto& s : equipSlots) {
+            Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+            if (CheckCollisionPointRec(mousePos, r) && *s.idPtr != core::kNoItem) {
+                m_isDragging = true;
+                m_draggedItemId = *s.idPtr;
+                m_draggedItemCount = 1;
+                m_dragSource = s.src;
+                *s.idPtr = core::kNoItem;
+                break;
+            }
+        }
+    }
+    else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && m_isDragging) {
+        bool dropped = false;
+        
+        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; };
+        SlotDef equipSlots[] = {
+            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head },
+            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body },
+            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs },
+            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet },
+            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand },
+            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand }
+        };
+        
+        for (const auto& s : equipSlots) {
+            Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+            if (CheckCollisionPointRec(mousePos, r)) {
+                if (*s.idPtr != core::kNoItem) {
+                    c.AddItem(*s.idPtr, 1);
+                }
+                *s.idPtr = m_draggedItemId;
+                dropped = true;
+                break;
+            }
+        }
+        
+        if (!dropped) {
+            for (int row = 0; row < GRID_ROWS; ++row) {
+                for (int col = 0; col < GRID_COLS; ++col) {
+                    float x = gridX + col * (SLOT_SIZE + SLOT_PADDING);
+                    float y = gridY + row * (SLOT_SIZE + SLOT_PADDING);
+                    Rectangle r = { x, y, SLOT_SIZE, SLOT_SIZE };
+                    
+                    if (CheckCollisionPointRec(mousePos, r)) {
+                        int itemIndex = (m_scrollOffset + row) * GRID_COLS + col;
+                        if (itemIndex < totalItems) {
+                            if (c.inventory[itemIndex].id == core::kNoItem) {
+                                c.inventory[itemIndex].id = m_draggedItemId;
+                                c.inventory[itemIndex].count = m_draggedItemCount;
+                            } else {
+                                core::ItemId temp = c.inventory[itemIndex].id;
+                                int tempCount = c.inventory[itemIndex].count;
+                                c.inventory[itemIndex].id = m_draggedItemId;
+                                c.inventory[itemIndex].count = m_draggedItemCount;
+                                c.AddItem(temp, tempCount);
+                            }
+                        } else {
+                            c.AddItem(m_draggedItemId, m_draggedItemCount);
+                        }
+                        dropped = true;
+                        break;
+                    }
+                }
+                if (dropped) break;
+            }
+        }
+        
+        if (!dropped) {
+            c.AddItem(m_draggedItemId, m_draggedItemCount);
+        }
+        
+        c.inventory.erase(
+            std::remove_if(c.inventory.begin(), c.inventory.end(),
+                           [](const core::ItemStack& stack) { return stack.id == core::kNoItem || stack.count <= 0; }),
+            c.inventory.end());
+            
+        m_isDragging = false;
+    }
+}
 
-    if (IsKeyPressed(KEY_DOWN)) m_selected = (m_selected + 1) % n;
-    if (IsKeyPressed(KEY_UP))   m_selected = (m_selected - 1 + n) % n;
+void InventoryState::Render3DPreview(Rectangle bounds) {
+    BeginTextureMode(m_previewTexture);
+    ClearBackground(BLANK);
+    
+    Camera3D previewCamera = { 0 };
+    previewCamera.position = Vector3{ 0.0f, 1.5f, 5.0f };
+    previewCamera.target = Vector3{ 0.0f, 1.0f, 0.0f };
+    previewCamera.up = Vector3{ 0.0f, 1.0f, 0.0f };
+    previewCamera.fovy = 45.0f;
+    previewCamera.projection = CAMERA_PERSPECTIVE;
+    
+    BeginMode3D(previewCamera);
+    
+    core::LightingSystem* ls = m_game->GetLightingSystem();
+    if (ls) ls->BeginLightingMode();
+    
+    if (m_game->GetPlayer()) {
+        Player* p = m_game->GetPlayer();
+        Vector3 oldPos = p->GetPosition();
+        p->SetPosition({0,0,0});
+        p->Render();
+        p->SetPosition(oldPos);
+    }
+    
+    if (ls) ls->EndLightingMode();
+    
+    EndMode3D();
+    EndTextureMode();
+    
+    Rectangle source = { 0.0f, 0.0f, (float)m_previewTexture.texture.width, -(float)m_previewTexture.texture.height };
+    DrawTexturePro(m_previewTexture.texture, source, bounds, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+}
 
-    if (IsKeyPressed(KEY_ENTER)) {
-        // Se è già equipaggiata la rimette in inventario (disarmato)
-        c.equippedWeapon = (c.equippedWeapon == m_selected) ? -1 : m_selected;
+void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool isHovered, const char* label) {
+    DrawRectangleRec(rect, isHovered ? Fade(kGold, 0.3f) : Fade(BLACK, 0.6f));
+    DrawRectangleLinesEx(rect, 2.0f, isHovered ? kGoldBright : kGoldDim);
+    
+    if (label) {
+        DrawText(label, (int)rect.x, (int)(rect.y - 14), 10, kGoldDim);
+    }
+    
+    if (id != core::kNoItem) {
+        const core::ItemDef* def = core::GetItem(id);
+        if (def) {
+            DrawText(TextSubtext(def->name, 0, 4), (int)rect.x + 4, (int)rect.y + 16, 10, kBone);
+            if (count > 1) {
+                DrawText(TextFormat("x%d", count), (int)rect.x + 2, (int)(rect.y + SLOT_SIZE - 12), 10, WHITE);
+            }
+        }
     }
 }
 
 void InventoryState::Render() {
-    const Player* player = m_game->GetPlayer();
-    if (!player) return;
-    const core::Character& c = player->GetCharacter();
-
     const int sw = GetScreenWidth(), sh = GetScreenHeight();
-    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
-
-    const Rectangle b = { (sw - 460.0f) / 2, (sh - 420.0f) / 2, 460.0f, 420.0f };
-    DrawRectangleRec(b, kWood);
-    DrawRectangleLinesEx(b, 3.0f, kGoldDim);
-
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.7f));
+    
+    const float panelW = 800.0f, panelH = 500.0f;
+    const float px = (sw - panelW) / 2.0f;
+    const float py = (sh - panelH) / 2.0f;
+    const Rectangle panelBounds = { px, py, panelW, panelH };
+    
+    DrawRectangleRec(panelBounds, kIron);
+    DrawRectangleLinesEx(panelBounds, 4.0f, kGoldDim);
+    DrawRectangleLinesEx({px+6, py+6, panelW-12, panelH-12}, 1.0f, kGold);
+    
     const Font& font = UIFont();
-    DrawTextCentered(font, "Inventario", b.x + b.width / 2, b.y + 18, 30.0f, kGoldBright);
-    DrawTextEx(font, "Armi", { b.x + 30, b.y + 70 }, 20.0f, 2.0f, Fade(kBone, 0.7f));
-
-    float y = b.y + 100;
-    for (int i = 0; i < (int)c.ownedWeapons.size(); ++i) {
-        const auto& w = c.ownedWeapons[i];
-        const Rectangle row = { b.x + 20, y - 4, b.width - 40, 34 };
-        if (i == m_selected) {
-            DrawRectangleRec(row, Fade(kGold, 0.14f));
-            DrawRectangleLinesEx(row, 1.0f, Fade(kGold, 0.7f));
-        }
-        const bool eq = (c.equippedWeapon == i);
-        const char* txt = TextFormat("%s  %s  (portata %.1fm)%s",
-                                     w.name, core::ToString(w.damage).c_str(), w.range,
-                                     eq ? "   [EQUIPAGGIATA]" : "");
-        DrawTextEx(font, txt, { b.x + 30, y }, 20.0f, 2.0f, eq ? kGoldBright : kBone);
-        y += 38;
+    DrawTextEx(font, "Equipaggiamento e Zaino", { px + 24, py + 16 }, 28.0f, 2.0f, kGoldBright);
+    
+    Player* p = m_game->GetPlayer();
+    if (!p) return;
+    const core::Character& c = p->GetCharacter();
+    Vector2 mousePos = GetMousePosition();
+    
+    Rectangle previewBounds = { px + 120, py + 80, 200, 350 };
+    DrawRectangleRec(previewBounds, Fade(BLACK, 0.4f));
+    Render3DPreview(previewBounds);
+    DrawRectangleLinesEx(previewBounds, 2.0f, kGoldDim);
+    
+    struct SlotDef { float x; float y; core::ItemId id; const char* label; };
+    SlotDef equipSlots[] = {
+        { px + 50, py + 80, c.equipment.head, "Testa" },
+        { px + 50, py + 160, c.equipment.body, "Corpo" },
+        { px + 50, py + 240, c.equipment.legs, "Gambe" },
+        { px + 50, py + 320, c.equipment.feet, "Piedi" },
+        { px + 350, py + 160, c.equipment.rightHand, "Mano Dx" },
+        { px + 350, py + 240, c.equipment.leftHand, "Mano Sx" }
+    };
+    
+    for (const auto& s : equipSlots) {
+        Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+        bool hovered = !m_isDragging && CheckCollisionPointRec(mousePos, r);
+        DrawSlot(r, s.id, 1, hovered, s.label);
     }
-
-    DrawTextCentered(font, "SU/GIU: seleziona   INVIO: equipaggia / rimuovi   I/ESC: chiudi",
-                     b.x + b.width / 2, b.y + b.height - 34, 16.0f, Fade(kBone, 0.7f));
+    
+    const float gridX = px + 450.0f;
+    const float gridY = py + 60.0f;
+    int totalItems = (int)c.inventory.size();
+    
+    DrawTextEx(font, "Zaino", { gridX, gridY - 24 }, 20.0f, 1.0f, kBone);
+    
+    for (int row = 0; row < GRID_ROWS; ++row) {
+        for (int col = 0; col < GRID_COLS; ++col) {
+            float x = gridX + col * (SLOT_SIZE + SLOT_PADDING);
+            float y = gridY + row * (SLOT_SIZE + SLOT_PADDING);
+            Rectangle r = { x, y, SLOT_SIZE, SLOT_SIZE };
+            
+            int itemIndex = (m_scrollOffset + row) * GRID_COLS + col;
+            bool hovered = !m_isDragging && CheckCollisionPointRec(mousePos, r);
+            
+            if (itemIndex < totalItems) {
+                DrawSlot(r, c.inventory[itemIndex].id, c.inventory[itemIndex].count, hovered);
+            } else {
+                DrawSlot(r, core::kNoItem, 0, hovered);
+            }
+        }
+    }
+    
+    float scrollBarX = gridX + GRID_COLS * (SLOT_SIZE + SLOT_PADDING) + 10;
+    float scrollBarH = GRID_ROWS * (SLOT_SIZE + SLOT_PADDING);
+    DrawRectangle((int)scrollBarX, (int)gridY, 10, (int)scrollBarH, Fade(BLACK, 0.5f));
+    
+    if (m_maxScroll > 0) {
+        float thumbH = scrollBarH * ((float)GRID_ROWS / (m_maxScroll + GRID_ROWS));
+        float thumbY = gridY + (scrollBarH - thumbH) * ((float)m_scrollOffset / m_maxScroll);
+        DrawRectangle((int)scrollBarX, (int)thumbY, 10, (int)thumbH, kGoldDim);
+    }
+    
+    if (m_isDragging) {
+        Rectangle dragRect = { mousePos.x - SLOT_SIZE/2, mousePos.y - SLOT_SIZE/2, SLOT_SIZE, SLOT_SIZE };
+        DrawSlot(dragRect, m_draggedItemId, m_draggedItemCount, false);
+    }
 }
