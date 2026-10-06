@@ -1,5 +1,6 @@
 #include "states/CharacterCreationState.h"
 #include "states/MainMenuState.h"
+#include "states/DiceRollState.h"
 #include "core/Game.h"
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 #include <states/PlayingState.h>
 
@@ -15,7 +17,7 @@ using namespace ui::theme;
 namespace {
 
 constexpr float kPanelW = 540.0f;
-constexpr float kPanelH = 560.0f;
+constexpr float kPanelH = 640.0f;
 constexpr float kRowH = 36.0f;
 
 void DrawLabel(const Font& font, const char* text, float x, float y, float size, Color color) {
@@ -29,6 +31,10 @@ void DrawRowHighlight(const Rectangle& r) {
     DrawRectangleLinesEx(r, 1.0f, Fade(kGold, 0.7f));
 }
 
+const char* MethodName(CharacterCreationState::Method m) {
+    return (m == CharacterCreationState::Method::Roll) ? "Tira i dadi" : "Punteggi fissi";
+}
+
 } // namespace
 
 CharacterCreationState::CharacterCreationState(Game* game)
@@ -36,21 +42,54 @@ CharacterCreationState::CharacterCreationState(Game* game)
 {
     m_type = GameStateType::CharacterCreation;
     m_assigned.fill(-1);
+    m_rolled.fill(false);
+}
+
+CharacterCreationState::CharacterCreationState(Game* game, const Progress& progress)
+    : GameState(game)
+    , m_method(progress.method)
+    , m_class(progress.characterClass)
+    , m_pool(progress.pool)
+    , m_rolled(progress.rolled)
+    , m_assigned(progress.assigned)
+    , m_row(progress.row)
+    , m_restored(true)
+{
+    m_type = GameStateType::CharacterCreation;
+}
+
+CharacterCreationState::Progress CharacterCreationState::Snapshot() const {
+    Progress p;
+    p.method = m_method;
+    p.characterClass = m_class;
+    p.pool = m_pool;
+    p.rolled = m_rolled;
+    p.assigned = m_assigned;
+    p.row = m_row;
+    return p;
 }
 
 void CharacterCreationState::Enter() {
-    // I sei tiri avvengono qui, una sola volta per ingresso nella Character Creation.
-    m_pool = core::RollAbilityPool();
-    m_assigned.fill(-1);
-    m_class = core::CharacterClass::Warrior;
-    m_row = kRowClass;
+    if (m_restored) return;   // si torna dalla board dei dadi: la creazione continua da dove era
 
-    std::cout << "[CHARACTER] 4d6 drop lowest x6 ->";
-    for (int score : m_pool) std::cout << ' ' << score;
-    std::cout << std::endl;
+    // Si parte con "Tira i dadi": nessun punteggio ancora lanciato.
+    m_method = Method::Roll;
+    m_class = core::CharacterClass::Warrior;
+    m_pool.fill(0);
+    m_rolled.fill(false);
+    m_assigned.fill(-1);
+    m_row = kRowRoll;
 }
 
 void CharacterCreationState::Update(float) {}
+
+int CharacterCreationState::RolledCount() const {
+    return static_cast<int>(std::count(m_rolled.begin(), m_rolled.end(), true));
+}
+
+bool CharacterCreationState::RollRowActive() const {
+    return m_method == Method::Roll && RolledCount() < core::kAbilityCount;
+}
 
 bool CharacterCreationState::AllAssigned() const {
     return std::all_of(m_assigned.begin(), m_assigned.end(), [](int s) { return s >= 0; });
@@ -60,15 +99,87 @@ bool CharacterCreationState::IsPoolSlotUsed(int slot) const {
     return std::find(m_assigned.begin(), m_assigned.end(), slot) != m_assigned.end();
 }
 
+int CharacterCreationState::NextRow(int dir) const {
+    int row = m_row;
+    for (int i = 0; i < kRowCount; ++i) {
+        row = (row + dir + kRowCount) % kRowCount;
+        if (row == kRowRoll && !RollRowActive()) continue;   // niente da lanciare: la riga non si seleziona
+        return row;
+    }
+    return m_row;
+}
+
+void CharacterCreationState::SetMethod(Method method) {
+    m_method = method;
+    m_assigned.fill(-1);                       // i punteggi cambiano: le assegnazioni non valgono piu'
+    if (method == Method::Fixed) {
+        m_pool = core::StandardArray();
+        m_rolled.fill(true);
+    } else {
+        m_pool.fill(0);
+        m_rolled.fill(false);
+    }
+    if (m_row == kRowRoll && !RollRowActive()) m_row = kRowFirstAbility;
+}
+
+void CharacterCreationState::AutoRollRemaining() {
+    if (m_method != Method::Roll) return;
+    for (int i = 0; i < core::kAbilityCount; ++i) {
+        if (!m_rolled[static_cast<size_t>(i)]) {
+            m_pool[static_cast<size_t>(i)] = core::RollAbilityScore();
+            m_rolled[static_cast<size_t>(i)] = true;
+        }
+    }
+    std::cout << "[CHARACTER] 4d6 drop lowest (auto) ->";
+    for (int score : m_pool) std::cout << ' ' << score;
+    std::cout << std::endl;
+    if (m_row == kRowRoll) m_row = kRowFirstAbility;
+}
+
+// Apre la board gotica per il prossimo punteggio da lanciare: 4d6, un dado per volta, poi si scarta il piu' basso.
+// La board sostituisce questo stato (SetState lo distrugge): per tornare qui se ne ricrea uno con il punteggio dentro.
+void CharacterCreationState::StartBoardRoll() {
+    if (!m_game) return;
+    int slot = -1;
+    for (int i = 0; i < core::kAbilityCount; ++i) {
+        if (!m_rolled[static_cast<size_t>(i)]) { slot = i; break; }
+    }
+    if (slot < 0) return;
+
+    Game* game = m_game;
+    Progress snap = Snapshot();
+
+    DiceRollOptions options;
+    options.opaqueBackdrop = true;     // dietro la creazione non c'e' il mondo
+    options.summary = [](const std::vector<int>& dice) {
+        return "Punteggio " + std::to_string(core::AbilityScoreFromDice(dice)) + "  (scarta il piu' basso)";
+    };
+    options.onFinish = [game, snap, slot](const std::vector<int>& dice, bool completed) mutable -> std::unique_ptr<GameState> {
+        if (completed && dice.size() == 4) {
+            snap.pool[static_cast<size_t>(slot)] = core::AbilityScoreFromDice(dice);
+            snap.rolled[static_cast<size_t>(slot)] = true;
+            std::cout << "[CHARACTER] 4d6 drop lowest (board) slot " << slot << " ->";
+            for (int d : dice) std::cout << ' ' << d;
+            std::cout << " = " << snap.pool[static_cast<size_t>(slot)] << std::endl;
+        }
+        const int rolledNow = static_cast<int>(std::count(snap.rolled.begin(), snap.rolled.end(), true));
+        snap.row = (rolledNow < core::kAbilityCount) ? kRowRoll : kRowFirstAbility;
+        return std::make_unique<CharacterCreationState>(game, snap);
+    };
+
+    m_game->SetState(std::make_unique<DiceRollState>(m_game, core::DiceExpr{ 4, 6 }, std::move(options)));
+}
+
 void CharacterCreationState::CycleClass(int dir) {
     const int n = core::kCharacterClassCount;
     m_class = static_cast<core::CharacterClass>((static_cast<int>(m_class) + dir + n) % n);
 }
 
 void CharacterCreationState::CycleAssignment(int ability, int dir) {
-    // Opzioni: "non assegnato" (-1) + ogni punteggio del pool non gia' preso da un'altra caratteristica.
+    // Opzioni: "non assegnato" (-1) + ogni punteggio GIA' NOTO del pool non gia' preso da un'altra caratteristica.
     std::vector<int> options{ -1 };
     for (int slot = 0; slot < core::kAbilityCount; ++slot) {
+        if (!m_rolled[static_cast<size_t>(slot)]) continue;
         bool takenByOther = false;
         for (int a = 0; a < core::kAbilityCount; ++a) {
             if (a != ability && m_assigned[static_cast<size_t>(a)] == slot) takenByOther = true;
@@ -98,16 +209,25 @@ void CharacterCreationState::HandleInput() {
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
 
-    if (IsKeyPressed(KEY_DOWN)) m_row = (m_row + 1) % kRowCount;
-    if (IsKeyPressed(KEY_UP))   m_row = (m_row + kRowCount - 1) % kRowCount;
+    if (IsKeyPressed(KEY_DOWN)) m_row = NextRow(+1);
+    if (IsKeyPressed(KEY_UP))   m_row = NextRow(-1);
+
+    if (IsKeyPressed(KEY_A)) AutoRollRemaining();
 
     const int dir = (IsKeyPressed(KEY_RIGHT) ? 1 : 0) - (IsKeyPressed(KEY_LEFT) ? 1 : 0);
     if (dir != 0) {
-        if (m_row == kRowClass) {
+        if (m_row == kRowMethod) {
+            SetMethod(m_method == Method::Roll ? Method::Fixed : Method::Roll);
+        } else if (m_row == kRowClass) {
             CycleClass(dir);
         } else if (m_row >= kRowFirstAbility && m_row < kRowConfirm) {
             CycleAssignment(m_row - kRowFirstAbility, dir);
         }
+    }
+
+    if (IsKeyPressed(KEY_ENTER) && m_row == kRowRoll && RollRowActive()) {
+        StartBoardRoll();
+        return;   // questo stato e' stato distrutto: non toccare i membri
     }
 
     if (IsKeyPressed(KEY_ENTER) && m_row == kRowConfirm && AllAssigned()) {
@@ -118,7 +238,7 @@ void CharacterCreationState::HandleInput() {
                   << " CON " << character.Score(core::Ability::Con)
                   << " INT " << character.Score(core::Ability::Int)
                   << " WIS " << character.Score(core::Ability::Wis)
-                  << " CHA " << character.Score(core::Ability::Cha) 
+                  << " CHA " << character.Score(core::Ability::Cha)
                   << ", HP " << character.vitals.currentHP << "/" << character.MaxHP()<<")" << std::endl;
         if (m_game) {
             // Stessa sequenza che prima faceva "Nuova partita" nel menu, ora dopo la conferma.
@@ -152,29 +272,51 @@ void CharacterCreationState::Render() {
 
     auto rowColor = [&](int row) { return (m_row == row) ? kGoldBright : kBone; };
 
-    // --- classe ----------------------------------------------------------
+    // --- metodo ----------------------------------------------------------
     float y = b.y + 104.0f;
+    if (m_row == kRowMethod) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
+    DrawLabel(font, "Punteggi", left, y, 24.0f, rowColor(kRowMethod));
+    DrawLabel(font, TextFormat("<  %s  >", MethodName(m_method)), left + 170.0f, y, 24.0f, rowColor(kRowMethod));
+
+    // --- classe ----------------------------------------------------------
+    y += kRowH;
     if (m_row == kRowClass) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
     DrawLabel(font, "Classe", left, y, 24.0f, rowColor(kRowClass));
     DrawLabel(font, TextFormat("<  %s  >", core::ToString(m_class)), left + 170.0f, y, 24.0f, rowColor(kRowClass));
 
-    // --- pool dei punteggi tirati ---------------------------------------
+    // --- pool dei punteggi ----------------------------------------------
     y += kRowH + 10.0f;
-    DrawLabel(font, "Tiri (4d6, scarta il piu' basso)", left, y, 20.0f, Fade(kBone, 0.75f));
+    DrawLabel(font, (m_method == Method::Roll) ? "Tiri (4d6, scarta il piu' basso)"
+                                               : "Array standard D&D (15 14 13 12 10 8)",
+              left, y, 20.0f, Fade(kBone, 0.75f));
     y += 28.0f;
     for (int i = 0; i < core::kAbilityCount; ++i) {
         const Rectangle slot = { left + 8.0f + i * 80.0f, y, 64.0f, 34.0f };
-        const bool used = IsPoolSlotUsed(i);
+        const bool known = m_rolled[static_cast<size_t>(i)];
+        const bool used = known && IsPoolSlotUsed(i);
         DrawRectangleRec(slot, Fade(BLACK, used ? 0.25f : 0.45f));
-        DrawRectangleLinesEx(slot, 1.0f, Fade(kGoldDim, used ? 0.35f : 0.9f));
-        const char* t = TextFormat("%d", m_pool[static_cast<size_t>(i)]);
+        DrawRectangleLinesEx(slot, 1.0f, Fade(kGoldDim, (used || !known) ? 0.35f : 0.9f));
+        const char* t = known ? TextFormat("%d", m_pool[static_cast<size_t>(i)]) : "?";
         const Vector2 m = MeasureTextEx(font, t, 24.0f, 2.4f);
         DrawLabel(font, t, slot.x + (slot.width - m.x) / 2.0f, slot.y + 5.0f, 24.0f,
-                  used ? Fade(kBone, 0.3f) : kGoldBright);
+                  !known ? Fade(kBone, 0.3f) : (used ? Fade(kBone, 0.3f) : kGoldBright));
     }
 
+    // --- lancio dei dadi -------------------------------------------------
+    y += 34.0f + 10.0f;
+    if (m_method == Method::Roll) {
+        if (RollRowActive()) {
+            if (m_row == kRowRoll) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
+            DrawLabel(font, TextFormat("Lancia i dadi (%d/%d)", RolledCount(), core::kAbilityCount), left, y, 22.0f, rowColor(kRowRoll));
+            DrawLabel(font, "INVIO: board    A: tira tutto", left + 250.0f, y + 3.0f, 18.0f, Fade(kBone, 0.65f));
+        } else {
+            DrawLabel(font, "Tutti i punteggi sono stati tirati", left, y, 20.0f, Fade(kBone, 0.6f));
+        }
+    }
+    y += kRowH;
+
     // --- caratteristiche -------------------------------------------------
-    y += 34.0f + 18.0f;
+    y += 6.0f;
     for (int a = 0; a < core::kAbilityCount; ++a) {
         const int row = kRowFirstAbility + a;
         if (m_row == row) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
@@ -204,6 +346,6 @@ void CharacterCreationState::Render() {
     DrawTextCentered(font, ready ? "[ Conferma ]" : "[ Conferma ]  assegna tutti i punteggi", cx, y, 24.0f,
                      ready ? rowColor(kRowConfirm) : Fade(kBone, 0.4f));
 
-    DrawTextCentered(font, "SU/GIU: riga   SX/DX: cambia   INVIO: conferma   ESC: indietro", cx,
+    DrawTextCentered(font, "SU/GIU: riga   SX/DX: cambia   INVIO: conferma   A: tira tutto   ESC: indietro", cx,
                      b.y + b.height + 14.0f, 20.0f, Fade(kBone, 0.7f));
 }

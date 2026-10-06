@@ -36,16 +36,25 @@ int AbilityModifier(int score) {
     return (d >= 0) ? d / 2 : -((-d + 1) / 2);   // floor(d / 2)
 }
 
+int AbilityScoreFromDice(const std::vector<int>& dice) {
+    if (dice.empty()) return 0;
+    int total = 0;
+    for (int d : dice) total += d;
+    return total - *std::min_element(dice.begin(), dice.end());
+}
+
 int RollAbilityScore() {
-    const DiceResult r = RollDice(4, 6);
-    const int lowest = *std::min_element(r.dice.begin(), r.dice.end());
-    return r.total - lowest;
+    return AbilityScoreFromDice(RollDice(4, 6).dice);
 }
 
 AbilityScores RollAbilityPool() {
     AbilityScores pool{};
     for (int& score : pool) score = RollAbilityScore();
     return pool;
+}
+
+AbilityScores StandardArray() {
+    return { 15, 14, 13, 12, 10, 8 };
 }
 
 WeaponDef StartingWeapon(CharacterClass cls) {

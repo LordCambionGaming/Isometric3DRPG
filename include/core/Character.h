@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <vector>
@@ -23,10 +24,14 @@ const char* ToString(Ability ability);                   // "STR", "DEX", ...
 // 9 -> -1 (con la divisione intera di C++ verrebbe 0).
 int AbilityModifier(int score);
 
+// Punteggio da quattro d6 GIA' lanciati (per esempio sulla board dei dadi): somma meno il piu' basso (3..18).
+int AbilityScoreFromDice(const std::vector<int>& dice);
 // 4d6 scartando il dado piu' basso (3..18), costruito su core::RollDice.
 int RollAbilityScore();
 // I sei punteggi della Character Creation (sei tiri indipendenti, nell'ordine di lancio).
 AbilityScores RollAbilityPool();
+// Alternativa D&D 5e al tirare i dadi: l'array standard 15, 14, 13, 12, 10, 8.
+AbilityScores StandardArray();
 
 struct WeaponDef {
     const char* name = "";

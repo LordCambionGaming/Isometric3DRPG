@@ -4,6 +4,9 @@
 #include "core/Dice.h"
 #include "ui/DiceRoller.h"
 #include <raylib.h>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
 class Mob;
@@ -20,6 +23,18 @@ struct VisualDice3D {
     Color color = WHITE;
 };
 
+// Per usare la board come passaggio di un'altra schermata (per esempio la Character Creation):
+// al posto di tornare al PlayingState, chiude restituendo lo stato scelto da chi l'ha aperta.
+struct DiceRollOptions {
+    // Dove andare quando chiudi la board (INVIO / ESC). Riceve i dadi lanciati e se il lancio e' stato
+    // completato: chiudendo a meta' i dadi sono vuoti e completed e' false.
+    std::function<std::unique_ptr<GameState>(const std::vector<int>& dice, bool completed)> onFinish;
+    // Testo del risultato finale al posto di "Risultato NdX: totale" (facoltativo)
+    std::function<std::string(const std::vector<int>& dice)> summary;
+    bool opaqueBackdrop = false;   // sfondo pieno invece del mondo oscurato (quando dietro non c'e' il mondo)
+    bool lockWhenDone = true;      // a lancio completato i dadi non si possono rilanciare
+};
+
 // Board gotica: feltro, guglie, dado 3D con ricamo dorato, lancio trascinando col mouse.
 //  - Attacco (Mob*): lanci il d20; se COLPISCI devi lanciare anche il dado del danno
 //    (con un colpo critico i dadi del danno sono il doppio, e li lanci uno dopo l'altro).
@@ -31,6 +46,9 @@ public:
 
     // Tiro libero: 1d4, 2d6, 1d8, 1d10, 1d12, 1d20, ...
     DiceRollState(Game* game, core::DiceExpr expr);
+
+    // Tiro libero aperto da un'altra schermata, che decide dove tornare (vedi DiceRollOptions)
+    DiceRollState(Game* game, core::DiceExpr expr, DiceRollOptions options);
 
     ~DiceRollState() override;
 
@@ -73,6 +91,7 @@ private:
     core::AttackRollResult m_attackResult{};
     core::DamageRollResult m_damageResult{};
     bool m_isCombatRoll = false;
+    DiceRollOptions m_opts;
     bool m_attackRolled = false;    // l'attacco e' stato lanciato davvero
     bool m_damageRolled = false;    // tutti i dadi del danno sono stati lanciati
     bool m_damageApplied = false;

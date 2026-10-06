@@ -81,6 +81,17 @@ DiceRollState::DiceRollState(Game* game, core::DiceExpr expr)
     SetupGothicBoard();
 }
 
+DiceRollState::DiceRollState(Game* game, core::DiceExpr expr, DiceRollOptions options)
+    : GameState(game)
+    , m_target(nullptr)
+    , m_diceExpr(expr)
+    , m_isCombatRoll(false)
+    , m_opts(std::move(options))
+{
+    m_type = GameStateType::DiceRoll;
+    SetupGothicBoard();
+}
+
 DiceRollState::~DiceRollState() = default;
 
 // d4/d6/d8/d10/d12/d20 (fino a kMaxPoolDice dadi) -> board gotica. Il resto -> dadi semplici.
@@ -305,8 +316,9 @@ void DiceRollState::RenderGothic() {
     const Rectangle felt = Felt();
     const float cx = b.x + b.width / 2.0f;
 
-    // il mondo congelato dietro si oscura
-    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.75f));
+    // il mondo congelato dietro si oscura (oppure sfondo pieno, se dietro non c'e' il mondo)
+    if (m_opts.opaqueBackdrop) DrawRectangle(0, 0, sw, sh, kIron);
+    else                       DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.75f));
 
     // --- cornice ---------------------------------------------------------
     DrawSpires(b);
@@ -416,7 +428,8 @@ void DiceRollState::RenderGothic() {
                         banner = TextFormat("%d  -  d%d", m_result.rollValue, m_pool.sides);
                     }
                 } else if (m_poolDone) {
-                    banner = TextFormat("Risultato %s: %d", core::ToString(m_pool).c_str(), m_diceResult.total);
+                    if (m_opts.summary) banner = TextFormat("%s", m_opts.summary(m_poolValues).c_str());
+                    else                banner = TextFormat("Risultato %s: %d", core::ToString(m_pool).c_str(), m_diceResult.total);
                     bannerColor = kGoldBright;
                     subline = "Dadi: " + JoinValues(m_poolValues);
                 } else {
@@ -457,13 +470,18 @@ void DiceRollState::RenderGothic() {
 void DiceRollState::HandleInputGothic() {
     // Durante la pausa tra due lanci e dopo la fine di un attacco il dado non si puo' afferrare
     // (un attacco si lancia una volta sola: niente rilanci finche' non colpisci).
-    const bool locked = (m_pending != Pending::None) || (IsCombat() && m_combatDone);
+    const bool lockedByCaller = m_opts.onFinish && m_opts.lockWhenDone && m_poolDone;
+    const bool locked = (m_pending != Pending::None) || (IsCombat() && m_combatDone) || lockedByCaller;
     if (!locked) {
         m_dice.HandleInput();
     }
 
     if (!m_dice.IsBusy() && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE))) {
-        m_game->SetState(std::make_unique<PlayingState>(m_game));
+        // Lo stato di destinazione si costruisce PRIMA di SetState: SetState distrugge questo oggetto.
+        std::unique_ptr<GameState> next;
+        if (m_opts.onFinish) next = m_opts.onFinish(m_poolDone ? m_poolValues : std::vector<int>{}, m_poolDone);
+        else                 next = std::make_unique<PlayingState>(m_game);
+        m_game->SetState(std::move(next));
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
 }
