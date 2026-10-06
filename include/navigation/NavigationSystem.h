@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <unordered_set>
+#include <cstdint>
 #include <raylib.h>
 
 class World;
@@ -35,9 +37,15 @@ public:
     // Find path using A* (returns empty vector if no path exists)
     std::vector<TileCoord> FindPath(int startX, int startZ, int targetX, int targetZ) const;
 
+    // Registers world-space positions of mob blockers (call once per frame before FindPath)
+    void SetOccupiedTiles(const std::vector<Vector3>& mobPositions);
+
 private:
     World* m_world;
     float m_maxStepHeight;
+
+    // Tiles currently occupied by mobs (penalised, not fully blocked)
+    std::unordered_set<std::int64_t> m_occupiedTiles;
 
     // A* helpers
     struct Node {

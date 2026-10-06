@@ -1,4 +1,4 @@
-﻿#include "rendering/Renderer.h"
+#include "rendering/Renderer.h"
 #include "rendering/Camera3DController.h"
 #include "world/World.h"
 #include "core/Timer.h"
@@ -89,50 +89,31 @@ void Renderer::RenderUI() {
 }
 
 void Renderer::RenderDebugInfo() {
-    const int startY = 10;
-    const int lineHeight = 20;
-    int currentY = startY;
+    const int x = 10;
+    const int lh = 18;
+    int y = 8;
 
-    DrawText("=== DEBUG INFO ===", 10, currentY, 16, WHITE);
-    currentY += lineHeight + 5;
+    // Semi-transparent background panel
+    DrawRectangle(4, 4, 260, 100, Color{0, 0, 0, 140});
+    DrawRectangleLines(4, 4, 260, 100, Color{80, 80, 80, 180});
 
-    // FPS
-    DrawText(TextFormat("FPS: %d", GetFPS()), 10, currentY, 14, GREEN);
-    currentY += lineHeight;
+    DrawText(TextFormat("FPS: %d", GetFPS()), x, y, 15, Color{100, 255, 100, 255});
+    y += lh;
 
-    // Camera info
     if (m_camera) {
         Vector3 pos = m_camera->GetPosition();
-        Vector3 target = m_camera->GetTarget();
-        DrawText(TextFormat("Camera Pos: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z), 10, currentY, 14, YELLOW);
-        currentY += lineHeight;
-        DrawText(TextFormat("Camera Target: (%.1f, %.1f, %.1f)", target.x, target.y, target.z), 10, currentY, 14, YELLOW);
-        currentY += lineHeight;
-        DrawText(TextFormat("Zoom: %.2f", m_camera->GetZoom()), 10, currentY, 14, YELLOW);
-        currentY += lineHeight;
+        DrawText(TextFormat("Pos: %.0f  %.0f  %.0f", pos.x, pos.y, pos.z), x, y, 14, Color{200, 200, 255, 255});
+        y += lh;
+        DrawText(TextFormat("Zoom: %.2f", m_camera->GetZoom()), x, y, 14, Color{200, 200, 255, 255});
+        y += lh;
     }
 
-    // World info
     if (m_world) {
-        DrawText(TextFormat("World Seed: %u", m_world->GetSeed()), 10, currentY, 14, ORANGE);
-        currentY += lineHeight;
+        DrawText(TextFormat("Seed: %u | Chunks: %d", m_world->GetSeed(), m_world->GetLoadedChunkCount()), x, y, 13, Color{255, 200, 100, 255});
+        y += lh;
     }
 
-    // Controls
-    currentY += 10;
-    DrawText("=== CONTROLS ===", 10, currentY, 14, WHITE);
-    currentY += lineHeight;
-    DrawText("Mouse: Pan camera", 10, currentY, 12, LIGHTGRAY);
-    currentY += lineHeight;
-    DrawText("Scroll: Zoom", 10, currentY, 12, LIGHTGRAY);
-    currentY += lineHeight;
-    DrawText("Arrow Keys: Rotate", 10, currentY, 12, LIGHTGRAY);
-    currentY += lineHeight;
-    DrawText("R: Dice   ", 10, currentY, 12, LIGHTGRAY);
-    currentY += lineHeight;
-    DrawText("F1: Toggle debug", 10, currentY, 12, LIGHTGRAY);
-    currentY += lineHeight;
-    DrawText("ESC: Exit", 10, currentY, 12, LIGHTGRAY);
+    DrawText("[F1] Toggle  [ESC] Menu", x, y + 4, 11, Color{150, 150, 150, 200});
 }
 
 void Renderer::DrawGrid(int slices, float spacing) {

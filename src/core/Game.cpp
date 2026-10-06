@@ -1,8 +1,9 @@
-﻿#include "core/Game.h"
+#include "core/Game.h"
 #include "navigation/NavigationSystem.h"
 #include "states/GameState.h"
 #include "states/PauseState.h"
 #include "states/MainMenuState.h"
+#include "states/DiceRollState.h"
 #include "entities/Player.h"
 #include "core/Timer.h"
 #include "rendering/Renderer.h"
@@ -13,6 +14,7 @@
 #include "audio/AudioManager.h"
 #include "ui/HUD.h"
 #include <raylib.h>
+#include "ui/InteractionMenu.h"
 #include <raymath.h>
 #include <iostream>
 #include <cmath>
@@ -392,6 +394,11 @@ void Game::Render() {
         }
     }
 
+        // Draw interaction menu in 2D screen-space (outside Mode3D & shader)
+        if (m_interactionMenu.IsOpen() && m_camera) {
+            m_interactionMenu.Draw(m_camera->GetCamera());
+        }
+
     if (m_gameState) {
         m_gameState->Render();
     }
@@ -409,7 +416,9 @@ void Game::Render() {
     }
 
     if (IsKeyPressed(KEY_ESCAPE)) {
-        if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
+        if (m_interactionMenu.IsOpen()) {
+            m_interactionMenu.Close();
+        } else if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
             SetState(std::make_unique<PauseState>(this));
         } else if (m_gameState && m_gameState->GetType() == GameStateType::MainMenu) {
             m_isRunning = false;
@@ -475,20 +484,69 @@ void Game::Render() {
 
         
 
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            const int curTileX = m_player->GetTileX();
-            const int curTileZ = m_player->GetTileZ();
+        bool menuConsumedClick = m_interactionMenu.Update();
 
-            const std::vector<TileCoord> path = m_navigation.FindPath(curTileX, curTileZ, bestTileX, bestTileZ);
-
-            if (!path.empty()) {
-                std::vector<PathNode> pathWithY;
-                pathWithY.reserve(path.size());
-                for (const auto& t : path) {
-                    const float h = m_world->GetHeightAt(t.x + 0.5f, t.z + 0.5f);
-                    pathWithY.emplace_back(t.x, t.z, h);
+        if (!menuConsumedClick && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (m_hoveredMob) {
+                // Click su mob: apri menu interazione
+                ui::Interactable target;
+                target.name          = m_hoveredMob->GetName();
+                target.worldPosition = m_hoveredMob->GetPosition();
+                Mob* mob = m_hoveredMob;
+                target.actions.push_back({ "Attacca", [this, mob]() {
+                    if (m_player && mob && mob->IsAttackable()) {
+                        const float range = m_player->GetCharacter().ActiveWeapon().range;
+                        const float dist = Vector3Distance(m_player->GetPosition(), mob->GetPosition());
+                        if (dist <= range) {
+                            SetState(std::make_unique<DiceRollState>(this, mob));
+                        } else {
+                            TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio: %.2fm)", dist, range);
+                        }
+                    }
+                }});
+                target.actions.push_back({ "Avvicinati", [this, mob]() {
+                    const Vector3 mp = mob->GetPosition();
+                    const int tx = (int)std::floor(mp.x);
+                    const int tz = (int)std::floor(mp.z);
+                    const int dx[] = {1,-1,0,0};
+                    const int dz[] = {0,0,1,-1};
+                    for (int d = 0; d < 4; ++d) {
+                        int ntx = tx + dx[d], ntz = tz + dz[d];
+                        auto path = m_navigation.FindPath(m_player->GetTileX(), m_player->GetTileZ(), ntx, ntz);
+                        if (!path.empty()) {
+                            std::vector<PathNode> pathWithY;
+                            for (const auto& t : path) {
+                                float h = m_world->GetHeightAt(t.x + 0.5f, t.z + 0.5f);
+                                pathWithY.emplace_back(t.x, t.z, h);
+                            }
+                            m_player->SetPath(pathWithY);
+                            break;
+                        }
+                    }
+                }});
+                if (mob->GetType() != MobType::Enemy) {
+                    target.actions.push_back({ "Interagisci", []() {} });
                 }
-                m_player->SetPath(pathWithY);
+                m_interactionMenu.Open(target);
+            } else {
+                // Click su casella vuota: muovi player
+                m_interactionMenu.Close();
+                const int curTileX = m_player->GetTileX();
+                const int curTileZ = m_player->GetTileZ();
+                std::vector<Vector3> mobPositions;
+                if (m_testMob && m_testMob->IsAlive())
+                    mobPositions.push_back(m_testMob->GetPosition());
+                m_navigation.SetOccupiedTiles(mobPositions);
+                const std::vector<TileCoord> path = m_navigation.FindPath(curTileX, curTileZ, bestTileX, bestTileZ);
+                if (!path.empty()) {
+                    std::vector<PathNode> pathWithY;
+                    pathWithY.reserve(path.size());
+                    for (const auto& t : path) {
+                        const float h = m_world->GetHeightAt(t.x + 0.5f, t.z + 0.5f);
+                        pathWithY.emplace_back(t.x, t.z, h);
+                    }
+                    m_player->SetPath(pathWithY);
+                }
             }
         }
     }
@@ -503,3 +561,7 @@ void Game::Render() {
     }
 
 }
+
+
+
+

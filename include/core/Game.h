@@ -6,6 +6,8 @@
 #include "navigation/NavigationSystem.h"
 #include "core/CombatSystem.h"
 #include <entities/Mob.h>
+#include "ui/HUD.h"
+#include "ui/InteractionMenu.h"
 #include "rendering/LightingSystem.h"
 
 
@@ -74,6 +76,8 @@ private:
     int m_hoverTileZ = -1;
     
     std::unique_ptr<core::LightingSystem> m_lightingSystem;
+
+    ui::InteractionMenu m_interactionMenu;
 
     static constexpr float MAX_STEP_HEIGHT = 1.5f;
 

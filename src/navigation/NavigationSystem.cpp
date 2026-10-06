@@ -84,6 +84,17 @@ void NavigationSystem::Initialize(World* world, float maxStepHeight)
     m_maxStepHeight = maxStepHeight;
 }
 
+void NavigationSystem::SetOccupiedTiles(const std::vector<Vector3>& mobPositions)
+{
+    m_occupiedTiles.clear();
+    for (const auto& pos : mobPositions) {
+        int tx = static_cast<int>(std::floor(pos.x));
+        int tz = static_cast<int>(std::floor(pos.z));
+        std::int64_t key = MakeTileKey(tx, tz);
+        m_occupiedTiles.insert(key);
+    }
+}
+
 bool NavigationSystem::IsTileBlocked(int tileX, int tileZ) const
 {
     if (!m_world) {
@@ -201,6 +212,13 @@ float NavigationSystem::CalculateMovementCost(
 
     if (delta < -0.01f) {
         return 1.0f;
+    }
+
+    // Extra cost if the destination tile is occupied by a mob
+    // A* will naturally route around occupied tiles unless there is no other path
+    const std::int64_t toKey = MakeTileKey(toX, toZ);
+    if (m_occupiedTiles.count(toKey)) {
+        return 12.0f; // high penalty – still passable if no other route exists
     }
 
     return 1.0f;

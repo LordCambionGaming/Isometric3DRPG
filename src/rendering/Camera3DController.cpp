@@ -28,25 +28,22 @@ void Camera3DController::Update(float deltaTime) {
 }
 
 void Camera3DController::HandleInput() {
-    // Mouse dragging for camera panning
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        m_mouseDragging = true;
-        m_lastMousePosition = GetMousePosition();
-    }
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        if (!m_mouseDragging) {
+            m_mouseDragging = true;
+            m_lastMousePosition = GetMousePosition();
+        } else {
+            Vector2 currentMousePos = GetMousePosition();
+            Vector2 delta = {
+                currentMousePos.x - m_lastMousePosition.x,
+                currentMousePos.y - m_lastMousePosition.y
+            };
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Pan(Vector2Scale(delta, -0.01f));
+            m_lastMousePosition = currentMousePos;
+        }
+    } else {
         m_mouseDragging = false;
-    }
-
-    if (m_mouseDragging) {
-        Vector2 currentMousePos = GetMousePosition();
-        Vector2 delta = {
-            currentMousePos.x - m_lastMousePosition.x,
-            currentMousePos.y - m_lastMousePosition.y
-        };
-
-        Pan(Vector2Scale(delta, -0.01f));
-        m_lastMousePosition = currentMousePos;
     }
 
     // Mouse wheel for zoom

@@ -19,7 +19,6 @@ public:
     void Unload();
 
     void UpdateTimeOfDay(float deltaTime);
-    //void UpdateTimeOfDay(float deltaTime);
     float GetTimeOfDay() const { return m_timeOfDay; }
     void SetTimeOfDay(float time) { m_timeOfDay = time; }
     Color GetSkyColor() const;

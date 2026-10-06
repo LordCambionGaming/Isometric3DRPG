@@ -1,4 +1,4 @@
-#include "states/PlayingState.h"
+ï»¿#include "states/PlayingState.h"
 #include "states/DiceRollState.h"
 #include "core/Game.h"
 #include "entities/Player.h"
@@ -71,30 +71,11 @@ void PlayingState::HandleInput() {
         m_rollTimer = 0.0f;
     }
 
-    // R: Apre il lancio dadi libero (senza bersaglio)
-    if (IsKeyPressed(KEY_R)) {
-        m_game->SetState(std::make_unique<DiceRollState>(m_game, nullptr));
-        return; // PlayingState è stato distrutto da SetState
-    }
 
     Player* player = m_game->GetPlayer();
     if (!player) return;
 
-    // F: Attacca il Mob puntato o selezionato
-        if (IsKeyPressed(KEY_F)) {
-        Mob* targetMob = m_game->GetHoveredMob();
 
-        if (targetMob && targetMob->IsAttackable()) {
-            const float range = player->GetCharacter().ActiveWeapon().range;   // arma equipaggiata, altrimenti pugni
-            const float dist = Vector3Distance(player->GetPosition(), targetMob->GetPosition());
-
-            if (dist <= range) {
-                m_game->SetState(std::make_unique<DiceRollState>(m_game, targetMob));
-                return;
-            }
-            TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio: %.2fm)", dist, range);
-        }
-    }
 
     if (IsKeyPressed(KEY_I)) { m_game->SetState(std::make_unique<InventoryState>(m_game)); return; }
 
