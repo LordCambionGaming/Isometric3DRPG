@@ -98,6 +98,7 @@ struct Character {
     bool HasEquippedWeapon() const {
         return equipment.rightHand != kNoItem || equipment.leftHand != kNoItem;
     }
+    bool CanEquip(ItemId id, EquipSlot slot) const;
     WeaponDef ActiveWeapon() const;
     void AddItem(ItemId id, int count = 1);
 };

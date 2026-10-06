@@ -13,6 +13,9 @@ constexpr ItemId kNoItem = -1;
 
 enum class ItemCategory { Weapon, Armor, Consumable, Misc };
 
+enum class EquipSlot { None, Head, Body, Legs, Feet, RightHand, LeftHand, AnyHand };
+
+
 // Come si impugna un'arma: decide l'animazione d'attacco.
 //   Unarmed   -> Attack      (pugni, nessuna arma)
 //   OneHanded -> Attack1H    (mano destra)
@@ -30,6 +33,8 @@ struct WeaponDef {
     DiceExpr damage{ 1, 8 };                     // Default: 1d8
     float range = 1.5f;                          // Portata in metri (1.5m = mischia, 8m = distanza)
     WeaponGrip grip = WeaponGrip::OneHanded;
+    bool isVersatile = false;
+    DiceExpr versatileDamage{ 1, 10 };
 };
 
 struct ItemDef {
@@ -37,6 +42,7 @@ struct ItemDef {
     const char* key = "";                        // chiave stabile, per salvataggi e script ("longsword")
     const char* name = "";                       // nome mostrato
     ItemCategory category = ItemCategory::Misc;
+    EquipSlot validSlot = EquipSlot::None;
     WeaponDef weapon{};                          // valido solo se category == Weapon
     const char* model = "";                      // asset .glb sotto assets/ ("" finche' non esiste)
     const char* icon = "";                       // immagine dell'inventario ("" finche' non esiste)

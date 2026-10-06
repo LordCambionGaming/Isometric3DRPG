@@ -95,14 +95,14 @@ void InventoryState::Update(float deltaTime) {
             }
         }
         
-        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; };
+        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
         SlotDef equipSlots[] = {
-            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head },
-            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body },
-            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs },
-            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet },
-            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand },
-            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand }
+            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head, core::EquipSlot::Head },
+            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body, core::EquipSlot::Body },
+            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs, core::EquipSlot::Legs },
+            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet, core::EquipSlot::Feet },
+            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand, core::EquipSlot::RightHand },
+            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand, core::EquipSlot::LeftHand }
         };
         
         for (const auto& s : equipSlots) {
@@ -120,24 +120,26 @@ void InventoryState::Update(float deltaTime) {
     else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && m_isDragging) {
         bool dropped = false;
         
-        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; };
+        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
         SlotDef equipSlots[] = {
-            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head },
-            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body },
-            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs },
-            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet },
-            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand },
-            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand }
+            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head, core::EquipSlot::Head },
+            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body, core::EquipSlot::Body },
+            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs, core::EquipSlot::Legs },
+            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet, core::EquipSlot::Feet },
+            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand, core::EquipSlot::RightHand },
+            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand, core::EquipSlot::LeftHand }
         };
         
         for (const auto& s : equipSlots) {
             Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
             if (CheckCollisionPointRec(mousePos, r)) {
-                if (*s.idPtr != core::kNoItem) {
-                    c.AddItem(*s.idPtr, 1);
+                if (c.CanEquip(m_draggedItemId, s.eSlot)) {
+                    if (*s.idPtr != core::kNoItem) {
+                        c.AddItem(*s.idPtr, 1);
+                    }
+                    *s.idPtr = m_draggedItemId;
+                    dropped = true;
                 }
-                *s.idPtr = m_draggedItemId;
-                dropped = true;
                 break;
             }
         }
@@ -219,9 +221,11 @@ void InventoryState::Render3DPreview(Rectangle bounds) {
     DrawTexturePro(m_previewTexture.texture, source, bounds, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
 }
 
-void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool isHovered, const char* label) {
-    DrawRectangleRec(rect, isHovered ? Fade(kGold, 0.3f) : Fade(BLACK, 0.6f));
-    DrawRectangleLinesEx(rect, 2.0f, isHovered ? kGoldBright : kGoldDim);
+void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool isHovered, const char* label, bool isInvalidDrop) {
+    Color bg = isInvalidDrop ? Fade(RED, 0.4f) : (isHovered ? Fade(kGold, 0.3f) : Fade(BLACK, 0.6f));
+    Color border = isInvalidDrop ? RED : (isHovered ? kGoldBright : kGoldDim);
+    DrawRectangleRec(rect, bg);
+    DrawRectangleLinesEx(rect, 2.0f, border);
     
     if (label) {
         DrawText(label, (int)rect.x, (int)(rect.y - 14), 10, kGoldDim);
@@ -264,20 +268,22 @@ void InventoryState::Render() {
     Render3DPreview(previewBounds);
     DrawRectangleLinesEx(previewBounds, 2.0f, kGoldDim);
     
-    struct SlotDef { float x; float y; core::ItemId id; const char* label; };
+    struct SlotDef { float x; float y; core::ItemId id; const char* label; core::EquipSlot eSlot; };
     SlotDef equipSlots[] = {
-        { px + 50, py + 80, c.equipment.head, "Testa" },
-        { px + 50, py + 160, c.equipment.body, "Corpo" },
-        { px + 50, py + 240, c.equipment.legs, "Gambe" },
-        { px + 50, py + 320, c.equipment.feet, "Piedi" },
-        { px + 350, py + 160, c.equipment.rightHand, "Mano Dx" },
-        { px + 350, py + 240, c.equipment.leftHand, "Mano Sx" }
+        { px + 50, py + 80, c.equipment.head, "Testa", core::EquipSlot::Head },
+        { px + 50, py + 160, c.equipment.body, "Corpo", core::EquipSlot::Body },
+        { px + 50, py + 240, c.equipment.legs, "Gambe", core::EquipSlot::Legs },
+        { px + 50, py + 320, c.equipment.feet, "Piedi", core::EquipSlot::Feet },
+        { px + 350, py + 160, c.equipment.rightHand, "Mano Dx", core::EquipSlot::RightHand },
+        { px + 350, py + 240, c.equipment.leftHand, "Mano Sx", core::EquipSlot::LeftHand }
     };
     
     for (const auto& s : equipSlots) {
         Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
         bool hovered = !m_isDragging && CheckCollisionPointRec(mousePos, r);
-        DrawSlot(r, s.id, 1, hovered, s.label);
+        bool dropHovered = m_isDragging && CheckCollisionPointRec(mousePos, r);
+        bool isInvalidDrop = dropHovered && !c.CanEquip(m_draggedItemId, s.eSlot);
+        DrawSlot(r, s.id, 1, hovered, s.label, isInvalidDrop);
     }
     
     const float gridX = px + 450.0f;

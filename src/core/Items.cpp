@@ -32,8 +32,17 @@ ItemDef MakeWeapon(ItemId id, const char* key, const char* name, DiceExpr damage
     d.key = key;
     d.name = name;
     d.category = ItemCategory::Weapon;
-    d.weapon = WeaponDef{ id, name, damage, range, grip };
+    d.validSlot = EquipSlot::AnyHand;
+    d.weapon = WeaponDef{ id, name, damage, range, grip, false, {1,1} };
     d.model = model;
+    return d;
+}
+
+ItemDef MakeVersatileWeapon(ItemId id, const char* key, const char* name, DiceExpr damage, float range,
+                            WeaponGrip grip, DiceExpr versDamage, const char* model) {
+    ItemDef d = MakeWeapon(id, key, name, damage, range, grip, model);
+    d.weapon.isVersatile = true;
+    d.weapon.versatileDamage = versDamage;
     return d;
 }
 
@@ -45,7 +54,7 @@ const std::vector<ItemDef>& AllItems() {
         //         id                 key           name          damage    range  grip                    model
         MakeWeapon(items::Dagger,     "dagger",     "Dagger",     { 1, 4 }, 1.5f,  WeaponGrip::OneHanded,  "models/items/dagger.glb"),
         MakeWeapon(items::Shortsword, "shortsword", "Shortsword", { 1, 6 }, 1.5f,  WeaponGrip::OneHanded,  "models/items/shortsword.glb"),
-        MakeWeapon(items::Longsword,  "longsword",  "Longsword",  { 1, 8 }, 1.5f,  WeaponGrip::OneHanded,  "models/items/longsword.glb"),
+        MakeVersatileWeapon(items::Longsword,  "longsword",  "Longsword",  { 1, 8 }, 1.5f,  WeaponGrip::OneHanded, { 1, 10 }, "models/items/longsword.glb"),
         MakeWeapon(items::Greatsword, "greatsword", "Greatsword", { 2, 6 }, 1.5f,  WeaponGrip::TwoHanded,  "models/items/greatsword.glb"),
         MakeWeapon(items::Greataxe,   "greataxe",   "Greataxe",   { 1, 12 }, 1.5f, WeaponGrip::TwoHanded,  "models/items/greataxe.glb"),
         MakeWeapon(items::Bow,        "bow",        "Bow",        { 1, 8 }, 8.0f,  WeaponGrip::Bow,        "models/items/bow.glb"),

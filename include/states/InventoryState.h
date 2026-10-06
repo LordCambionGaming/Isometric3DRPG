@@ -17,7 +17,7 @@ public:
 
 private:
     void Render3DPreview(Rectangle bounds);
-    void DrawSlot(Rectangle rect, core::ItemId id, int count, bool isHovered, const char* label = nullptr);
+    void DrawSlot(Rectangle rect, core::ItemId id, int count, bool isHovered, const char* label = nullptr, bool isInvalidDrop = false);
     
     enum DragSource {
         DRAG_NONE,

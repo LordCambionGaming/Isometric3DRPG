@@ -79,8 +79,52 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
     return c;
 }
 
+bool Character::CanEquip(ItemId id, EquipSlot slot) const {
+    if (id == kNoItem) return true;
+    const ItemDef* def = GetItem(id);
+    if (!def) return false;
+
+    // Check slot compatibility
+    bool slotMatch = false;
+    if (def->validSlot == EquipSlot::AnyHand) {
+        slotMatch = (slot == EquipSlot::RightHand || slot == EquipSlot::LeftHand);
+    } else {
+        slotMatch = (def->validSlot == slot);
+    }
+    if (!slotMatch) return false;
+
+    // Check two-handed constraints
+    if (def->category == ItemCategory::Weapon && (def->weapon.grip == WeaponGrip::TwoHanded || def->weapon.grip == WeaponGrip::Bow)) {
+        if (slot == EquipSlot::RightHand && equipment.leftHand != kNoItem) return false;
+        if (slot == EquipSlot::LeftHand && equipment.rightHand != kNoItem) return false;
+    }
+
+    // Check if we are equipping something in one hand while the other has a two-handed weapon
+    if (slot == EquipSlot::LeftHand && equipment.rightHand != kNoItem) {
+        const ItemDef* mainWep = GetItem(equipment.rightHand);
+        if (mainWep && mainWep->category == ItemCategory::Weapon && 
+            (mainWep->weapon.grip == WeaponGrip::TwoHanded || mainWep->weapon.grip == WeaponGrip::Bow)) {
+            return false;
+        }
+    }
+    if (slot == EquipSlot::RightHand && equipment.leftHand != kNoItem) {
+        const ItemDef* offWep = GetItem(equipment.leftHand);
+        if (offWep && offWep->category == ItemCategory::Weapon && 
+            (offWep->weapon.grip == WeaponGrip::TwoHanded || offWep->weapon.grip == WeaponGrip::Bow)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 WeaponDef Character::ActiveWeapon() const {
-    return ResolveWeapon(equipment.rightHand);
+    WeaponDef w = ResolveWeapon(equipment.rightHand);
+    if (w.isVersatile && equipment.leftHand == kNoItem) {
+        w.damage = w.versatileDamage;
+        w.grip = WeaponGrip::TwoHanded;
+    }
+    return w;
 }
 
 void Character::AddItem(ItemId id, int count) {
