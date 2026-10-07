@@ -29,6 +29,9 @@ public:
     bool Initialize();
     void ResetGameSession();
     void CreateGameSession();
+    bool SaveGame();
+    bool LoadGame();
+    bool HasSave() const;
     void Run();
     void Shutdown();
 
@@ -82,8 +85,8 @@ private:
 
     static constexpr float MAX_STEP_HEIGHT = 1.5f;
 
-    static constexpr int SCREEN_WIDTH = 1024;
-    static constexpr int SCREEN_HEIGHT = 768;
+    static constexpr int SCREEN_WIDTH = 1280;
+    static constexpr int SCREEN_HEIGHT = 720;
     static constexpr const char* WINDOW_TITLE = "Isometric RPG";
 std::unique_ptr<Mob> m_testMob;
 };

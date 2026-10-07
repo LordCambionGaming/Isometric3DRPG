@@ -39,6 +39,7 @@ public:
 
 private:
     std::string GetFullPath(const std::string& filename) const;
+    void SaveSettings() const;
 
     std::unordered_map<std::string, std::unique_ptr<Sound>> m_sounds;
     std::unordered_map<std::string, std::unique_ptr<Music>> m_music;

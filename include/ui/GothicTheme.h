@@ -38,7 +38,23 @@ inline Font& DiceFont() {
 }
 
 inline Font& UIFont() {
-    static Font font = GetFontDefault();
+    static Font font{};
+    static bool loaded = false;
+
+    if (!loaded) {
+        loaded = true;
+        const char* path = "assets/fonts/texts.ttf";
+        if (FileExists(path)) {
+            font = LoadFontEx(path, 128, nullptr, 0);
+            if (font.texture.id != 0) {
+                SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+                std::cout << "[UI] font caricato: " << path << std::endl;
+                return font;
+            }
+        }
+        std::cerr << "[UI] ERRORE: assets/fonts/texts.ttf non trovato" << std::endl;
+        font = GetFontDefault();
+    }
     return font;
 }
 

@@ -20,6 +20,12 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+keybindings.cfg
+game_settings.cfg
+audio_settings.cfg
+language.cfg
+saves/quick_save.json
+saves/quick_save.json.tmp
 
 # Logs
 *.log

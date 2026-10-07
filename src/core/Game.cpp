@@ -4,8 +4,12 @@
 #include "states/PauseState.h"
 #include "states/MainMenuState.h"
 #include "states/DiceRollState.h"
+#include "states/PlayingState.h"
 #include "entities/Player.h"
 #include "core/Timer.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
+#include "core/SaveGame.h"
 #include "rendering/Renderer.h"
 #include "rendering/Camera3DController.h"
 #include "world/World.h"
@@ -43,6 +47,7 @@ Game::~Game() {
 
 bool Game::Initialize() {
     try {
+        lang::Initialize();
         m_timer = std::make_unique<Timer>();
         m_assetManager = std::make_unique<AssetManager>();
         m_audioManager = std::make_unique<AudioManager>();
@@ -60,6 +65,8 @@ bool Game::Initialize() {
             std::cerr << "Failed to initialize renderer!" << std::endl;
             return false;
         }
+
+        core::KeyBindings::Load();
         
         // Shaders require an active OpenGL context: must be loaded after InitWindow.
         m_lightingSystem->Initialize();
@@ -280,7 +287,7 @@ void Game::CreateGameSession() {
 
     // Creiamo un mostro di prova reale (Orco con 20 HP e CA 12)
    Vector3 mobPos = { spawnX + 2.0f, spawnY, spawnZ + 2.0f };
-m_testMob = std::make_unique<Enemy>("Orco di Prova", mobPos, 20, 12);
+    m_testMob = std::make_unique<Enemy>("mob.test_orc", mobPos, 20, 12);
 m_hoveredMob = m_testMob.get();
 
     if (m_renderer) {
@@ -289,6 +296,48 @@ m_hoveredMob = m_testMob.get();
     }
 }
 
+
+bool Game::HasSave() const {
+    return core::SaveGame::Exists();
+}
+
+bool Game::SaveGame() {
+    if (!m_player) return false;
+    core::SaveGameData data;
+    data.character = m_player->GetCharacter();
+    data.playerPosition = m_player->GetPosition();
+    if (m_testMob) {
+        data.hasTestMob = true;
+        data.testMobPosition = m_testMob->GetPosition();
+        data.testMobCurrentHP = m_testMob->GetCurrentHP();
+        data.testMobMaxHP = m_testMob->GetMaxHP();
+    }
+    return core::SaveGame::Write(data);
+}
+
+bool Game::LoadGame() {
+    core::SaveGameData data;
+    if (!core::SaveGame::Read(data)) return false;
+
+    ResetGameSession();
+    CreateGameSession();
+    if (!m_player) return false;
+    m_player->SetCharacter(data.character);
+    m_player->SetPosition(data.playerPosition);
+    if (m_world) m_world->SetPlayerPosition(data.playerPosition);
+
+    if (data.hasTestMob && m_testMob && data.testMobMaxHP == m_testMob->GetMaxHP()) {
+        m_testMob->SetPosition(data.testMobPosition);
+        m_testMob->TakeDamage(m_testMob->GetCurrentHP() - data.testMobCurrentHP);
+    }
+
+    m_interactionMenu.Close();
+    m_hoveredMob = nullptr;
+    m_hoverTileX = -1;
+    m_hoverTileZ = -1;
+    SetState(std::make_unique<PlayingState>(this));
+    return true;
+}
 
 void Game::ResetGameSession() {
     if (m_testMob) m_testMob.reset();
@@ -368,28 +417,23 @@ void Game::Render() {
             m_testMob->SetHovered(m_hoveredMob == m_testMob.get());
             m_testMob->Render(camera);
         }
-        if (m_hoveredMob) DrawBoundingBox(m_hoveredMob->GetBounds(), YELLOW);
 
+        if (m_lightingSystem) m_lightingSystem->EndLightingMode();
+
+        if (m_hoveredMob) DrawBoundingBox(m_hoveredMob->GetBounds(), YELLOW);
         if (m_hoverTileX != -9999 && m_hoverTileZ != -9999) {
             const int tx = m_hoverTileX;
             const int tz = m_hoverTileZ;
-            const float tileCenterX = static_cast<float>(tx) + 0.5f;
-            const float tileCenterZ = static_cast<float>(tz) + 0.5f;
-            const float surfaceY = m_world->GetHeightAt(tileCenterX, tileCenterZ) + 0.05f;
-            const float s = 1.0f;
-
-            const Vector3 p0 = { static_cast<float>(tx),     surfaceY, static_cast<float>(tz) };
-            const Vector3 p1 = { static_cast<float>(tx) + s, surfaceY, static_cast<float>(tz) };
-            const Vector3 p2 = { static_cast<float>(tx) + s, surfaceY, static_cast<float>(tz) + s };
-            const Vector3 p3 = { static_cast<float>(tx),     surfaceY, static_cast<float>(tz) + s };
-
+            const float surfaceY = m_world->GetHeightAt(tx + 0.5f, tz + 0.5f) + 0.05f;
+            const Vector3 p0 = { static_cast<float>(tx), surfaceY, static_cast<float>(tz) };
+            const Vector3 p1 = { static_cast<float>(tx) + 1.0f, surfaceY, static_cast<float>(tz) };
+            const Vector3 p2 = { static_cast<float>(tx) + 1.0f, surfaceY, static_cast<float>(tz) + 1.0f };
+            const Vector3 p3 = { static_cast<float>(tx), surfaceY, static_cast<float>(tz) + 1.0f };
             DrawLine3D(p0, p1, YELLOW);
             DrawLine3D(p1, p2, YELLOW);
             DrawLine3D(p2, p3, YELLOW);
             DrawLine3D(p3, p0, YELLOW);
         }
-
-        if (m_lightingSystem) m_lightingSystem->EndLightingMode();
 
         m_renderer->EndMode3D();
          if (m_testMob) {
@@ -422,13 +466,11 @@ void Game::Render() {
         m_debugMode = !m_debugMode;
     }
 
-    if (IsKeyPressed(KEY_ESCAPE)) {
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) {
         if (m_interactionMenu.IsOpen()) {
             m_interactionMenu.Close();
         } else if (m_gameState && m_gameState->GetType() == GameStateType::Playing) {
             SetState(std::make_unique<PauseState>(this));
-        } else if (m_gameState && m_gameState->GetType() == GameStateType::MainMenu) {
-            m_isRunning = false;
         }
     }
 
@@ -500,7 +542,7 @@ void Game::Render() {
                 target.name          = m_hoveredMob->GetName();
                 target.worldPosition = m_hoveredMob->GetPosition();
                 Mob* mob = m_hoveredMob;
-                target.actions.push_back({ "Attacca", [this, mob]() {
+                target.actions.push_back({ "interaction.attack", [this, mob]() {
                     if (m_player && mob && mob->IsAttackable()) {
                         const core::Character& character = m_player->GetCharacter();
                         const core::WeaponDef weapon = character.ActiveWeapon();
@@ -517,7 +559,7 @@ void Game::Render() {
                         }
                     }
                 }});
-                target.actions.push_back({ "Avvicinati", [this, mob]() {
+                target.actions.push_back({ "interaction.approach", [this, mob]() {
                     const Vector3 mp = mob->GetPosition();
                     const int tx = (int)std::floor(mp.x);
                     const int tz = (int)std::floor(mp.z);
@@ -538,7 +580,7 @@ void Game::Render() {
                     }
                 }});
                 if (mob->GetType() != MobType::Enemy) {
-                    target.actions.push_back({ "Interagisci", []() {} });
+                    target.actions.push_back({ "interaction.interact", []() {} });
                 }
                 m_interactionMenu.Open(target);
             } else {

@@ -1,6 +1,7 @@
 #include "ui/HUD.h"
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
+#include "core/Localization.h"
 #include "rendering/LightingSystem.h"
 
 #include <raymath.h>
@@ -111,11 +112,11 @@ void HUD::DrawCharacterPanel(const core::Character& c) const
 
     // ── Nome + classe + livello ─────────────────────────
     // (il nome non esiste in Character: placeholder)
-    const char* name = "Eroe";
-    DrawText(name, (int)(px + 16), (int)(py + 12), 22, ui::theme::kBone);
+    DrawText(lang::Get("hud.hero").c_str(), (int)(px + 16), (int)(py + 12), 22, ui::theme::kBone);
 
-    const char* subtitle = TextFormat("%s  ·  Livello %d",
-        core::ToString(c.characterClass), c.level);
+    const std::string className = lang::CharacterClassName(core::ToString(c.characterClass));
+    const char* subtitle = TextFormat(lang::Get("hud.class_level").c_str(), className.c_str(),
+        lang::Get("hud.level_word").c_str(), c.level);
     DrawText(subtitle, (int)(px + 16), (int)(py + 38), 16, ui::theme::kGoldDim);
 
     // ── Barra vita (animata + flash) ────────────────────
@@ -126,10 +127,12 @@ void HUD::DrawCharacterPanel(const core::Character& c) const
                   22.0f);
 
     // ── Arma equipaggiata ───────────────────────────────
-    const char* weapon = c.HasEquippedWeapon()
-        ? c.ActiveWeapon().name
-        : "(disarmato)";
-    DrawText(TextFormat("Arma: %s", weapon),
+    std::string weaponName = lang::Get("hud.unarmed");
+    if (c.HasEquippedWeapon()) {
+        const core::WeaponDef weapon = c.ActiveWeapon();
+        if (const core::ItemDef* item = core::GetItem(weapon.id)) weaponName = lang::ItemName(item->key);
+    }
+    DrawText(TextFormat(lang::Get("hud.weapon").c_str(), weaponName.c_str()),
              (int)(px + 16), (int)(py + 108), 16, ui::theme::kBone);
 }
 
@@ -180,7 +183,7 @@ void HUD::DrawHealthBar(const core::Character& c,
     DrawRectangle((int)x, (int)(y + h - 3), (int)fillW, 3, Fade(BLACK, 0.35f));
 
     // ── 6. Testo centrato ───────────────────────────────
-    const char* label = TextFormat("HP  %d / %d", hp, maxHp);
+    const char* label = TextFormat(lang::Get("hud.hp").c_str(), hp, maxHp);
     const int fontSize = 16;
     const int textW = MeasureText(label, fontSize);
     const int textX = (int)(x + (w - textW) / 2);
@@ -435,7 +438,10 @@ void HUD::DrawCompass(const Camera3D& camera) const
     }
 
     // ── Etichette cardinali (N E S W)
-    const char* labels[] = { "N", "E", "S", "W" };
+    const std::string labels[] = {
+        lang::Get("compass.north"), lang::Get("compass.east"),
+        lang::Get("compass.south"), lang::Get("compass.west")
+    };
     for (int i = 0; i < 4; ++i) {
         const float a = northAngle + i * (PI * 0.5f);
         const float lx = cx + sinf(a + PI * 0.5f) * (Ri - 17.0f);  // offset corretto per i/e/s/o
@@ -445,7 +451,7 @@ void HUD::DrawCompass(const Camera3D& camera) const
         const float lY = cy + sinf(la) * (Ri - 17.0f);
         const Color lc = (i == 0) ? Color{255, 80, 60, 255} : ui::theme::kGoldBright;
         const int fs = (i == 0) ? 13 : 10;
-        DrawText(labels[i], (int)(lX - (i == 0 ? 4 : 3)), (int)(lY - fs / 2), fs, lc);
+        DrawText(labels[i].c_str(), (int)(lX - (i == 0 ? 4 : 3)), (int)(lY - fs / 2), fs, lc);
     }
 
     // ── Ago a doppio diamante

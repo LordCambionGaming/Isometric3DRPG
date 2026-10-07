@@ -1,4 +1,6 @@
 #include "ui/InteractionMenu.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
 #include <algorithm>
 #include <cmath>
 
@@ -30,8 +32,7 @@ void InteractionMenu::Close() {
 bool InteractionMenu::Update() {
     if (!m_open) return false;
 
-    // Close on ESC
-    if (IsKeyPressed(KEY_ESCAPE)) { Close(); return true; }
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) { Close(); return true; }
 
     // Detect click
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -111,9 +112,10 @@ void InteractionMenu::Draw(const Camera3D& camera) const {
                { m_bounds.x + m_bounds.width - 6, m_bounds.y + kHeaderH },
                1.0f, Color{190, 150, 60, 180});
 
-    int nameW = MeasureText(m_target.name.c_str(), 13);
+    const std::string targetName = lang::Get(m_target.name);
+    int nameW = MeasureText(targetName.c_str(), 13);
     int nameX = px + (panelW - nameW) / 2;
-    DrawText(m_target.name.c_str(), nameX, py + 5, 13, Color{255, 215, 100, 255});
+    DrawText(targetName.c_str(), nameX, py + 5, 13, Color{255, 215, 100, 255});
 
     // ── Action items ──────────────────────────────────────────────────────────
     Vector2 mouse = GetMousePosition();
@@ -137,7 +139,8 @@ void InteractionMenu::Draw(const Camera3D& camera) const {
 
         int labelX = px + 22;
         int labelY = ny + (kItemH - 13) / 2;
-        DrawText(m_target.actions[i].label.c_str(), labelX, labelY, 13,
+        const std::string actionLabel = lang::Get(m_target.actions[i].label);
+        DrawText(actionLabel.c_str(), labelX, labelY, 13,
                  hov ? Color{255,240,180,255} : Color{200,185,160,230});
 
         ny += kItemH;

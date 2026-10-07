@@ -36,7 +36,7 @@ set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(json)
 
 # Troviamo automaticamente tutti i sorgenti .cpp nelle sottocartelle di src/
-file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -59,6 +59,8 @@ endif()
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/lang $<TARGET_FILE_DIR:${PROJECT_NAME}>/lang
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

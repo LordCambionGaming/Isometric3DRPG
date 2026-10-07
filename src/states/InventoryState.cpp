@@ -1,6 +1,8 @@
 #include "states/InventoryState.h"
 #include "states/PlayingState.h"
 #include "core/Game.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
 #include "rendering/LightingSystem.h"
@@ -36,7 +38,8 @@ void InventoryState::Exit() {
 }
 
 void InventoryState::HandleInput() {
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_E)) { 
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back) ||
+        core::KeyBindings::Pressed(core::KeyBindings::Action::Inventory)) {
         if (m_isDragging) {
             m_game->GetPlayer()->GetCharacterMutable().AddItem(m_draggedItemId, m_draggedItemCount);
             auto& inv = m_game->GetPlayer()->GetCharacterMutable().inventory;
@@ -254,7 +257,8 @@ void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool i
     DrawRectangleLinesEx(rect, 2.0f, border);
     
     if (label) {
-        DrawText(label, (int)rect.x, (int)(rect.y - 14), 10, kGoldDim);
+        const std::string localizedLabel = lang::Get(label);
+        DrawText(localizedLabel.c_str(), (int)rect.x, (int)(rect.y - 14), 10, kGoldDim);
     }
     
      if (id != core::kNoItem) {
@@ -262,7 +266,8 @@ void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool i
         if (visuals) {
             visuals->DrawIcon(id, { rect.x + 4, rect.y + 4, rect.width - 8, rect.height - 8 });
         } else if (const core::ItemDef* def = core::GetItem(id)) {
-            DrawText(TextSubtext(def->name, 0, 4), (int)rect.x + 4, (int)rect.y + 16, 10, kBone);
+            const std::string name = lang::ItemName(def->key);
+            DrawText(TextSubtext(name.c_str(), 0, 4), (int)rect.x + 4, (int)rect.y + 16, 10, kBone);
         }
         if (count > 1) DrawText(TextFormat("x%d", count), (int)rect.x + 2, (int)(rect.y + SLOT_SIZE - 12), 10, WHITE);
     }
@@ -282,7 +287,7 @@ void InventoryState::Render() {
     DrawRectangleLinesEx({px+6, py+6, panelW-12, panelH-12}, 1.0f, kGold);
     
     const Font& font = UIFont();
-    DrawTextEx(font, "Equipaggiamento e Zaino", { px + 24, py + 16 }, 28.0f, 2.0f, kGoldBright);
+    DrawTextEx(font, lang::Get("inventory.title").c_str(), { px + 24, py + 16 }, 28.0f, 2.0f, kGoldBright);
     
     Player* p = m_game->GetPlayer();
     if (!p) return;
@@ -296,12 +301,12 @@ void InventoryState::Render() {
     
     struct SlotDef { float x; float y; core::ItemId id; const char* label; core::EquipSlot eSlot; };
     SlotDef equipSlots[] = {
-        { px + 50, py + 80, c.equipment.head, "Testa", core::EquipSlot::Head },
-        { px + 50, py + 160, c.equipment.body, "Corpo", core::EquipSlot::Body },
-        { px + 50, py + 240, c.equipment.legs, "Gambe", core::EquipSlot::Legs },
-        { px + 50, py + 320, c.equipment.feet, "Piedi", core::EquipSlot::Feet },
-        { px + 350, py + 160, c.equipment.rightHand, "Mano Dx", core::EquipSlot::RightHand },
-        { px + 350, py + 240, c.equipment.leftHand, "Mano Sx", core::EquipSlot::LeftHand }
+        { px + 50, py + 80, c.equipment.head, "inventory.head", core::EquipSlot::Head },
+        { px + 50, py + 160, c.equipment.body, "inventory.body", core::EquipSlot::Body },
+        { px + 50, py + 240, c.equipment.legs, "inventory.legs", core::EquipSlot::Legs },
+        { px + 50, py + 320, c.equipment.feet, "inventory.feet", core::EquipSlot::Feet },
+        { px + 350, py + 160, c.equipment.rightHand, "inventory.right_hand", core::EquipSlot::RightHand },
+        { px + 350, py + 240, c.equipment.leftHand, "inventory.left_hand", core::EquipSlot::LeftHand }
     };
     
     for (const auto& s : equipSlots) {
@@ -317,13 +322,13 @@ void InventoryState::Render() {
     const bool quiverInvalidDrop = m_isDragging && CheckCollisionPointRec(mousePos, quiverRect) &&
                                    !c.CanEquip(m_draggedItemId, core::EquipSlot::Quiver);
     DrawSlot(quiverRect, c.equipment.quiver.id, c.equipment.quiver.count, quiverHovered,
-             "Faretra", quiverInvalidDrop);
+             "inventory.quiver", quiverInvalidDrop);
     
     const float gridX = px + 450.0f;
     const float gridY = py + 60.0f;
     int totalItems = (int)c.inventory.size();
     
-    DrawTextEx(font, "Zaino", { gridX, gridY - 24 }, 20.0f, 1.0f, kBone);
+    DrawTextEx(font, lang::Get("inventory.backpack").c_str(), { gridX, gridY - 24 }, 20.0f, 1.0f, kBone);
     
     for (int row = 0; row < GRID_ROWS; ++row) {
         for (int col = 0; col < GRID_COLS; ++col) {

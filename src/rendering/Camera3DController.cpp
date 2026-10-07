@@ -1,4 +1,5 @@
 #include "rendering/Camera3DController.h"
+#include "core/KeyBindings.h"
 #include <raymath.h>
 #include <iostream>
 
@@ -53,10 +54,10 @@ void Camera3DController::HandleInput() {
     }
 
     // Arrow keys for rotation
-    if (IsKeyDown(KEY_LEFT)) {
+    if (core::KeyBindings::Down(core::KeyBindings::Action::Left)) {
         Rotate(-ROTATION_SPEED * GetFrameTime());
     }
-    if (IsKeyDown(KEY_RIGHT)) {
+    if (core::KeyBindings::Down(core::KeyBindings::Action::Right)) {
         Rotate(ROTATION_SPEED * GetFrameTime());
     }
 

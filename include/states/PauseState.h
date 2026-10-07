@@ -1,5 +1,6 @@
 #pragma once
 #include "states/GameState.h"
+#include <string>
 
 class PauseState : public GameState {
 public:
@@ -11,4 +12,6 @@ public:
     void HandleInput() override;
 private:
     int m_selectedOption;
+    float m_saveMessageTimer = 0.0f;
+    std::string m_saveMessageKey;
 };

@@ -8,5 +8,14 @@ public:
     void Enter() override; void Exit() override;
     void Update(float deltaTime) override; void Render() override; void HandleInput() override;
 private:
+    enum class Page { General, Controls };
+
     PreviousState m_prev;
+    Page m_page = Page::General;
+    int m_selectedOption = 0;
+    bool m_waitingForKey = false;
+    int m_draggingSlider = -1;
+
+    void ReturnToPreviousState();
+    void ApplyGeneralSetting(int direction);
 };

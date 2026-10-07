@@ -1,4 +1,5 @@
 #include "entities/Mob.h"
+#include "core/Localization.h"
 #include <raymath.h>
 
 Mob::Mob(std::string name, MobType type, Vector3 pos, int maxHP, int armorClass)
@@ -36,7 +37,9 @@ void Mob::RenderOverlay(const Camera3D& camera) {
     if (screenPos.x > 0 && screenPos.x < GetScreenWidth() &&
         screenPos.y > 0 && screenPos.y < GetScreenHeight()) {
 
-        DrawText(m_name.c_str(), (int)screenPos.x - MeasureText(m_name.c_str(), 12) / 2, (int)screenPos.y - 18, 12, WHITE);
+        const std::string localizedName = lang::Get(m_name);
+        DrawText(localizedName.c_str(), (int)screenPos.x - MeasureText(localizedName.c_str(), 12) / 2,
+                 (int)screenPos.y - 18, 12, WHITE);
 
         const float barWidth = 40.0f;
         const float barHeight = 5.0f;

@@ -2,8 +2,10 @@
 #include "rendering/Camera3DController.h"
 #include "world/World.h"
 #include "core/Timer.h"
+#include "core/Localization.h"
 #include <raylib.h>
 #include <iostream>
+#include <fstream>
 
 Renderer::Renderer()
     : m_world(nullptr)
@@ -11,6 +13,10 @@ Renderer::Renderer()
     , m_initialized(false)
     , m_showGrid(true)
     , m_showCoordinates(true)
+    , m_fullscreen(true)
+    , m_vsyncEnabled(true)
+    , m_windowWidth(1280)
+    , m_windowHeight(720)
 {
 }
 
@@ -20,14 +26,33 @@ Renderer::~Renderer() {
 
 bool Renderer::Initialize(int screenWidth, int screenHeight, const char* title) {
     try {
-        InitWindow(screenWidth, screenHeight, title);
+        m_windowWidth = screenWidth;
+        m_windowHeight = screenHeight;
+        std::ifstream settings("game_settings.cfg");
+        int fullscreen = 1;
+        int vsync = 1;
+        int width = screenWidth;
+        int height = screenHeight;
+        if (settings >> fullscreen >> vsync >> width >> height &&
+            width >= 640 && width <= 7680 && height >= 480 && height <= 4320) {
+            m_fullscreen = fullscreen != 0;
+            m_vsyncEnabled = vsync != 0;
+            m_windowWidth = width;
+            m_windowHeight = height;
+        }
+
+        unsigned int flags = 0;
+        if (m_fullscreen) flags |= FLAG_FULLSCREEN_MODE;
+        if (m_vsyncEnabled) flags |= FLAG_VSYNC_HINT;
+        SetConfigFlags(flags);
+        InitWindow(m_windowWidth, m_windowHeight, title);
 
         if (!IsWindowReady()) {
             std::cerr << "Failed to create window!" << std::endl;
             return false;
         }
 
-        SetTargetFPS(60);
+        SetTargetFPS(m_vsyncEnabled ? 0 : 60);
         SetExitKey(KEY_NULL); // ESC non chiude finestra � come puzzle3d
 
         m_initialized = true;
@@ -69,6 +94,47 @@ bool Renderer::ShouldClose() const {
     return WindowShouldClose();
 }
 
+void Renderer::SetFullscreen(bool enabled) {
+    if (enabled == m_fullscreen || !m_initialized) return;
+    ToggleFullscreen();
+    m_fullscreen = enabled;
+    if (!enabled) {
+        SetWindowSize(m_windowWidth, m_windowHeight);
+        const int monitor = GetCurrentMonitor();
+        SetWindowPosition((GetMonitorWidth(monitor) - m_windowWidth) / 2,
+                          (GetMonitorHeight(monitor) - m_windowHeight) / 2);
+    }
+    SaveWindowSettings();
+}
+
+void Renderer::SetVSyncEnabled(bool enabled) {
+    if (enabled == m_vsyncEnabled || !m_initialized) return;
+    m_vsyncEnabled = enabled;
+    if (enabled) SetWindowState(FLAG_VSYNC_HINT);
+    else ClearWindowState(FLAG_VSYNC_HINT);
+    SetTargetFPS(enabled ? 0 : 60);
+    SaveWindowSettings();
+}
+
+void Renderer::SetWindowedResolution(int width, int height) {
+    if (width < 640 || width > 7680 || height < 480 || height > 4320) return;
+    m_windowWidth = width;
+    m_windowHeight = height;
+    if (!m_fullscreen && m_initialized) {
+        SetWindowSize(width, height);
+        const int monitor = GetCurrentMonitor();
+        SetWindowPosition((GetMonitorWidth(monitor) - width) / 2,
+                          (GetMonitorHeight(monitor) - height) / 2);
+    }
+    SaveWindowSettings();
+}
+
+void Renderer::SaveWindowSettings() const {
+    std::ofstream settings("game_settings.cfg", std::ios::trunc);
+    if (settings) settings << m_fullscreen << ' ' << m_vsyncEnabled << ' '
+                          << m_windowWidth << ' ' << m_windowHeight << '\n';
+}
+
 void Renderer::RenderWorld() {
     if (m_world) {
         m_world->Render();
@@ -97,23 +163,23 @@ void Renderer::RenderDebugInfo() {
     DrawRectangle(4, 4, 260, 100, Color{0, 0, 0, 140});
     DrawRectangleLines(4, 4, 260, 100, Color{80, 80, 80, 180});
 
-    DrawText(TextFormat("FPS: %d", GetFPS()), x, y, 15, Color{100, 255, 100, 255});
+    DrawText(TextFormat(lang::Get("debug.fps").c_str(), GetFPS()), x, y, 15, Color{100, 255, 100, 255});
     y += lh;
 
     if (m_camera) {
         Vector3 pos = m_camera->GetPosition();
-        DrawText(TextFormat("Pos: %.0f  %.0f  %.0f", pos.x, pos.y, pos.z), x, y, 14, Color{200, 200, 255, 255});
+        DrawText(TextFormat(lang::Get("debug.position").c_str(), pos.x, pos.y, pos.z), x, y, 14, Color{200, 200, 255, 255});
         y += lh;
-        DrawText(TextFormat("Zoom: %.2f", m_camera->GetZoom()), x, y, 14, Color{200, 200, 255, 255});
+        DrawText(TextFormat(lang::Get("debug.zoom").c_str(), m_camera->GetZoom()), x, y, 14, Color{200, 200, 255, 255});
         y += lh;
     }
 
     if (m_world) {
-        DrawText(TextFormat("Seed: %u | Chunks: %d", m_world->GetSeed(), m_world->GetLoadedChunkCount()), x, y, 13, Color{255, 200, 100, 255});
+        DrawText(TextFormat(lang::Get("debug.seed_chunks").c_str(), m_world->GetSeed(), m_world->GetLoadedChunkCount()), x, y, 13, Color{255, 200, 100, 255});
         y += lh;
     }
 
-    DrawText("[F1] Toggle  [ESC] Menu", x, y + 4, 11, Color{150, 150, 150, 200});
+    DrawText(lang::Get("debug.controls").c_str(), x, y + 4, 11, Color{150, 150, 150, 200});
 }
 
 void Renderer::DrawGrid(int slices, float spacing) {

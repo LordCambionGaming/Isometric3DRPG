@@ -1,6 +1,7 @@
 #include "audio/AudioManager.h"
 #include "utils/Logger.h"
 #include <filesystem>
+#include <fstream>
 #include <raymath.h>
 
 AudioManager::AudioManager()
@@ -24,10 +25,19 @@ bool AudioManager::Initialize() {
             return false;
         }
 
+        std::ifstream settings("audio_settings.cfg");
+        if (settings >> m_masterVolume >> m_soundVolume >> m_musicVolume) {
+            m_masterVolume = Clamp(m_masterVolume, 0.0f, 1.0f);
+            m_soundVolume = Clamp(m_soundVolume, 0.0f, 1.0f);
+            m_musicVolume = Clamp(m_musicVolume, 0.0f, 1.0f);
+        }
+
         // Create audio directory if it doesn't exist
         std::filesystem::create_directories(AUDIO_PATH);
 
         SetMasterVolume(m_masterVolume);
+        SetSoundVolume(m_soundVolume);
+        SetMusicVolume(m_musicVolume);
 
         m_initialized = true;
         return true;
@@ -98,6 +108,7 @@ Sound* AudioManager::LoadSound(const std::string& filename) {
 void AudioManager::PlaySound(const std::string& filename) {
     Sound* sound = LoadSound(filename);
     if (sound) {
+        ::SetSoundVolume(*sound, m_soundVolume);
         ::PlaySound(*sound);
     }
 }
@@ -152,6 +163,7 @@ void AudioManager::PlayMusic(const std::string& filename) {
     Music* music = LoadMusic(filename);
     if (music) {
         ::PlayMusicStream(*music);
+        ::SetMusicVolume(*music, m_musicVolume);
         m_currentMusic = filename;
     }
 }
@@ -196,11 +208,13 @@ void AudioManager::UpdateMusic() {
 void AudioManager::SetMasterVolume(float volume) {
     m_masterVolume = Clamp(volume, 0.0f, 1.0f);
     ::SetMasterVolume(m_masterVolume);
+    SaveSettings();
 }
 
 void AudioManager::SetSoundVolume(float volume) {
     m_soundVolume = Clamp(volume, 0.0f, 1.0f);
-    // Individual sound volumes would be set when playing
+    for (auto& pair : m_sounds) ::SetSoundVolume(*pair.second, m_soundVolume);
+    SaveSettings();
 }
 
 void AudioManager::SetMusicVolume(float volume) {
@@ -212,6 +226,7 @@ void AudioManager::SetMusicVolume(float volume) {
             ::SetMusicVolume(*it->second, m_musicVolume);
         }
     }
+    SaveSettings();
 }
 
 bool AudioManager::IsMusicPlaying() const {
@@ -227,4 +242,9 @@ bool AudioManager::IsMusicPlaying() const {
 
 std::string AudioManager::GetFullPath(const std::string& filename) const {
     return std::string(AUDIO_PATH) + filename;
+}
+
+void AudioManager::SaveSettings() const {
+    std::ofstream settings("audio_settings.cfg", std::ios::trunc);
+    if (settings) settings << m_masterVolume << ' ' << m_soundVolume << ' ' << m_musicVolume << '\n';
 }

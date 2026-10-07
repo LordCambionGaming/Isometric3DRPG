@@ -1,4 +1,6 @@
 #include "states/DiceRollState.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
 #include "states/PlayingState.h"
 #include "core/Game.h"
 #include "entities/Mob.h"
@@ -415,62 +417,71 @@ void DiceRollState::RenderGothic() {
 
     // --- messaggio (nessun titolo) ---------------------------------------
     const int have = (int)m_poolValues.size();
-    const char* banner = "";
+    std::string banner;
     Color bannerColor = kBone;
     std::string subline;
 
     if (m_showResult) {
         switch (m_phase) {
             case Phase::Attack: {
-                const char* label = "Tiro normale";
+                std::string label = lang::Get("dice.normal");
                 if (m_result.result == core::CombatResult::CriticalSuccess) {
-                    label = "Successo critico!"; bannerColor = kGoldBright;
+                    label = lang::Get("dice.critical_success"); bannerColor = kGoldBright;
                 } else if (m_result.result == core::CombatResult::CriticalFailure) {
-                    label = "Fallimento critico!"; bannerColor = kBlood;
+                    label = lang::Get("dice.critical_failure"); bannerColor = kBlood;
                 }
                 if (m_attackRolled) {
-                    // esito dell'attacco calcolato da CombatSystem (Colpito! / Mancato! / critici)
-                    label = m_attackResult.log.c_str();
+                    const char* resultKey = m_attackResult.resultType == core::CombatResult::CriticalSuccess
+                        ? "dice.critical_success"
+                        : m_attackResult.resultType == core::CombatResult::CriticalFailure
+                            ? "dice.critical_failure"
+                            : m_attackResult.isHit ? "dice.hit" : "dice.miss";
+                    label = lang::Get(resultKey);
                     if (m_result.result == core::CombatResult::Normal && !m_attackResult.isHit) {
                         bannerColor = Fade(kBone, 0.6f);
                     }
                 }
-                banner = TextFormat("%d  -  %s", m_result.rollValue, label);
-                if (m_pending == Pending::ToDamage) subline = "Ora tira il dado del danno";
-                else if (m_damageRolled)            subline = m_damageResult.log;
+                banner = TextFormat(lang::Get("dice.hit_result").c_str(), m_result.rollValue, label.c_str());
+                if (m_pending == Pending::ToDamage) subline = lang::Get("dice.damage_now");
+                else if (m_damageRolled) {
+                    subline = TextFormat(lang::Get("dice.damage_result").c_str(), m_damageResult.totalDamage,
+                        core::ToString(m_damageResult.weaponDice).c_str(), m_damageResult.modifier);
+                }
                 break;
             }
             case Phase::Damage:
                 if (m_damageRolled) {
-                    banner = TextFormat("%s", m_damageResult.log.c_str());
+                    banner = TextFormat(lang::Get("dice.damage_result").c_str(), m_damageResult.totalDamage,
+                        core::ToString(m_damageResult.weaponDice).c_str(), m_damageResult.modifier);
                     bannerColor = kGoldBright;
-                    subline = "Dadi: " + JoinValues(m_poolValues) + "   Modificatore: +" + std::to_string(WeaponAbilityModifier(m_game));
+                    subline = TextFormat(lang::Get("dice.attack_modifier").c_str(), JoinValues(m_poolValues).c_str(),
+                                         std::to_string(WeaponAbilityModifier(m_game)).c_str());
                 } else {
-                    banner = TextFormat("Dado %d/%d:  %d", have, m_pool.count, m_result.rollValue);
-                    subline = "Dadi: " + JoinValues(m_poolValues);
+                    banner = TextFormat(lang::Get("dice.numbered").c_str(), have, m_pool.count, m_result.rollValue);
+                    subline = TextFormat(lang::Get("dice.values").c_str(), JoinValues(m_poolValues).c_str());
                 }
                 break;
             case Phase::Free:
                 if (m_pool.count == 1) {
                     if (m_pool.sides == 20) {
-                        const char* label = "Tiro normale";
+                        std::string label = lang::Get("dice.normal");
                         if (m_result.result == core::CombatResult::CriticalSuccess) {
-                            label = "Successo critico!"; bannerColor = kGoldBright;
+                            label = lang::Get("dice.critical_success"); bannerColor = kGoldBright;
                         } else if (m_result.result == core::CombatResult::CriticalFailure) {
-                            label = "Fallimento critico!"; bannerColor = kBlood;
+                            label = lang::Get("dice.critical_failure"); bannerColor = kBlood;
                         }
-                        banner = TextFormat("%d  -  %s", m_result.rollValue, label);
+                        banner = TextFormat(lang::Get("dice.hit_result").c_str(), m_result.rollValue, label.c_str());
                     } else {
-                        banner = TextFormat("%d  -  d%d", m_result.rollValue, m_pool.sides);
+                        banner = TextFormat(lang::Get("dice.single").c_str(), m_result.rollValue, m_pool.sides);
                     }
                 } else if (m_poolDone) {
                     if (m_opts.summary) banner = TextFormat("%s", m_opts.summary(m_poolValues).c_str());
-                    else                banner = TextFormat("Risultato %s: %d", core::ToString(m_pool).c_str(), m_diceResult.total);
+                    else                banner = TextFormat(lang::Get("dice.roll_result").c_str(), core::ToString(m_pool).c_str(), m_diceResult.total);
                     bannerColor = kGoldBright;
-                    subline = "Dadi: " + JoinValues(m_poolValues);
+                    subline = TextFormat(lang::Get("dice.values").c_str(), JoinValues(m_poolValues).c_str());
                 } else {
-                    banner = TextFormat("Dado %d/%d:  %d", have, m_pool.count, m_result.rollValue);
-                    subline = "Dadi: " + JoinValues(m_poolValues);
+                    banner = TextFormat(lang::Get("dice.numbered").c_str(), have, m_pool.count, m_result.rollValue);
+                    subline = TextFormat(lang::Get("dice.values").c_str(), JoinValues(m_poolValues).c_str());
                 }
                 break;
         }
@@ -479,21 +490,22 @@ void DiceRollState::RenderGothic() {
         switch (m_dice.GetState()) {
             case ui::DiceRoller::State::Idle:
                 if (m_phase == Phase::Damage) {
-                    banner = (m_pool.count == 1) ? "Colpito! Lancia il dado del danno"
-                                                 : TextFormat("Lancia il dado del danno (%d/%d)", next, m_pool.count);
+                    banner = (m_pool.count == 1) ? lang::Get("dice.damage_hit_roll")
+                        : TextFormat(lang::Get("dice.numbered_damage").c_str(), next, m_pool.count);
                 } else if (m_phase == Phase::Free && m_pool.count > 1) {
-                    banner = TextFormat("Lancia il dado (%d/%d)", next, m_pool.count);
+                    banner = TextFormat(lang::Get("dice.numbered_roll").c_str(), next, m_pool.count);
                 } else {
-                    banner = "Afferra il dado e scaglialo sul feltro";
+                    banner = lang::Get("dice.grab");
                 }
                 break;
-            case ui::DiceRoller::State::Dragging: banner = "Lascia andare con uno scatto!"; break;
-            default:                              banner = "Il destino rotola...";          break;
+            case ui::DiceRoller::State::Dragging: banner = lang::Get("dice.release"); break;
+            default:                              banner = lang::Get("dice.rolling"); break;
         }
         bannerColor = Fade(kBone, 0.75f);
-        if (m_phase != Phase::Attack && have > 0 && !m_poolDone) subline = "Dadi: " + JoinValues(m_poolValues);
+        if (m_phase != Phase::Attack && have > 0 && !m_poolDone)
+            subline = TextFormat(lang::Get("dice.values").c_str(), JoinValues(m_poolValues).c_str());
     }
-    DrawTextCentered(font, banner, cx, b.y + 30.0f, 32.0f, bannerColor);
+    DrawTextCentered(font, banner.c_str(), cx, b.y + 30.0f, 32.0f, bannerColor);
     if (!subline.empty()) DrawTextCentered(font, subline.c_str(), cx, b.y + 62.0f, 20.0f, kGold);
 
     // --- dado ------------------------------------------------------------
@@ -501,7 +513,7 @@ void DiceRollState::RenderGothic() {
 
     const bool mustRollDamage = IsCombat() && m_attackRolled && m_attackResult.isHit && !m_damageRolled;
     if (!mustRollDamage)
-        DrawTextCentered(font, "INVIO / ESC : chiudi", cx, b.y + b.height + 14.0f, 22.0f, Fade(kBone, 0.7f));
+        DrawTextCentered(font, lang::Get("dice.close").c_str(), cx, b.y + b.height + 14.0f, 22.0f, Fade(kBone, 0.7f));
 }
 
 void DiceRollState::HandleInputGothic() {
@@ -514,7 +526,9 @@ void DiceRollState::HandleInputGothic() {
     }
     const bool mustRollDamage = IsCombat() && m_attackRolled && m_attackResult.isHit && !m_damageRolled;
 
-    if (!m_dice.IsBusy() && !mustRollDamage && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE))) {
+    if (!m_dice.IsBusy() && !mustRollDamage &&
+        (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm) ||
+         core::KeyBindings::Pressed(core::KeyBindings::Action::Back))) {
         // Lo stato di destinazione si costruisce PRIMA di SetState: SetState distrugge questo oggetto.
         std::unique_ptr<GameState> next;
         if (m_opts.onFinish) next = m_opts.onFinish(m_poolDone ? m_poolValues : std::vector<int>{}, m_poolDone);
@@ -620,12 +634,14 @@ void DiceRollState::RenderSimple() {
     const int cx = GetScreenWidth() / 2;
 
     if (m_allSettled) {
-        const char* exprStr = TextFormat("Risultato %s: %d", core::ToString(m_diceExpr).c_str(), m_diceResult.total);
+        const char* exprStr = TextFormat(lang::Get("dice.roll_result").c_str(), core::ToString(m_diceExpr).c_str(), m_diceResult.total);
         DrawText(exprStr, cx - MeasureText(exprStr, 36) / 2, 80, 36, GOLD);
 
-        DrawText("Premi [SPAZIO] o [INVIO] per continuare", cx - MeasureText("Premi [SPAZIO] o [INVIO] per continuare", 20) / 2, GetScreenHeight() - 60, 20, LIGHTGRAY);
+        const std::string prompt = lang::Get("dice.press_continue");
+        DrawText(prompt.c_str(), cx - MeasureText(prompt.c_str(), 20) / 2, GetScreenHeight() - 60, 20, LIGHTGRAY);
     } else {
-        DrawText("Lancio in corso...", cx - MeasureText("Lancio in corso...", 28) / 2, 80, 28, WHITE);
+        const std::string rolling = lang::Get("dice.rolling_simple");
+        DrawText(rolling.c_str(), cx - MeasureText(rolling.c_str(), 28) / 2, 80, 28, WHITE);
     }
 }
 
@@ -677,7 +693,7 @@ void DiceRollState::RenderDie3D(const VisualDice3D& die) {
 
 void DiceRollState::HandleInputSimple() {
     // Tasto rapido per saltare la fisica del tiro e mostrare subito l'esito
-    if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) {
         if (!m_allSettled) {
             for (auto& die : m_visualDice) {
                 die.settled = true;

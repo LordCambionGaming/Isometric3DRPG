@@ -1,6 +1,8 @@
 ﻿#include "states/PlayingState.h"
 #include "states/DiceRollState.h"
 #include "core/Game.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
 #include "entities/Player.h"
 #include "entities/Mob.h"
 #include <raylib.h>
@@ -38,24 +40,24 @@ void PlayingState::Render() {
     const int cy = GetScreenHeight() / 2;
 
     Color textColor = WHITE;
-    const char* resultText = "Tiro normale.";
+    std::string resultText = lang::Get("dice.normal");
     switch (m_lastRoll.result) {
         case core::CombatResult::CriticalFailure:
             textColor = RED;
-            resultText = "CRITICAL FAILURE!";
+            resultText = lang::Get("dice.critical_failure");
             break;
         case core::CombatResult::CriticalSuccess:
             textColor = GREEN;
-            resultText = "CRITICAL SUCCESS!";
+            resultText = lang::Get("dice.critical_success");
             break;
         default:
             break;
     }
 
-    const char* numText = TextFormat("D20: %d", m_lastRoll.rollValue);
+    const char* numText = TextFormat(lang::Get("playing.d20").c_str(), m_lastRoll.rollValue);
     DrawText(numText, cx - MeasureText(numText, fontSize) / 2,
              cy - fontSize, fontSize, textColor);
-    DrawText(resultText, cx - MeasureText(resultText, fontSize) / 2,
+    DrawText(resultText.c_str(), cx - MeasureText(resultText.c_str(), fontSize) / 2,
              cy + 10, fontSize, textColor);
 }
 
@@ -77,7 +79,10 @@ void PlayingState::HandleInput() {
 
 
 
-    if (IsKeyPressed(KEY_I)) { m_game->SetState(std::make_unique<InventoryState>(m_game)); return; }
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Inventory)) {
+        m_game->SetState(std::make_unique<InventoryState>(m_game));
+        return;
+    }
 
     // F6 (debug): aggiunge un esemplare di ogni arma del catalogo, per provare le animazioni 1H / 2H / arco
     if (IsKeyPressed(KEY_F6)) {

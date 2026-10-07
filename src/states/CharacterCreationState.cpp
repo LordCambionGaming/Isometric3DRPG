@@ -1,4 +1,6 @@
 #include "states/CharacterCreationState.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
 #include "states/MainMenuState.h"
 #include "states/DiceRollState.h"
 #include "core/Game.h"
@@ -31,8 +33,9 @@ void DrawRowHighlight(const Rectangle& r) {
     DrawRectangleLinesEx(r, 1.0f, Fade(kGold, 0.7f));
 }
 
-const char* MethodName(CharacterCreationState::Method m) {
-    return (m == CharacterCreationState::Method::Roll) ? "Tira i dadi" : "Punteggi fissi";
+std::string MethodName(CharacterCreationState::Method method) {
+    return lang::Get(method == CharacterCreationState::Method::Roll
+        ? "character.method_roll" : "character.method_fixed");
 }
 
 } // namespace
@@ -152,7 +155,7 @@ void CharacterCreationState::StartBoardRoll() {
     DiceRollOptions options;
     options.opaqueBackdrop = true;     // dietro la creazione non c'e' il mondo
     options.summary = [](const std::vector<int>& dice) {
-        return "Punteggio " + std::to_string(core::AbilityScoreFromDice(dice)) + "  (scarta il piu' basso)";
+        return TextFormat(lang::Get("character.rolled_score").c_str(), core::AbilityScoreFromDice(dice));
     };
     options.onFinish = [game, snap, slot](const std::vector<int>& dice, bool completed) mutable -> std::unique_ptr<GameState> {
         if (completed && dice.size() == 4) {
@@ -203,18 +206,19 @@ core::Character CharacterCreationState::Build() const {
 }
 
 void CharacterCreationState::HandleInput() {
-    if (IsKeyPressed(KEY_ESCAPE)) {
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) {
         std::cout << "STATE CHANGE: CharacterCreationState -> MainMenuState" << std::endl;
         if (m_game) m_game->SetState(std::make_unique<MainMenuState>(m_game));
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
 
-    if (IsKeyPressed(KEY_DOWN)) m_row = NextRow(+1);
-    if (IsKeyPressed(KEY_UP))   m_row = NextRow(-1);
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Down)) m_row = NextRow(+1);
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Up))   m_row = NextRow(-1);
 
     if (IsKeyPressed(KEY_A)) AutoRollRemaining();
 
-    const int dir = (IsKeyPressed(KEY_RIGHT) ? 1 : 0) - (IsKeyPressed(KEY_LEFT) ? 1 : 0);
+    const int dir = (core::KeyBindings::Pressed(core::KeyBindings::Action::Right) ? 1 : 0) -
+                    (core::KeyBindings::Pressed(core::KeyBindings::Action::Left) ? 1 : 0);
     if (dir != 0) {
         if (m_row == kRowMethod) {
             SetMethod(m_method == Method::Roll ? Method::Fixed : Method::Roll);
@@ -225,12 +229,12 @@ void CharacterCreationState::HandleInput() {
         }
     }
 
-    if (IsKeyPressed(KEY_ENTER) && m_row == kRowRoll && RollRowActive()) {
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm) && m_row == kRowRoll && RollRowActive()) {
         StartBoardRoll();
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
 
-    if (IsKeyPressed(KEY_ENTER) && m_row == kRowConfirm && AllAssigned()) {
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm) && m_row == kRowConfirm && AllAssigned()) {
         const core::Character character = Build();   // prima di SetState: lo stato viene distrutto
         std::cout << "STATE CHANGE: CharacterCreationState -> PlayingState (" << core::ToString(character.characterClass)
                   << ", STR " << character.Score(core::Ability::Str)
@@ -266,8 +270,9 @@ void CharacterCreationState::Render() {
     DrawRectangleLinesEx({ b.x + 8.0f, b.y + 8.0f, b.width - 16.0f, b.height - 16.0f }, 1.0f, Fade(kGoldDim, 0.7f));
 
     static const core::Character kSheet{};   // valori fissi: Human, livello 1, XP 0
-    DrawTextCentered(font, "Creazione del personaggio", cx, b.y + 22.0f, 30.0f, kGoldBright);
-    DrawTextCentered(font, TextFormat("%s  -  Livello %d  -  XP %d", core::ToString(kSheet.race), kSheet.level, kSheet.xp),
+    const std::string raceName = lang::RaceName(core::ToString(kSheet.race));
+    DrawTextCentered(font, lang::Get("character.title").c_str(), cx, b.y + 22.0f, 30.0f, kGoldBright);
+    DrawTextCentered(font, TextFormat(lang::Get("character.sheet").c_str(), raceName.c_str(), kSheet.level, kSheet.xp),
                      cx, b.y + 62.0f, 20.0f, Fade(kBone, 0.8f));
 
     auto rowColor = [&](int row) { return (m_row == row) ? kGoldBright : kBone; };
@@ -275,19 +280,20 @@ void CharacterCreationState::Render() {
     // --- metodo ----------------------------------------------------------
     float y = b.y + 104.0f;
     if (m_row == kRowMethod) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
-    DrawLabel(font, "Punteggi", left, y, 24.0f, rowColor(kRowMethod));
-    DrawLabel(font, TextFormat("<  %s  >", MethodName(m_method)), left + 170.0f, y, 24.0f, rowColor(kRowMethod));
+    DrawLabel(font, lang::Get("character.scores").c_str(), left, y, 24.0f, rowColor(kRowMethod));
+    const std::string methodName = MethodName(m_method);
+    DrawLabel(font, TextFormat("<  %s  >", methodName.c_str()), left + 170.0f, y, 24.0f, rowColor(kRowMethod));
 
     // --- classe ----------------------------------------------------------
     y += kRowH;
     if (m_row == kRowClass) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
-    DrawLabel(font, "Classe", left, y, 24.0f, rowColor(kRowClass));
-    DrawLabel(font, TextFormat("<  %s  >", core::ToString(m_class)), left + 170.0f, y, 24.0f, rowColor(kRowClass));
+    DrawLabel(font, lang::Get("character.class").c_str(), left, y, 24.0f, rowColor(kRowClass));
+    const std::string className = lang::CharacterClassName(core::ToString(m_class));
+    DrawLabel(font, TextFormat("<  %s  >", className.c_str()), left + 170.0f, y, 24.0f, rowColor(kRowClass));
 
     // --- pool dei punteggi ----------------------------------------------
     y += kRowH + 10.0f;
-    DrawLabel(font, (m_method == Method::Roll) ? "Tiri (4d6, scarta il piu' basso)"
-                                               : "Array standard D&D (15 14 13 12 10 8)",
+    DrawLabel(font, lang::Get(m_method == Method::Roll ? "character.rolls_label" : "character.array_label").c_str(),
               left, y, 20.0f, Fade(kBone, 0.75f));
     y += 28.0f;
     for (int i = 0; i < core::kAbilityCount; ++i) {
@@ -307,10 +313,10 @@ void CharacterCreationState::Render() {
     if (m_method == Method::Roll) {
         if (RollRowActive()) {
             if (m_row == kRowRoll) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
-            DrawLabel(font, TextFormat("Lancia i dadi (%d/%d)", RolledCount(), core::kAbilityCount), left, y, 22.0f, rowColor(kRowRoll));
-            DrawLabel(font, "INVIO: board    A: tira tutto", left + 250.0f, y + 3.0f, 18.0f, Fade(kBone, 0.65f));
+            DrawLabel(font, TextFormat(lang::Get("character.roll_action").c_str(), RolledCount(), core::kAbilityCount), left, y, 22.0f, rowColor(kRowRoll));
+            DrawLabel(font, lang::Get("character.roll_help").c_str(), left + 250.0f, y + 3.0f, 18.0f, Fade(kBone, 0.65f));
         } else {
-            DrawLabel(font, "Tutti i punteggi sono stati tirati", left, y, 20.0f, Fade(kBone, 0.6f));
+            DrawLabel(font, lang::Get("character.all_rolled").c_str(), left, y, 20.0f, Fade(kBone, 0.6f));
         }
     }
     y += kRowH;
@@ -336,17 +342,19 @@ void CharacterCreationState::Render() {
     y += 8.0f;
     const core::ItemId weaponId = core::StartingWeaponId(m_class);
     const core::WeaponDef weapon = core::ResolveWeapon(weaponId);
-    DrawLabel(font, TextFormat("Arma iniziale: %s %s", weapon.name, core::ToString(weapon.damage).c_str()),
+    const core::ItemDef* weaponDef = core::GetItem(weaponId);
+    const std::string weaponName = weaponDef ? lang::ItemName(weaponDef->key) : weapon.name;
+    DrawLabel(font, TextFormat(lang::Get("character.initial_weapon").c_str(), weaponName.c_str(), core::ToString(weapon.damage).c_str()),
               left, y, 20.0f, Fade(kBone, 0.85f));
-    DrawLabel(font, "Posseduta, non equipaggiata", left, y + 24.0f, 18.0f, Fade(kBone, 0.6f));
+    DrawLabel(font, lang::Get("character.owned_not_equipped").c_str(), left, y + 24.0f, 18.0f, Fade(kBone, 0.6f));
 
     // --- conferma --------------------------------------------------------
     y += 62.0f;
     const bool ready = AllAssigned();
     if (m_row == kRowConfirm) DrawRowHighlight({ left - 10.0f, y - 4.0f, rowW + 20.0f, kRowH - 2.0f });
-    DrawTextCentered(font, ready ? "[ Conferma ]" : "[ Conferma ]  assegna tutti i punteggi", cx, y, 24.0f,
+    DrawTextCentered(font, lang::Get(ready ? "character.confirm" : "character.confirm_assign").c_str(), cx, y, 24.0f,
                      ready ? rowColor(kRowConfirm) : Fade(kBone, 0.4f));
 
-    DrawTextCentered(font, "SU/GIU: riga   SX/DX: cambia   INVIO: conferma   A: tira tutto   ESC: indietro", cx,
+    DrawTextCentered(font, lang::Get("character.help").c_str(), cx,
                      b.y + b.height + 14.0f, 20.0f, Fade(kBone, 0.7f));
 }
