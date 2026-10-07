@@ -675,8 +675,15 @@ _BOW_STANCE = dict(legs_yaw=-55, Lthigh=10, Lknee=7, Rthigh=-10, Rknee=7, hips_y
                    head_yaw=78, head_pitch=2)
 BOW_KEYS = [
     (0.00, _smooth,   _K()),
-    # nocked and ready: half-turned, bow forward and upright, right hand on the resting string
-    (0.35, _smooth,   _K(legs_yaw=-14, Lthigh=6, Lknee=5, Rthigh=-6, Rknee=5, hips_yaw=-20, spine_yaw=-4,
+    # Reach behind the shoulder to take an arrow from the quiver.
+    (0.20, _smooth,   _K(Rswing=-90, Rabd=-60, Relbow=120, Rroll=-15, Rhand=-12,
+                         hips_yaw=-8, chest_yaw=-4, head_yaw=8)),
+    # Bring the arrow forward and nock it while raising the bow.
+    (0.48, _smooth,   _K(legs_yaw=-10, hips_yaw=-16, spine_yaw=-4, chest_yaw=-4, head_yaw=24,
+                         Lswing=34, Labd=44, Lelbow=48, Lhand=30, Lroll=-12,
+                         Rswing=112, Rabd=84, Relbow=28, Rroll=-2)),
+    # Nocked and ready: half-turned, bow forward and upright, right hand on the resting string
+    (0.65, _smooth,   _K(legs_yaw=-14, Lthigh=6, Lknee=5, Rthigh=-6, Rknee=5, hips_yaw=-20, spine_yaw=-4,
                          chest_yaw=-4, head_yaw=28, spine_pitch=2,
                          Lswing=42.5, Labd=52.7, Lelbow=60.7, Lhand=41.8, Lroll=-20.6,
                          Rswing=146.4, Rabd=103.4, Relbow=0, Rroll=0)),

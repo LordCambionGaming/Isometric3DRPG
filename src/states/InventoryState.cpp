@@ -4,6 +4,8 @@
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
 #include "rendering/LightingSystem.h"
+#include "rendering/ItemVisuals.h"
+#include <algorithm>
 #include <raylib.h>
 #include <raymath.h>
 #include <memory>
@@ -37,6 +39,9 @@ void InventoryState::HandleInput() {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_E)) { 
         if (m_isDragging) {
             m_game->GetPlayer()->GetCharacterMutable().AddItem(m_draggedItemId, m_draggedItemCount);
+            auto& inv = m_game->GetPlayer()->GetCharacterMutable().inventory;
+        inv.erase(std::remove_if(inv.begin(), inv.end(),
+                  [](const core::ItemStack& s) { return s.id == core::kNoItem || s.count <= 0; }), inv.end());
             m_isDragging = false;
         }
         m_game->SetState(std::make_unique<PlayingState>(m_game));
@@ -116,6 +121,16 @@ void InventoryState::Update(float deltaTime) {
                 break;
             }
         }
+
+        const Rectangle quiverRect = { px + 350, py + 320, SLOT_SIZE, SLOT_SIZE };
+        if (!m_isDragging && CheckCollisionPointRec(mousePos, quiverRect) &&
+            c.equipment.quiver.id != core::kNoItem) {
+            m_isDragging = true;
+            m_draggedItemId = c.equipment.quiver.id;
+            m_draggedItemCount = c.equipment.quiver.count;
+            m_dragSource = DRAG_EQUIP_QUIVER;
+            c.equipment.quiver = { core::kNoItem, 0 };
+        }
     }
     else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && m_isDragging) {
         bool dropped = false;
@@ -141,6 +156,17 @@ void InventoryState::Update(float deltaTime) {
                     dropped = true;
                 }
                 break;
+            }
+        }
+
+        const Rectangle quiverRect = { px + 350, py + 320, SLOT_SIZE, SLOT_SIZE };
+        if (!dropped && CheckCollisionPointRec(mousePos, quiverRect)) {
+            if (c.CanEquip(m_draggedItemId, core::EquipSlot::Quiver)) {
+                if (c.equipment.quiver.id != core::kNoItem) {
+                    c.AddItem(c.equipment.quiver.id, c.equipment.quiver.count);
+                }
+                c.equipment.quiver = { m_draggedItemId, m_draggedItemCount };
+                dropped = true;
             }
         }
         
@@ -231,14 +257,14 @@ void InventoryState::DrawSlot(Rectangle rect, core::ItemId id, int count, bool i
         DrawText(label, (int)rect.x, (int)(rect.y - 14), 10, kGoldDim);
     }
     
-    if (id != core::kNoItem) {
-        const core::ItemDef* def = core::GetItem(id);
-        if (def) {
+     if (id != core::kNoItem) {
+        ItemVisuals* visuals = m_game ? m_game->GetItemVisuals() : nullptr;
+        if (visuals) {
+            visuals->DrawIcon(id, { rect.x + 4, rect.y + 4, rect.width - 8, rect.height - 8 });
+        } else if (const core::ItemDef* def = core::GetItem(id)) {
             DrawText(TextSubtext(def->name, 0, 4), (int)rect.x + 4, (int)rect.y + 16, 10, kBone);
-            if (count > 1) {
-                DrawText(TextFormat("x%d", count), (int)rect.x + 2, (int)(rect.y + SLOT_SIZE - 12), 10, WHITE);
-            }
         }
+        if (count > 1) DrawText(TextFormat("x%d", count), (int)rect.x + 2, (int)(rect.y + SLOT_SIZE - 12), 10, WHITE);
     }
 }
 
@@ -285,6 +311,13 @@ void InventoryState::Render() {
         bool isInvalidDrop = dropHovered && !c.CanEquip(m_draggedItemId, s.eSlot);
         DrawSlot(r, s.id, 1, hovered, s.label, isInvalidDrop);
     }
+
+    const Rectangle quiverRect = { px + 350, py + 320, SLOT_SIZE, SLOT_SIZE };
+    const bool quiverHovered = !m_isDragging && CheckCollisionPointRec(mousePos, quiverRect);
+    const bool quiverInvalidDrop = m_isDragging && CheckCollisionPointRec(mousePos, quiverRect) &&
+                                   !c.CanEquip(m_draggedItemId, core::EquipSlot::Quiver);
+    DrawSlot(quiverRect, c.equipment.quiver.id, c.equipment.quiver.count, quiverHovered,
+             "Faretra", quiverInvalidDrop);
     
     const float gridX = px + 450.0f;
     const float gridY = py + 60.0f;

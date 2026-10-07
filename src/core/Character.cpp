@@ -73,7 +73,8 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
     c.level = 1;
     c.xp = 0;
     c.abilities = abilities;
-    c.inventory.push_back({ StartingWeaponId(cls), 1 });
+    c.AddItem(StartingWeaponId(cls));
+    c.AddItem(items::Arrow, 20);
     // equipment starts empty (all slots kNoItem by default)
     c.vitals.currentHP = c.MaxHP();
     return c;
@@ -92,6 +93,15 @@ bool Character::CanEquip(ItemId id, EquipSlot slot) const {
         slotMatch = (def->validSlot == slot);
     }
     if (!slotMatch) return false;
+
+    if (slot == EquipSlot::LeftHand && def->category == ItemCategory::Weapon &&
+        def->weapon.grip == WeaponGrip::OneHanded) {
+        return false;
+    }
+    if (def->category == ItemCategory::Weapon && def->weapon.grip == WeaponGrip::Bow &&
+        slot != EquipSlot::LeftHand) {
+        return false;
+    }
 
     // Check two-handed constraints
     if (def->category == ItemCategory::Weapon && (def->weapon.grip == WeaponGrip::TwoHanded || def->weapon.grip == WeaponGrip::Bow)) {
@@ -119,7 +129,8 @@ bool Character::CanEquip(ItemId id, EquipSlot slot) const {
 }
 
 WeaponDef Character::ActiveWeapon() const {
-    WeaponDef w = ResolveWeapon(equipment.rightHand);
+    const ItemId activeId = equipment.rightHand != kNoItem ? equipment.rightHand : equipment.leftHand;
+    WeaponDef w = ResolveWeapon(activeId);
     if (w.isVersatile && equipment.leftHand == kNoItem) {
         w.damage = w.versatileDamage;
         w.grip = WeaponGrip::TwoHanded;
@@ -136,6 +147,16 @@ void Character::AddItem(ItemId id, int count) {
         }
     }
     inventory.push_back({ id, count });
+}
+
+int Character::QuiverArrowCount() const {
+    return equipment.quiver.id == items::Arrow ? equipment.quiver.count : 0;
+}
+
+bool Character::RemoveQuiverArrow() {
+    if (QuiverArrowCount() <= 0) return false;
+    if (--equipment.quiver.count == 0) equipment.quiver = ItemStack{ kNoItem, 0 };
+    return true;
 }
 
 } // namespace core

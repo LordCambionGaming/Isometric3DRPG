@@ -273,10 +273,9 @@ void DiceRollState::Enter() {
 }
 
 void DiceRollState::Exit() {
-    // Il danno si applica una sola volta, e solo se l'attacco e' stato lanciato davvero e ha colpito.
-    if (!(IsCombat() && m_attackRolled && m_attackResult.isHit) || m_damageApplied) return;
+    if (!IsCombat() || !m_attackRolled || m_damageApplied) return;
 
-    if (!m_damageRolled) {
+    if (m_attackResult.isHit && !m_damageRolled) {
         // Hai chiuso la board dopo aver colpito ma prima di aver lanciato tutti i dadi del danno:
         // un colpo a segno non si perde, i dadi che mancano li tira il gioco.
         core::CombatSystem* cs = m_game ? m_game->GetCombatSystem() : nullptr;
@@ -288,11 +287,15 @@ void DiceRollState::Exit() {
             m_damageRolled = true;
         }
     }
-    if (m_damageRolled) {
+
+    if (m_attackResult.isHit && m_damageRolled) {
         m_damageApplied = true;
         m_target->TakeDamage(m_damageResult.totalDamage);
-         if (Player* p = m_game->GetPlayer())
-        p->StartAttack(m_target->GetPosition()); 
+    }
+
+    if (m_attackResult.isHit) {
+        if (Player* player = m_game ? m_game->GetPlayer() : nullptr)
+            player->StartAttack(m_target->GetPosition());
     }
 }
 

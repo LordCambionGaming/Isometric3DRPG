@@ -53,6 +53,7 @@ struct Equipment {
     ItemId feet = kNoItem;
     ItemId rightHand = kNoItem;
     ItemId leftHand = kNoItem;
+    ItemStack quiver{ kNoItem, 0 };
 };
 
 struct Character {
@@ -95,12 +96,14 @@ struct Character {
 
     int Score(Ability a) const { return abilities[static_cast<std::size_t>(a)]; }
     int Modifier(Ability a) const { return AbilityModifier(Score(a)); }
+    int QuiverArrowCount() const;
     bool HasEquippedWeapon() const {
         return equipment.rightHand != kNoItem || equipment.leftHand != kNoItem;
     }
     bool CanEquip(ItemId id, EquipSlot slot) const;
     WeaponDef ActiveWeapon() const;
     void AddItem(ItemId id, int count = 1);
+    bool RemoveQuiverArrow();
 };
 
 // Human, livello 1, XP 0, possiede l'arma iniziale della classe ma non la equipaggia.

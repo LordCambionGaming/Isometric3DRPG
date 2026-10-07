@@ -59,6 +59,8 @@ const std::vector<ItemDef>& AllItems() {
         MakeWeapon(items::Greataxe,   "greataxe",   "Greataxe",   { 1, 12 }, 1.5f, WeaponGrip::TwoHanded,  "models/items/greataxe.glb"),
         MakeWeapon(items::Bow,        "bow",        "Bow",        { 1, 8 }, 8.0f,  WeaponGrip::Bow,        "models/items/bow.glb"),
         MakeWeapon(items::Longbow,    "longbow",    "Longbow",    { 1, 8 }, 12.0f, WeaponGrip::Bow,        "models/items/longbow.glb"),
+        ItemDef{ items::Arrow, "arrow", "Arrow", ItemCategory::Misc, EquipSlot::Quiver, {}, "models/items/arrow.glb", "" },
+        ItemDef{ items::Quiver, "quiver", "Quiver", ItemCategory::Misc, EquipSlot::None, {}, "models/items/quiver.glb", "" },
     };
     return table;
 }

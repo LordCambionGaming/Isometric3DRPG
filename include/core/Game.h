@@ -19,6 +19,7 @@ class AssetManager;
 class AudioManager;
 class Timer;
 class HUD;
+class ItemVisuals; 
 
 class Game {
 public:
@@ -47,7 +48,7 @@ public:
     Mob* GetHoveredMob() const { return m_hoveredMob; }
     void SetHoveredMob(Mob* mob) { m_hoveredMob = mob; }
     core::LightingSystem* GetLightingSystem() const { return m_lightingSystem.get(); }
-
+    ItemVisuals* GetItemVisuals() const { return m_itemVisuals.get(); }
 private:
     void Update(float deltaTime);
     void Render();
@@ -74,7 +75,7 @@ private:
     Mob* m_hoveredMob = nullptr;
     int m_hoverTileX = -1;
     int m_hoverTileZ = -1;
-    
+    std::unique_ptr<ItemVisuals> m_itemVisuals;
     std::unique_ptr<core::LightingSystem> m_lightingSystem;
 
     ui::InteractionMenu m_interactionMenu;

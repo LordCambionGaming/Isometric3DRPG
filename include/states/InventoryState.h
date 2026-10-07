@@ -27,7 +27,8 @@ private:
         DRAG_EQUIP_LEGS,
         DRAG_EQUIP_FEET,
         DRAG_EQUIP_RIGHT,
-        DRAG_EQUIP_LEFT
+        DRAG_EQUIP_LEFT,
+        DRAG_EQUIP_QUIVER
     };
 
     RenderTexture2D m_previewTexture;

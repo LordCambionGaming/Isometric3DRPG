@@ -6,7 +6,7 @@ Pure Python, no Blender needed.  Must sit in the same folder as generate_player.
 Usage:
     python3 tools/generate_weapons.py --out-dir assets/models/weapons
 
-Writes weapon_longsword.glb, weapon_dagger.glb, weapon_bow.glb, weapon_arrow.glb.
+Writes longsword.glb, dagger.glb, bow.glb, arrow.glb (the names used by Items.cpp: models/items/<key>.glb).
 
 Mounting (the important part)
     Longsword / Dagger / Bow are authored directly in the *hand bone's* local space (Y-up glTF, origin =
@@ -19,7 +19,7 @@ Mounting (the important part)
     Flat colours only: NO baked shading, vertex colours are plain white (the game does its own lighting).
     Normals are exported so an engine light can be used.
 
-Bow rig (weapon_bow.glb, 5 joints, rigid / per-vertex skinning)
+Bow rig (bow.glb, 5 joints, rigid / per-vertex skinning)
     Root (grip) -> LimbTop, LimbBottom (flex), String (the nock point) -> ArrowRoot (arrow, scaled 0 when not nocked)
     Animation "Bow" (1.7 s, 60 fps) is baked from the character's own Bow pose, so the string really follows
     the right hand, the limbs flex, the arrow appears when nocked and disappears at the release (release_time
@@ -31,7 +31,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "entities")))
 import generate_player as gp
 
 W_MATERIALS = {
@@ -196,6 +196,20 @@ def build_arrow():
     return m
 
 
+def build_quiver():
+    m = gp.Mesh()
+    m.bone = "Quiver"
+    gp.prism(m, "leather", 0, 0, 0.0, 0.66, 0.105, 0.135, n=8)
+    gp.prism(m, "leather_dark", 0, 0, 0.18, 0.22, 0.139, 0.142, n=8)
+    gp.prism(m, "gold", 0, 0, 0.47, 0.495, 0.141, 0.144, n=8)
+    gp.prism(m, "leather_dark", 0, 0, 0.58, 0.68, 0.143, 0.143, n=8)
+    gp.frustum(m, "gold", 0, 0.139, 0.28, 0.36, 0.070, 0.022, 0.070, 0.022)
+    for x in (-0.045, 0.0, 0.045):
+        gp.prism(m, "wood", x, 0, 0.56, 0.91, 0.005, 0.005, n=5)
+        gp.frustum(m, "feather", x, 0, 0.78, 0.89, 0.008, 0.024, 0.008, 0.014)
+    return m
+
+
 def build_bow():
     m = gp.Mesh()
     m.bone = "Root"
@@ -295,8 +309,9 @@ def bow_pose(t):
     nock_h = mv(mt(hl_R), vsub(grip_w, hl_p))                 # right-hand pinch point, in the bow-hand frame
     rest = REST_NOCK
     rel = gp.BOW_RELEASE_TIME
+    nock_start = 0.65
     if t < rel:
-        w = _smooth((t - 0.28) / 0.07)
+        w = _smooth((t - nock_start) / 0.07)
         nock = tuple(rest[i] + w * (nock_h[i] - rest[i]) for i in range(3))
     else:                                                     # string snaps back and vibrates
         tau = t - rel
@@ -307,7 +322,7 @@ def bow_pose(t):
     flex = math.radians(LIMB_FLEX) * min(1.0, pull / FULL_DRAW)
     if t >= rel:
         flex = 0.0 if (t - rel) > 0.05 else flex * (1 - (t - rel) / 0.05)
-    nocked = 0.30 <= t < rel
+    nocked = nock_start <= t < rel
     s = 1.0 if nocked else 0.0
     return {
         "LimbTop":    {"r": _qz(+flex)},
@@ -418,8 +433,6 @@ def write_weapon_glb(path, name, mesh, to_pt, to_dir, joints=None, anim=None, ex
                         elif v is None:
                             v = default
                         vals.append(v)
-                    if all(all(abs(a - b) < 1e-7 for a, b in zip(v, vals[0])) for v in vals):
-                        continue                                    # constant channel: not written
                     ncomp = 4 if chan_path == "rotation" else 3
                     acc = add_acc(b"".join(struct.pack("<%df" % ncomp, *v) for v in vals), 5126, len(vals),
                                   "VEC4" if ncomp == 4 else "VEC3")
@@ -446,19 +459,34 @@ def write_weapon_glb(path, name, mesh, to_pt, to_dir, joints=None, anim=None, ex
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     out = argv[argv.index("--out-dir") + 1] if "--out-dir" in argv else "assets/models/weapons"
+    if "--only" in argv:
+        only = argv[argv.index("--only") + 1]
+        if only == "bow":
+            write_weapon_glb(os.path.join(out, "bow.glb"), "Bow", build_bow(), bow_mount_pt, bow_mount_dir,
+                             joints=BOW_JOINTS,
+                             anim=("Bow", 1.7, 60, bow_pose, {"loop": False, "release_time": gp.BOW_RELEASE_TIME}),
+                             extras={"mount_bone": "Hand.L", "transform": "identity", "height_m": 1.17,
+                                     "note": "play animation 'Bow' in sync with the player's 'Bow'; hide/spawn arrow at release_time"})
+            return
+        if only != "quiver":
+            raise SystemExit("Unsupported item: %s" % only)
+        write_weapon_glb(os.path.join(out, "quiver.glb"), "Quiver", build_quiver(), lambda p: p, lambda d: d,
+                         extras={"height_m": 0.91, "note": "Low-poly leather quiver with three arrows"})
+        return
+
     pt, dr = make_blade_mount()
-    write_weapon_glb(os.path.join(out, "weapon_longsword.glb"), "Longsword", build_longsword(), pt, dr,
+    write_weapon_glb(os.path.join(out, "longsword.glb"), "Longsword", build_longsword(), pt, dr,
                      extras={"mount_bone": "Hand.R", "transform": "identity", "length_m": 1.01,
                              "blade_tilt_deg": BLADE_TILT, "grip_axis": "Z (blade), edge toward -Y"})
-    write_weapon_glb(os.path.join(out, "weapon_dagger.glb"), "Dagger", build_dagger(), pt, dr,
+    write_weapon_glb(os.path.join(out, "dagger.glb"), "Dagger", build_dagger(), pt, dr,
                      extras={"mount_bone": "Hand.R", "transform": "identity", "length_m": 0.42,
                              "blade_tilt_deg": BLADE_TILT, "grip_axis": "Z (blade), edge toward -Y"})
-    write_weapon_glb(os.path.join(out, "weapon_bow.glb"), "Bow", build_bow(), bow_mount_pt, bow_mount_dir,
+    write_weapon_glb(os.path.join(out, "bow.glb"), "Bow", build_bow(), bow_mount_pt, bow_mount_dir,
                      joints=BOW_JOINTS,
                      anim=("Bow", 1.7, 60, bow_pose, {"loop": False, "release_time": gp.BOW_RELEASE_TIME}),
                      extras={"mount_bone": "Hand.L", "transform": "identity", "height_m": 1.17,
                              "note": "play animation 'Bow' in sync with the player's 'Bow'; hide/spawn arrow at release_time"})
-    write_weapon_glb(os.path.join(out, "weapon_arrow.glb"), "Arrow", build_arrow(), arrow_mount_pt, lambda d: d,
+    write_weapon_glb(os.path.join(out, "arrow.glb"), "Arrow", build_arrow(), arrow_mount_pt, lambda d: d,
                      extras={"length_m": ARROW_LEN, "note": "origin at the middle of the shaft, points along +Z"})
 
 

@@ -3,7 +3,10 @@
 #include <array>
 #include <vector>
 #include "core/Character.h"
+#include "entities/ArrowProjectile.h"
 #include <algorithm>
+
+class ItemVisuals;   // rendering/ItemVisuals.h
 
 struct PathNode {
     int x;
@@ -41,6 +44,10 @@ public:
     // Expects the player_animated.glb clip order (kAnimIdle/kAnimWalk/kAnimAttack below). If the clips do
     // not match the model the player keeps rendering the static pose (it still turns to face its direction).
     void SetAnimations(ModelAnimation* anims, int count);
+
+    // Visual only. Non-owning: models of the items held in the hands (equipment.rightHand / leftHand).
+    // nullptr = nothing is drawn in the hands. Call AFTER SetModel(), it can be set at any time.
+    void SetItemVisuals(ItemVisuals* visuals) { m_itemVisuals = visuals; }
 
     // Visual only: turns toward targetWorld (XZ) and plays the attack clip of the EQUIPPED weapon once
     // (no weapon: Attack, one hand: Attack1H, two hands: Attack2H, bow: Bow), then returns to Walk/Idle.
@@ -122,10 +129,19 @@ private:
     AnimState m_animState = AnimState::Idle;
     int m_playClip = kAnimAttack;  // clip of the current one-shot (Attack or Hurt)
     float m_animPhase = 0.0f;  // 0..1 inside the current clip
+    Vector3 m_attackTarget{};
+    bool m_bowReleaseFired = false;
+    std::vector<ArrowProjectile> m_arrowProjectiles;
     int m_appliedClip = -1;    // last pose uploaded to the shared model
     int m_appliedFrame = -1;
     float m_visualYaw = 0.0f;  // radians around +Y; 0 = the model's native facing (+Z). Visual only.
     float m_attackYaw = 0.0f;
+
+    // Items held in the hands (visual only)
+    ItemVisuals* m_itemVisuals = nullptr; // non-owning (Game)
+    int m_handBoneR = -1;                 // indices of "Hand.R" / "Hand.L" in the model's skeleton
+    int m_handBoneL = -1;
+    int m_chestBone = -1;
 
     core::Character m_character; // gameplay data, see SetCharacter()
 
@@ -136,4 +152,9 @@ private:
     static float ClipDuration(int clip);
     void RotateToward(float targetYaw, float maxStep);
     float ModelScale() const;
+
+    // Draws equipment.rightHand / leftHand on the hand bones of the pose currently on the model.
+    void RenderHeldItems(const Vector3& drawPos, float scale) const;
+    // Hand space -> world matrix of a hand bone (current pose + the same transform DrawModelEx applies).
+    bool HandToWorld(int bone, const Vector3& drawPos, float scale, Matrix& out) const;
 };

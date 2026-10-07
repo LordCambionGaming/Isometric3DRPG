@@ -13,7 +13,7 @@ constexpr ItemId kNoItem = -1;
 
 enum class ItemCategory { Weapon, Armor, Consumable, Misc };
 
-enum class EquipSlot { None, Head, Body, Legs, Feet, RightHand, LeftHand, AnyHand };
+enum class EquipSlot { None, Head, Body, Legs, Feet, RightHand, LeftHand, Quiver, AnyHand };
 
 
 // Come si impugna un'arma: decide l'animazione d'attacco.
@@ -56,7 +56,7 @@ struct ItemStack {
 
 // Id degli oggetti: l'ordine DEVE coincidere con la tabella in Items.cpp.
 namespace items {
-enum : ItemId { Dagger, Shortsword, Longsword, Greatsword, Greataxe, Bow, Longbow, Count };
+enum : ItemId { Dagger, Shortsword, Longsword, Greatsword, Greataxe, Bow, Longbow, Arrow, Quiver, Count };
 }
 
 const std::vector<ItemDef>& AllItems();

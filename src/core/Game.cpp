@@ -15,6 +15,7 @@
 #include "ui/HUD.h"
 #include <raylib.h>
 #include "ui/InteractionMenu.h"
+#include "rendering/ItemVisuals.h" 
 #include <raymath.h>
 #include <iostream>
 #include <cmath>
@@ -141,9 +142,12 @@ bool Game::Initialize() {
             spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
         }
 
+         m_itemVisuals = std::make_unique<ItemVisuals>(m_assetManager.get(), m_lightingSystem->GetShader());
+
         m_playerModel = m_assetManager->LoadModel("models/entities/player_animated.glb");
-        for (int i = 0; i < m_playerModel->materialCount; i++) { m_playerModel->materials[i].shader = m_lightingSystem->GetShader(); }
         if (m_playerModel) {
+            for (int i = 0; i < m_playerModel->materialCount; i++)
+                m_playerModel->materials[i].shader = m_lightingSystem->GetShader();
             m_playerAnims = m_assetManager->LoadAnimations("models/entities/player_animated.glb", m_playerAnimCount);
         }
 
@@ -151,6 +155,7 @@ bool Game::Initialize() {
         m_player->SetTileSize(worldConfig.tileSize);
         m_player->SetModel(m_playerModel);
         m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
+        m_player->SetItemVisuals(m_itemVisuals.get());
         m_player->SetPosition({spawnX, spawnY, spawnZ});
         m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
 
@@ -201,6 +206,7 @@ void Game::Shutdown() {
     if (m_world) m_world.reset();
     if (m_hud) m_hud.reset();
     if (m_audioManager) m_audioManager.reset();
+    m_itemVisuals.reset();
     if (m_assetManager) m_assetManager.reset();
     if (m_camera) m_camera.reset();
     if (m_renderer) m_renderer.reset();
@@ -267,6 +273,7 @@ void Game::CreateGameSession() {
     m_player->SetTileSize(worldConfig.tileSize);
     m_player->SetModel(m_playerModel);
     m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
+    m_player->SetItemVisuals(m_itemVisuals.get());
     m_player->SetPosition({spawnX, spawnY, spawnZ});
     m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
@@ -495,7 +502,13 @@ void Game::Render() {
                 Mob* mob = m_hoveredMob;
                 target.actions.push_back({ "Attacca", [this, mob]() {
                     if (m_player && mob && mob->IsAttackable()) {
-                        const float range = m_player->GetCharacter().ActiveWeapon().range;
+                        const core::Character& character = m_player->GetCharacter();
+                        const core::WeaponDef weapon = character.ActiveWeapon();
+                        if (weapon.grip == core::WeaponGrip::Bow && character.QuiverArrowCount() == 0) {
+                            TraceLog(LOG_INFO, "[COMBAT] Non hai frecce per usare l'arco.");
+                            return;
+                        }
+                        const float range = weapon.range;
                         const float dist = Vector3Distance(m_player->GetPosition(), mob->GetPosition());
                         if (dist <= range) {
                             SetState(std::make_unique<DiceRollState>(this, mob));

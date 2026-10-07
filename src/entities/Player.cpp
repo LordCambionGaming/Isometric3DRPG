@@ -1,6 +1,8 @@
 #include "entities/Player.h"
+#include "rendering/ItemVisuals.h"
 #include <raymath.h>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <core/Items.h>
 
@@ -13,7 +15,7 @@ Player::Player() {
 
 void Player::Update(float dt) {
     const Vector3 posBefore = m_position; // visual animation only: measures the distance really covered
-    if (!m_path.empty() && m_pathIndex < m_path.size()) {
+        if (!m_path.empty() && m_pathIndex < m_path.size()) {
         const PathNode& node = m_path[m_pathIndex];
         float targetX = node.x * m_tileSize + m_tileSize * 0.5f;
         float targetZ = node.z * m_tileSize + m_tileSize * 0.5f;
@@ -74,10 +76,18 @@ void Player::Update(float dt) {
 
     // Visual only: reads the final position, never writes gameplay state.
     UpdateVisual(dt, posBefore);
+
+    for (auto it = m_arrowProjectiles.begin(); it != m_arrowProjectiles.end();) {
+        if (!it->Update(dt)) it = m_arrowProjectiles.erase(it);
+        else ++it;
+    }
 }
 
 void Player::SetModel(Model* model) {
     m_model = nullptr;
+    m_handBoneR = -1;
+    m_handBoneL = -1;
+    m_chestBone = -1;
     // Animations must be (re)attached after the model.
     m_animsValid = false;
     m_animState = AnimState::Idle;
@@ -95,6 +105,17 @@ void Player::SetModel(Model* model) {
     }
     m_model = model;
     m_modelBounds = bb;
+
+    // Hand bones: where the items held in the hands are attached.
+    for (int i = 0; i < model->boneCount; ++i) {
+        if (std::strcmp(model->bones[i].name, "Hand.R") == 0) m_handBoneR = i;
+        else if (std::strcmp(model->bones[i].name, "Hand.L") == 0) m_handBoneL = i;
+        else if (std::strcmp(model->bones[i].name, "Chest") == 0) m_chestBone = i;
+    }
+    if (m_handBoneR < 0 || m_handBoneL < 0) {
+        TraceLog(LOG_WARNING, "[PLAYER MODEL] bone Hand.R/Hand.L not found (R=%d L=%d): items will not be drawn in the hands",
+                 m_handBoneR, m_handBoneL);
+    }
 
     const float scale = (kVisualHeightMeters * m_tileSize) / h;
     const float w = (bb.max.x - bb.min.x) * scale;
@@ -170,10 +191,14 @@ int Player::AttackClipFor(core::WeaponGrip grip) const {
 
 bool Player::StartAttack(Vector3 targetWorld) {
     if (!m_model || !m_animsValid || m_animState == AnimState::Attack || m_animState == AnimState::Hurt) return false;
+    if (m_character.ActiveWeapon().grip == core::WeaponGrip::Bow &&
+        m_character.QuiverArrowCount() == 0) return false;
     const float dx = targetWorld.x - m_position.x;
     const float dz = targetWorld.z - m_position.z;
     // Target on top of the player: keep the current facing.
     m_attackYaw = (dx * dx + dz * dz > 1e-6f) ? std::atan2(dx, dz) : m_visualYaw;
+    m_attackTarget = targetWorld;
+    m_bowReleaseFired = false;
     m_playClip = AttackClipFor(m_character.ActiveWeapon().grip);
     m_animState = AnimState::Attack;
     m_animPhase = 0.0f;
@@ -233,8 +258,16 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
     if (!m_animsValid) return; // no clips: static pose, but it still turns
 
     // --- Animation state machine: Idle <-> Walk; Attack and Hurt play once, then fall back to Walk/Idle
+    bool bowRelease = false;
     if (m_animState == AnimState::Attack || m_animState == AnimState::Hurt) {
+        const float previousPhase = m_animPhase;
         m_animPhase += dt / ClipDuration(m_playClip);
+        const float releasePhase = 1.02f / kBowDurationSec;
+        if (m_animState == AnimState::Attack && m_playClip == kAnimBow && !m_bowReleaseFired &&
+            previousPhase < releasePhase && m_animPhase >= releasePhase) {
+            bowRelease = true;
+            m_bowReleaseFired = true;
+        }
         if (m_animPhase >= 1.0f) {
             m_animState = moving ? AnimState::Walk : AnimState::Idle;
             m_animPhase = 0.0f;
@@ -260,6 +293,121 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
         case AnimState::Walk:   ApplyClipPose(kAnimWalk, m_animPhase); break;
         default:                ApplyClipPose(kAnimIdle, m_animPhase); break;
     }
+
+    if (bowRelease) {
+        const float scale = ModelScale();
+        const Vector3 drawPos = { m_position.x, m_position.y - m_modelBounds.min.y * scale, m_position.z };
+        Matrix hand;
+        if (HandToWorld(m_handBoneL, drawPos, scale, hand) && m_character.RemoveQuiverArrow()) {
+            Vector3 target = m_attackTarget;
+            target.y += 0.65f;
+            const Vector3 handPosition = { hand.m12, hand.m13, hand.m14 };
+            const Vector3 direction = Vector3Normalize(Vector3Subtract(target, handPosition));
+            const Vector3 arrowCenter = Vector3Add(handPosition, Vector3Scale(direction, 0.40f));
+            m_arrowProjectiles.emplace_back(arrowCenter, target);
+        }
+    }
+}
+
+bool Player::HandToWorld(int bone, const Vector3& drawPos, float scale, Matrix& out) const {
+    if (!m_model || bone < 0 || bone >= m_model->boneCount) return false;
+
+    // Raylib exposes animation and bind-pose transforms in MODEL space after composing parent joints.
+    Transform pose;
+    if (m_animsValid && m_anims && m_appliedClip >= 0 && m_appliedFrame >= 0) {
+        pose = m_anims[m_appliedClip].framePoses[m_appliedFrame][bone];
+    } else if (m_model->bindPose) {
+        pose = m_model->bindPose[bone];
+    } else {
+        return false;
+    }
+
+    const Matrix bone2model = MatrixMultiply(
+        MatrixMultiply(MatrixScale(pose.scale.x, pose.scale.y, pose.scale.z), QuaternionToMatrix(pose.rotation)),
+        MatrixTranslate(pose.translation.x, pose.translation.y, pose.translation.z));
+
+    // Same composition DrawModelEx uses in Render(): scale, then yaw around +Y, then translation.
+    const Matrix model2world = MatrixMultiply(
+        MatrixMultiply(MatrixScale(scale, scale, scale), MatrixRotate(Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw)),
+        MatrixTranslate(drawPos.x, drawPos.y, drawPos.z));
+    out = MatrixMultiply(bone2model, model2world);
+    return true;
+}
+
+void Player::RenderHeldItems(const Vector3& drawPos, float scale) const {
+    if (!m_itemVisuals) return;
+
+    // The bow clip of the player drives the bow's own animation (string, limbs, nocked arrow).
+    const float bowPhase = (m_animState == AnimState::Attack && m_playClip == kAnimBow) ? m_animPhase : -1.0f;
+
+    struct Slot { core::ItemId id; int bone; };
+    const Slot slots[2] = { { m_character.equipment.rightHand, m_handBoneR },
+                            { m_character.equipment.leftHand,  m_handBoneL } };
+    bool bowDrawn = false;
+    for (const Slot& s : slots) {
+        if (s.id == core::kNoItem) continue;
+        int bone = s.bone;
+        if (ItemVisuals::UsesLeftHand(s.id)) {      // a bow is always held in the left hand
+            if (bowDrawn) continue;
+            bowDrawn = true;
+            bone = m_handBoneL;
+        }
+        Matrix hand;
+        if (HandToWorld(bone, drawPos, scale, hand)) {
+            if (ItemVisuals::UsesLeftHand(s.id)) {
+                const Matrix bowRotation = MatrixMultiply(
+                    MatrixMultiply(
+                        MatrixRotateX(90.0f * DEG2RAD),
+                        MatrixRotateZ(90.0f * DEG2RAD)),
+                    MatrixRotateY(180.0f * DEG2RAD));
+                hand = MatrixMultiply(bowRotation, hand);
+            }
+            m_itemVisuals->DrawInHand(s.id, hand, bowPhase);
+        }
+    }
+
+    Matrix quiverToWorld = MatrixIdentity();
+    bool quiverVisible = false;
+    if (m_character.QuiverArrowCount() > 0) {
+        Matrix chest;
+        if (HandToWorld(m_chestBone, drawPos, scale, chest)) {
+            const Matrix quiverLocal = MatrixMultiply(
+                MatrixRotateX(-90.0f * DEG2RAD),
+                MatrixTranslate(-0.04f, -0.38f, -0.16f));
+            quiverToWorld = MatrixMultiply(quiverLocal, chest);
+            quiverVisible = true;
+            m_itemVisuals->DrawInHand(core::items::Quiver, quiverToWorld);
+        }
+    }
+
+    const float pickupStart = 0.20f;
+    const float nockTime = 0.65f;
+    const float bowTime = bowPhase * kBowDurationSec;
+    if (quiverVisible && bowTime >= pickupStart && bowTime < nockTime) {
+        Matrix hand;
+        if (HandToWorld(m_handBoneR, drawPos, scale, hand)) {
+            Vector3 target = m_attackTarget;
+            target.y += 0.65f;
+            const Vector3 handPosition = { hand.m12, hand.m13, hand.m14 };
+            const Vector3 aimDirection = Vector3Normalize(Vector3Subtract(target, handPosition));
+            const Vector3 quiverBottom = Vector3Transform(Vector3{ 0.0f, 0.0f, 0.0f }, quiverToWorld);
+            const Vector3 quiverAxis = Vector3Normalize(Vector3Subtract(
+                Vector3Transform(Vector3{ 0.0f, 0.0f, 1.0f }, quiverToWorld), quiverBottom));
+            const Vector3 pickupPosition = Vector3Transform(Vector3{ 0.0f, 0.0f, 0.735f }, quiverToWorld);
+            const Vector3 arrowInHand = Vector3Add(handPosition, Vector3Scale(aimDirection, 0.40f));
+            const float amount = std::clamp((bowTime - pickupStart) / (nockTime - pickupStart), 0.0f, 1.0f);
+            const float eased = amount * amount * (3.0f - 2.0f * amount);
+            const Vector3 arrowCenter = Vector3Lerp(pickupPosition, arrowInHand, eased);
+            const Vector3 arrowDirection = Vector3Normalize(Vector3Lerp(quiverAxis, aimDirection, eased));
+            const Quaternion rotation = QuaternionFromVector3ToVector3(Vector3{ 0.0f, 0.0f, 1.0f }, arrowDirection);
+            const Matrix arrowToWorld = MatrixMultiply(
+                QuaternionToMatrix(rotation),
+                MatrixTranslate(arrowCenter.x, arrowCenter.y, arrowCenter.z));
+            m_itemVisuals->DrawInHand(core::items::Arrow, arrowToWorld);
+        }
+    }
+
+    for (const ArrowProjectile& arrow : m_arrowProjectiles) arrow.Render(m_itemVisuals);
 }
 
 void Player::Render() const {
@@ -274,6 +422,7 @@ void Player::Render() const {
         // Visual yaw only (smoothed in UpdateVisual); the gameplay position is untouched.
         DrawModelEx(*m_model, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                     Vector3{ scale, scale, scale }, WHITE);
+        RenderHeldItems(drawPos, scale);
         return;
     }
 
