@@ -141,10 +141,10 @@ bool Game::Initialize() {
             spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
         }
 
-        m_playerModel = m_assetManager->LoadModel("models/player/player_animated.glb");
+        m_playerModel = m_assetManager->LoadModel("models/entities/player_animated.glb");
         for (int i = 0; i < m_playerModel->materialCount; i++) { m_playerModel->materials[i].shader = m_lightingSystem->GetShader(); }
         if (m_playerModel) {
-            m_playerAnims = m_assetManager->LoadAnimations("models/player/player_animated.glb", m_playerAnimCount);
+            m_playerAnims = m_assetManager->LoadAnimations("models/entities/player_animated.glb", m_playerAnimCount);
         }
 
         m_player = std::make_unique<Player>();
