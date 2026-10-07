@@ -483,7 +483,8 @@ void Game::Render() {
         if (m_lightingSystem) m_lightingSystem->BeginLightingMode();
 
         if (interiorVisible) {
-            m_village->RenderInterior(m_activeBuilding);
+            const Vector3 playerPosition = m_player ? m_player->GetPosition() : camera.target;
+            m_village->RenderInterior(m_activeBuilding, camera.position, playerPosition);
             if (m_player) m_player->Render();
         } else {
             m_world->Render();
@@ -585,6 +586,24 @@ void Game::Render() {
         const auto requestBuildingEntry = [this](int buildingIndex) {
             if (!m_village || buildingIndex < 0) return;
             m_interactionMenu.Close();
+            const Vector3 door = m_village->BuildingDoorPosition(buildingIndex);
+            const Vector3 playerPosition = m_player->GetPosition();
+            const float dx = door.x - playerPosition.x;
+            const float dz = door.z - playerPosition.z;
+            if (dx * dx + dz * dz > 1.0f) {
+                const std::vector<TileCoord> path = m_navigation.FindPath(
+                    m_player->GetTileX(), m_player->GetTileZ(),
+                    static_cast<int>(std::floor(door.x)), static_cast<int>(std::floor(door.z)));
+                if (path.empty()) return;
+                std::vector<PathNode> pathWithHeight;
+                pathWithHeight.reserve(path.size());
+                for (const TileCoord& tile : path) {
+                    pathWithHeight.emplace_back(tile.x, tile.z,
+                        m_world->GetHeightAt(tile.x + 0.5f, tile.z + 0.5f));
+                }
+                m_player->SetPath(pathWithHeight);
+                return;
+            }
             m_village->HighlightBuilding(buildingIndex);
             m_pendingBuildingIndex = buildingIndex;
             m_doorTransitionTimer = 0.42f;

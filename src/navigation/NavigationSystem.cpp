@@ -163,6 +163,17 @@ bool NavigationSystem::CanTraverse(
     const float fromCenterZ = fromZ + 0.5f;
     const float toCenterX = toX + 0.5f;
     const float toCenterZ = toZ + 0.5f;
+    for (const Rectangle& bounds : m_structureBounds) {
+        if (fromX != toX) {
+            if (fromCenterZ >= bounds.y && fromCenterZ <= bounds.y + bounds.height &&
+                std::max(fromCenterX, toCenterX) > bounds.x &&
+                std::min(fromCenterX, toCenterX) < bounds.x + bounds.width) return false;
+        } else if (fromCenterX >= bounds.x && fromCenterX <= bounds.x + bounds.width &&
+                   std::max(fromCenterZ, toCenterZ) > bounds.y &&
+                   std::min(fromCenterZ, toCenterZ) < bounds.y + bounds.height) {
+            return false;
+        }
+    }
 
     const float fromHeight =
         m_world->GetHeightAt(fromCenterX, fromCenterZ);

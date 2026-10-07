@@ -3,6 +3,7 @@
 #include "navigation/NavigationSystem.h"
 #include "world/World.h"
 #include <raymath.h>
+#include <rlgl.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -319,42 +320,85 @@ Vector3 Village::FindSpawnPosition(const World& world) {
 
 std::vector<Rectangle> Village::CollisionBounds() const {
     std::vector<Rectangle> bounds;
-    bounds.reserve(kBuildings.size() * 4 + kTreeOffsets.size() + 1);
+    bounds.reserve(kBuildings.size() * 12 + kTreeOffsets.size() + 1);
     const auto addObstacle = [&](float centerX, float centerZ, float halfX, float halfZ) {
         bounds.push_back({ centerX - halfX, centerZ - halfZ, halfX * 2.0f, halfZ * 2.0f });
     };
-    for (const Building& building : kBuildings) {
-        const Vector2 halfExtents = BuildingHalfExtents(building);
+    for (int buildingIndex = 0; buildingIndex < static_cast<int>(kBuildings.size()); ++buildingIndex) {
+        const Building& building = kBuildings[static_cast<std::size_t>(buildingIndex)];
         const float centerX = m_center.x + building.offsetX;
         const float centerZ = m_center.z + building.offsetZ;
-        const float wall = 0.34f;
-        const float doorHalfWidth = 0.58f;
-        const bool doorAlongZ = building.frontSide == 0 || building.frontSide == 1;
-        const float frontSign = building.frontSide == 0 || building.frontSide == 3 ? 1.0f : -1.0f;
-        if (doorAlongZ) {
-            addObstacle(centerX - halfExtents.x, centerZ, wall, halfExtents.y + wall);
-            addObstacle(centerX + halfExtents.x, centerZ, wall, halfExtents.y + wall);
-            addObstacle(centerX, centerZ - frontSign * halfExtents.y, halfExtents.x + wall, wall);
-            const float frontZ = centerZ + frontSign * halfExtents.y;
-            const float segmentHalf = std::max(0.0f, (halfExtents.x - doorHalfWidth) * 0.5f);
-            const float segmentCenter = (halfExtents.x + doorHalfWidth) * 0.5f;
-            addObstacle(centerX - segmentCenter, frontZ, segmentHalf + wall, wall);
-            addObstacle(centerX + segmentCenter, frontZ, segmentHalf + wall, wall);
+        const float angle = building.frontSide == 1 ? PI
+            : (building.frontSide == 2 ? -PI * 0.5f : (building.frontSide == 3 ? PI * 0.5f : 0.0f));
+        const float cosine = std::cos(angle);
+        const float sine = std::sin(angle);
+        const auto addLocalObstacle = [&](float localX, float localZ, float width, float depth) {
+            const float worldX = centerX + localX * cosine + localZ * sine;
+            const float worldZ = centerZ - localX * sine + localZ * cosine;
+            if (building.frontSide == 2 || building.frontSide == 3)
+                addObstacle(worldX, worldZ, depth * 0.5f, width * 0.5f);
+            else
+                addObstacle(worldX, worldZ, width * 0.5f, depth * 0.5f);
+        };
+        constexpr float wall = 0.30f;
+        constexpr float doorWidth = 1.20f;
+        const float sideLength = building.halfWidth - doorWidth * 0.5f;
+        const float sideCenter = (building.halfWidth + doorWidth * 0.5f) * 0.5f;
+        addLocalObstacle(-building.halfWidth + wall * 0.5f, 0.0f, wall, building.halfDepth * 2.0f);
+        addLocalObstacle(building.halfWidth - wall * 0.5f, 0.0f, wall, building.halfDepth * 2.0f);
+        addLocalObstacle(0.0f, -building.halfDepth + wall * 0.5f,
+                         building.halfWidth * 2.0f, wall);
+        addLocalObstacle(-sideCenter, building.halfDepth - wall * 0.5f, sideLength, wall);
+        addLocalObstacle(sideCenter, building.halfDepth - wall * 0.5f, sideLength, wall);
+
+        const auto addGeneratedProp = [&](float localX, float authorY, float halfWidth, float halfDepth) {
+            addLocalObstacle(localX, -authorY, halfWidth * 2.0f, halfDepth * 2.0f);
+        };
+        if (buildingIndex == 0) {
+            addGeneratedProp(1.6f, -(building.halfDepth + 0.9f), 0.48f, 0.40f);
+            addGeneratedProp(-2.1f, -(building.halfDepth + 0.8f), 0.34f, 0.34f);
+            addGeneratedProp(building.halfWidth - 0.2f, -(building.halfDepth + 1.32f), 0.16f, 0.16f);
+            const float chimneyX = building.halfWidth + 0.9f * 0.5f - 0.15f;
+            addGeneratedProp(chimneyX, -0.9f, 0.575f, 0.575f);
+        } else if (buildingIndex == 1) {
+            const float postX = building.halfWidth - 0.25f;
+            for (float side : { -1.0f, 1.0f }) {
+                addGeneratedProp(side * postX, -(building.halfDepth + 1.42f), 0.20f, 0.20f);
+                addGeneratedProp(side * postX, -(building.halfDepth + 1.32f), 0.20f, 0.20f);
+            }
+        } else if (buildingIndex == 2) {
+            for (float side : { -1.0f, 1.0f }) {
+                for (float along : { -1.3f, 1.3f })
+                    addGeneratedProp(side * (building.halfWidth + 0.2f), -along, 0.22f, 0.25f);
+            }
+            addGeneratedProp(0.0f, building.halfDepth + 0.3f, 1.05f, 1.05f);
+        } else if (buildingIndex == 3) {
+            const float postX = building.halfWidth - 0.25f;
+            for (float side : { -1.0f, 1.0f })
+                addGeneratedProp(side * postX, -(building.halfDepth + 1.22f), 0.20f, 0.20f);
+            addGeneratedProp(-1.3f, -(building.halfDepth + 0.65f), 0.34f, 0.34f);
+            addGeneratedProp(-1.9f, -(building.halfDepth + 0.65f), 0.34f, 0.34f);
+            addGeneratedProp(1.75f, -(building.halfDepth + 0.45f), 0.76f, 0.24f);
+            const float chimneyX = -(building.halfWidth + 0.8f * 0.5f - 0.15f);
+            addGeneratedProp(chimneyX, -0.9f, 0.525f, 0.525f);
         } else {
-            addObstacle(centerX, centerZ - halfExtents.y, halfExtents.x + wall, wall);
-            addObstacle(centerX, centerZ + halfExtents.y, halfExtents.x + wall, wall);
-            addObstacle(centerX - frontSign * halfExtents.x, centerZ, wall, halfExtents.y + wall);
-            const float frontX = centerX + frontSign * halfExtents.x;
-            const float segmentHalf = std::max(0.0f, (halfExtents.y - doorHalfWidth) * 0.5f);
-            const float segmentCenter = (halfExtents.y + doorHalfWidth) * 0.5f;
-            addObstacle(frontX, centerZ - segmentCenter, wall, segmentHalf + wall);
-            addObstacle(frontX, centerZ + segmentCenter, wall, segmentHalf + wall);
+            addGeneratedProp(-1.75f, -(building.halfDepth + 0.45f), 0.76f, 0.24f);
+            addGeneratedProp(1.5f, -(building.halfDepth + 0.6f), 0.32f, 0.32f);
+            addGeneratedProp(2.2f, -(building.halfDepth + 0.5f), 0.44f, 0.44f);
+            addGeneratedProp(building.halfWidth + 1.1f, 0.8f, 0.78f, 0.78f);
+            const float chimneyX = -(building.halfWidth + 0.8f * 0.5f - 0.15f);
+            addGeneratedProp(chimneyX, -0.9f, 0.525f, 0.525f);
         }
     }
     addObstacle(m_center.x + 1.9f, m_center.z - 1.9f, 1.12f, 1.12f);
     for (const Vector2 offset : kTreeOffsets)
         addObstacle(m_center.x + offset.x, m_center.z + offset.y, 0.42f, 0.42f);
     return bounds;
+}
+
+Vector3 Village::BuildingDoorPosition(int buildingIndex) const {
+    if (buildingIndex < 0 || buildingIndex >= static_cast<int>(kBuildings.size())) return {};
+    return DoorPosition(m_center, kBuildings[static_cast<std::size_t>(buildingIndex)]);
 }
 
 const VillageNpc* Village::NpcAtTile(int tileX, int tileZ) const {
@@ -428,21 +472,21 @@ int Village::BuildingDoorAtRay(const World& world, Ray ray) const {
         const float z = m_center.z + building.offsetZ;
         const Vector2 halfExtents = BuildingHalfExtents(building);
         const float ground = BuildingGround(world, x, z, halfExtents.x, halfExtents.y);
-        BoundingBox doorBounds{};
-        doorBounds.min.y = ground + 0.42f;
-        doorBounds.max.y = ground + 2.15f;
-        if (building.frontSide == 0) {
-            doorBounds.min = { x - 0.58f, doorBounds.min.y, z + building.halfDepth + 0.02f };
-            doorBounds.max = { x + 0.58f, doorBounds.max.y, z + building.halfDepth + 0.22f };
-        } else if (building.frontSide == 1) {
-            doorBounds.min = { x - 0.58f, doorBounds.min.y, z - building.halfDepth - 0.22f };
-            doorBounds.max = { x + 0.58f, doorBounds.max.y, z - building.halfDepth - 0.02f };
-        } else if (building.frontSide == 2) {
-            doorBounds.min = { x - building.halfDepth - 0.22f, doorBounds.min.y, z - 0.58f };
-            doorBounds.max = { x - building.halfDepth - 0.02f, doorBounds.max.y, z + 0.58f };
-        } else {
-            doorBounds.min = { x + building.halfDepth + 0.02f, doorBounds.min.y, z - 0.58f };
-            doorBounds.max = { x + building.halfDepth + 0.22f, doorBounds.max.y, z + 0.58f };
+        const Vector3 door = DoorPosition(m_center, building);
+        Vector3 doorFace = door;
+        if (building.frontSide == 0) doorFace.z -= 0.65f;
+        else if (building.frontSide == 1) doorFace.z += 0.65f;
+        else if (building.frontSide == 2) doorFace.x += 0.65f;
+        else doorFace.x -= 0.65f;
+        BoundingBox doorBounds = {
+            { doorFace.x - 0.60f, ground + 0.42f, doorFace.z - 0.16f },
+            { doorFace.x + 0.60f, ground + 2.52f, doorFace.z + 0.16f }
+        };
+        if (building.frontSide == 2 || building.frontSide == 3) {
+            doorBounds = {
+                { doorFace.x - 0.16f, ground + 0.42f, doorFace.z - 0.60f },
+                { doorFace.x + 0.16f, ground + 2.52f, doorFace.z + 0.60f }
+            };
         }
 
         const RayCollision collision = GetRayCollisionBox(ray, doorBounds);
@@ -531,39 +575,61 @@ void Village::Render(const World& world) const {
     }
 }
 
-void Village::RenderInterior(int buildingIndex) const {
+void Village::RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition) const {
     const Color timber{ 83, 58, 39, 255 };
     const Color plaster{ 142, 115, 82, 255 };
     const Color floor{ 105, 80, 58, 255 };
-    DrawCube({ 0.0f, -0.18f, 0.0f }, 10.0f, 0.36f, 9.0f, floor);
-    DrawCube({ 0.0f, 1.5f, -4.35f }, 10.0f, 3.0f, 0.3f, plaster);
-    DrawCube({ -4.85f, 1.5f, 0.0f }, 0.3f, 3.0f, 9.0f, plaster);
-    DrawCube({ 4.85f, 1.5f, 0.0f }, 0.3f, 3.0f, 9.0f, plaster);
-    DrawCube({ -2.65f, 1.5f, 4.35f }, 4.7f, 3.0f, 0.3f, plaster);
-    DrawCube({ 2.65f, 1.5f, 4.35f }, 4.7f, 3.0f, 0.3f, plaster);
-    DrawCube({ 0.0f, 2.95f, 4.35f }, 1.0f, 0.2f, 0.3f, timber);
+    const Vector3 viewVector = Vector3Subtract(playerPosition, cameraPosition);
+    const float viewDistance = Vector3Length(viewVector);
+    const Ray viewRay = { cameraPosition, viewDistance > 0.001f
+        ? Vector3Scale(viewVector, 1.0f / viewDistance) : Vector3{ 0.0f, 0.0f, 0.0f } };
+    const auto drawInteriorCube = [&](Vector3 position, float width, float height, float depth, Color color) {
+        const BoundingBox bounds = {
+            { position.x - width * 0.5f, position.y - height * 0.5f, position.z - depth * 0.5f },
+            { position.x + width * 0.5f, position.y + height * 0.5f, position.z + depth * 0.5f }
+        };
+        const RayCollision hit = GetRayCollisionBox(viewRay, bounds);
+        const bool occludesPlayer = viewDistance > 0.001f && hit.hit && hit.distance < viewDistance - 0.18f;
+        if (occludesPlayer) {
+            BeginBlendMode(BLEND_ALPHA);
+            rlDisableDepthMask();
+            DrawCube(position, width, height, depth, Fade(color, 0.18f));
+            rlEnableDepthMask();
+            EndBlendMode();
+        } else {
+            DrawCube(position, width, height, depth, color);
+        }
+    };
+
+    drawInteriorCube({ 0.0f, -0.18f, 0.0f }, 10.0f, 0.36f, 9.0f, floor);
+    drawInteriorCube({ 0.0f, 1.5f, -4.35f }, 10.0f, 3.0f, 0.3f, plaster);
+    drawInteriorCube({ -4.85f, 1.5f, 0.0f }, 0.3f, 3.0f, 9.0f, plaster);
+    drawInteriorCube({ 4.85f, 1.5f, 0.0f }, 0.3f, 3.0f, 9.0f, plaster);
+    drawInteriorCube({ -2.65f, 1.5f, 4.35f }, 4.7f, 3.0f, 0.3f, plaster);
+    drawInteriorCube({ 2.65f, 1.5f, 4.35f }, 4.7f, 3.0f, 0.3f, plaster);
+    drawInteriorCube({ 0.0f, 2.95f, 4.35f }, 1.0f, 0.2f, 0.3f, timber);
 
     if (buildingIndex == 0) {
-        DrawCube({ -3.0f, 0.55f, -2.0f }, 2.0f, 1.1f, 1.3f, Color{ 65, 57, 50, 255 });
-        DrawCube({ -3.0f, 1.2f, -2.0f }, 1.0f, 0.35f, 0.6f, ORANGE);
-        DrawCube({ 1.0f, 0.52f, 0.0f }, 2.4f, 1.0f, 1.0f, timber);
-        DrawCube({ 1.0f, 1.08f, 0.0f }, 0.25f, 0.12f, 0.25f, LIGHTGRAY);
+        drawInteriorCube({ -3.0f, 0.55f, -2.0f }, 2.0f, 1.1f, 1.3f, Color{ 65, 57, 50, 255 });
+        drawInteriorCube({ -3.0f, 1.2f, -2.0f }, 1.0f, 0.35f, 0.6f, ORANGE);
+        drawInteriorCube({ 1.0f, 0.52f, 0.0f }, 2.4f, 1.0f, 1.0f, timber);
+        drawInteriorCube({ 1.0f, 1.08f, 0.0f }, 0.25f, 0.12f, 0.25f, LIGHTGRAY);
     } else if (buildingIndex == 1) {
-        DrawCube({ 0.0f, 0.62f, -1.6f }, 3.8f, 1.2f, 1.25f, timber);
-        DrawCube({ -3.4f, 1.45f, -2.7f }, 0.35f, 2.5f, 1.3f, DARKBROWN);
-        DrawCube({ -3.4f, 1.9f, -1.7f }, 0.35f, 0.08f, 1.3f, GOLD);
-        DrawCube({ 3.4f, 1.45f, -2.7f }, 0.35f, 2.5f, 1.3f, DARKBROWN);
+        drawInteriorCube({ 0.0f, 0.62f, -1.6f }, 3.8f, 1.2f, 1.25f, timber);
+        drawInteriorCube({ -3.4f, 1.45f, -2.7f }, 0.35f, 2.5f, 1.3f, DARKBROWN);
+        drawInteriorCube({ -3.4f, 1.9f, -1.7f }, 0.35f, 0.08f, 1.3f, GOLD);
+        drawInteriorCube({ 3.4f, 1.45f, -2.7f }, 0.35f, 2.5f, 1.3f, DARKBROWN);
     } else if (buildingIndex == 2) {
-        DrawCube({ 0.0f, 0.42f, -2.7f }, 2.6f, 0.8f, 1.0f, Color{ 174, 156, 119, 255 });
-        DrawCube({ 0.0f, 1.2f, -2.7f }, 0.12f, 1.0f, 0.12f, GOLD);
-        DrawCube({ 0.0f, 1.45f, -2.7f }, 0.5f, 0.12f, 0.12f, GOLD);
+        drawInteriorCube({ 0.0f, 0.42f, -2.7f }, 2.6f, 0.8f, 1.0f, Color{ 174, 156, 119, 255 });
+        drawInteriorCube({ 0.0f, 1.2f, -2.7f }, 0.12f, 1.0f, 0.12f, GOLD);
+        drawInteriorCube({ 0.0f, 1.45f, -2.7f }, 0.5f, 0.12f, 0.12f, GOLD);
         DrawCandle({ -1.0f, 0.85f, -2.7f }, 0.12f, 0.35f, 8, Color{ 240, 174, 65, 255 });
         DrawCandle({ 1.0f, 0.85f, -2.7f }, 0.12f, 0.35f, 8, Color{ 240, 174, 65, 255 });
     } else {
-        DrawCube({ 0.0f, 0.65f, -3.0f }, 6.6f, 1.3f, 0.8f, Color{ 105, 67, 42, 255 });
-        DrawCube({ -2.7f, 0.35f, 0.0f }, 1.5f, 0.7f, 1.3f, timber);
-        DrawCube({ 2.7f, 0.35f, 0.0f }, 1.5f, 0.7f, 1.3f, timber);
-        DrawCube({ 0.0f, 0.34f, 1.7f }, 2.0f, 0.68f, 1.1f, timber);
+        drawInteriorCube({ 0.0f, 0.65f, -3.0f }, 6.6f, 1.3f, 0.8f, Color{ 105, 67, 42, 255 });
+        drawInteriorCube({ -2.7f, 0.35f, 0.0f }, 1.5f, 0.7f, 1.3f, timber);
+        drawInteriorCube({ 2.7f, 0.35f, 0.0f }, 1.5f, 0.7f, 1.3f, timber);
+        drawInteriorCube({ 0.0f, 0.34f, 1.7f }, 2.0f, 0.68f, 1.1f, timber);
     }
 
     int interiorNpcIndex = 0;

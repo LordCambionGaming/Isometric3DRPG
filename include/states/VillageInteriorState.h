@@ -2,6 +2,7 @@
 
 #include "states/GameState.h"
 #include <raylib.h>
+#include <vector>
 
 class VillageInteriorState : public GameState {
 public:
@@ -15,6 +16,9 @@ public:
 
 private:
     int m_buildingIndex;
-    Vector3 m_moveTarget{};
+    std::vector<Vector3> m_path;
+    std::size_t m_pathIndex = 0;
     bool m_moving = false;
+
+    void SetMoveTarget(float x, float z);
 };

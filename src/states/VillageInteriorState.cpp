@@ -9,12 +9,19 @@
 #include "world/Village.h"
 #include "ui/GothicTheme.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <memory>
+#include <queue>
 #include <raylib.h>
 #include <raymath.h>
 
 namespace {
+
+constexpr int kInteriorGridSize = 25;
+constexpr float kInteriorGridStep = 0.35f;
+constexpr float kInteriorGridMinimum = -4.2f;
+constexpr int kInteriorCellCount = kInteriorGridSize * kInteriorGridSize;
 
 bool HitsInteriorFurniture(int buildingIndex, float x, float z) {
     const Vector2 point{ x, z };
@@ -31,6 +38,39 @@ bool HitsInteriorFurniture(int buildingIndex, float x, float z) {
            CheckCollisionPointRec(point, { 1.95f, -0.35f, 1.5f, 0.7f });
 }
 
+Vector2 InteriorGridPosition(int cellX, int cellZ) {
+    return { kInteriorGridMinimum + cellX * kInteriorGridStep,
+             kInteriorGridMinimum + cellZ * kInteriorGridStep };
+}
+
+int InteriorCellIndex(int cellX, int cellZ) {
+    return cellZ * kInteriorGridSize + cellX;
+}
+
+Vector2 InteriorCellForPosition(float x, float z) {
+    return {
+        static_cast<float>(std::clamp(static_cast<int>(std::round((x - kInteriorGridMinimum) /
+            kInteriorGridStep)), 0, kInteriorGridSize - 1)),
+        static_cast<float>(std::clamp(static_cast<int>(std::round((z - kInteriorGridMinimum) /
+            kInteriorGridStep)), 0, kInteriorGridSize - 1))
+    };
+}
+
+bool IsInteriorCellWalkable(int buildingIndex, int cellX, int cellZ) {
+    const Vector2 center = InteriorGridPosition(cellX, cellZ);
+    constexpr float bodyRadius = 0.24f;
+    const std::array<Vector2, 5> footprint = {{
+        { 0.0f, 0.0f }, { -bodyRadius, 0.0f }, { bodyRadius, 0.0f },
+        { 0.0f, -bodyRadius }, { 0.0f, bodyRadius }
+    }};
+    for (const Vector2 offset : footprint) {
+        const float x = center.x + offset.x;
+        const float z = center.y + offset.y;
+        if (HitsInteriorFurniture(buildingIndex, x, z)) return false;
+    }
+    return true;
+}
+
 }
 
 VillageInteriorState::VillageInteriorState(Game* game, int buildingIndex)
@@ -39,37 +79,101 @@ VillageInteriorState::VillageInteriorState(Game* game, int buildingIndex)
 }
 
 void VillageInteriorState::Enter() {
-    if (Player* player = m_game->GetPlayer()) m_moveTarget = player->GetPosition();
+    m_path.clear();
+    m_pathIndex = 0;
+    m_moving = false;
 }
 void VillageInteriorState::Exit() {}
-void VillageInteriorState::Update(float deltaTime) {
-    if (!m_moving) return;
+
+void VillageInteriorState::SetMoveTarget(float x, float z) {
     Player* player = m_game->GetPlayer();
     if (!player) return;
 
+    const Vector2 startCell = InteriorCellForPosition(player->GetPosition().x, player->GetPosition().z);
+    const Vector2 targetCell = InteriorCellForPosition(x, z);
+    const int startX = static_cast<int>(startCell.x);
+    const int startZ = static_cast<int>(startCell.y);
+    const int targetX = static_cast<int>(targetCell.x);
+    const int targetZ = static_cast<int>(targetCell.y);
+    if (!IsInteriorCellWalkable(m_buildingIndex, targetX, targetZ)) return;
+
+    std::array<int, kInteriorCellCount> parents;
+    parents.fill(-1);
+    std::queue<int> open;
+    const int startIndex = InteriorCellIndex(startX, startZ);
+    const int targetIndex = InteriorCellIndex(targetX, targetZ);
+    parents[static_cast<std::size_t>(startIndex)] = startIndex;
+    open.push(startIndex);
+    constexpr std::array<Vector2, 4> directions = {{
+        { 1.0f, 0.0f }, { -1.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, -1.0f }
+    }};
+
+    while (!open.empty() && parents[static_cast<std::size_t>(targetIndex)] < 0) {
+        const int current = open.front();
+        open.pop();
+        const int currentX = current % kInteriorGridSize;
+        const int currentZ = current / kInteriorGridSize;
+        for (const Vector2 direction : directions) {
+            const int nextX = currentX + static_cast<int>(direction.x);
+            const int nextZ = currentZ + static_cast<int>(direction.y);
+            if (nextX < 0 || nextX >= kInteriorGridSize || nextZ < 0 || nextZ >= kInteriorGridSize ||
+                !IsInteriorCellWalkable(m_buildingIndex, nextX, nextZ)) continue;
+            const int next = InteriorCellIndex(nextX, nextZ);
+            if (parents[static_cast<std::size_t>(next)] >= 0) continue;
+            parents[static_cast<std::size_t>(next)] = current;
+            open.push(next);
+        }
+    }
+    if (parents[static_cast<std::size_t>(targetIndex)] < 0) return;
+
+    std::vector<int> reversedPath;
+    for (int current = targetIndex; current != startIndex;
+         current = parents[static_cast<std::size_t>(current)]) {
+        reversedPath.push_back(current);
+    }
+    std::reverse(reversedPath.begin(), reversedPath.end());
+
+    m_path.clear();
+    m_path.reserve(reversedPath.size());
+    for (const int cell : reversedPath) {
+        const Vector2 position = InteriorGridPosition(cell % kInteriorGridSize, cell / kInteriorGridSize);
+        m_path.push_back({ position.x, 0.0f, position.y });
+    }
+    m_pathIndex = 0;
+    m_moving = !m_path.empty();
+    if (!m_moving) player->MoveBy({}, GetFrameTime());
+}
+
+void VillageInteriorState::Update(float deltaTime) {
+    Player* player = m_game->GetPlayer();
+    if (!player) return;
+    if (!m_moving || m_pathIndex >= m_path.size()) {
+        if (!m_moving) player->MoveBy({}, deltaTime);
+        return;
+    }
+
     const Vector3 before = player->GetPosition();
-    const float dx = m_moveTarget.x - before.x;
-    const float dz = m_moveTarget.z - before.z;
-    const float distance = std::sqrt(dx * dx + dz * dz);
+    const Vector3 waypoint = m_path[m_pathIndex];
+    const float deltaX = waypoint.x - before.x;
+    const float deltaZ = waypoint.z - before.z;
+    const float distance = std::sqrt(deltaX * deltaX + deltaZ * deltaZ);
     const float step = 3.2f * std::min(deltaTime, 0.05f);
     const float ratio = distance > 0.001f ? std::min(1.0f, step / distance) : 1.0f;
-    float nextX = std::clamp(before.x + dx * ratio, -4.42f, 4.42f);
-    float nextZ = std::clamp(before.z + dz * ratio, -4.12f, 4.12f);
+    const float nextX = before.x + deltaX * ratio;
+    const float nextZ = before.z + deltaZ * ratio;
 
-    if (std::fabs(nextX) <= 0.48f && before.z < 3.9f && nextZ >= 3.9f) {
+    if (std::fabs(nextX) <= 0.42f && before.z < 3.95f && nextZ >= 3.95f) {
         m_game->ExitVillageBuilding();
         return;
     }
-    if (HitsInteriorFurniture(m_buildingIndex, nextX, before.z)) nextX = before.x;
-    if (HitsInteriorFurniture(m_buildingIndex, nextX, nextZ)) nextZ = before.z;
-    if (std::fabs(nextX - before.x) + std::fabs(nextZ - before.z) < 0.0001f) {
+    player->MoveBy({ nextX - before.x, 0.0f, nextZ - before.z }, deltaTime);
+    if (distance <= step + 0.001f) ++m_pathIndex;
+    if (m_pathIndex >= m_path.size()) {
+        m_path.clear();
+        m_pathIndex = 0;
         m_moving = false;
         player->MoveBy({}, deltaTime);
-        return;
     }
-
-    player->MoveBy({ nextX - before.x, 0.0f, nextZ - before.z }, deltaTime);
-    if (distance <= step + 0.02f) m_moving = false;
 }
 
 void VillageInteriorState::Render() {
@@ -127,13 +231,14 @@ void VillageInteriorState::HandleInput() {
         const float dz = playerPosition.z - clickedNpc.position.z;
         const float distance = std::sqrt(dx * dx + dz * dz);
         if (distance <= 2.2f) {
+            m_path.clear();
+            m_pathIndex = 0;
             m_moving = false;
             m_game->SetState(std::make_unique<VillageInteractionState>(m_game, clickedNpc, m_buildingIndex));
         } else {
             const float inverseDistance = distance > 0.001f ? 1.0f / distance : 0.0f;
-            m_moveTarget = { clickedNpc.position.x + dx * inverseDistance * 1.05f, 0.0f,
-                             clickedNpc.position.z + dz * inverseDistance * 1.05f };
-            m_moving = true;
+            SetMoveTarget(clickedNpc.position.x + dx * inverseDistance * 1.05f,
+                          clickedNpc.position.z + dz * inverseDistance * 1.05f);
         }
         return;
     }
@@ -146,9 +251,7 @@ void VillageInteriorState::HandleInput() {
         0.0f,
         ray.position.z + ray.direction.z * floorDistance
     };
-    if (clickedFloor.x < -4.6f || clickedFloor.x > 4.6f ||
-        clickedFloor.z < -4.3f || clickedFloor.z > 4.6f ||
-        HitsInteriorFurniture(m_buildingIndex, clickedFloor.x, clickedFloor.z)) return;
-    m_moveTarget = clickedFloor;
-    m_moving = true;
+    if (clickedFloor.x < -4.4f || clickedFloor.x > 4.4f ||
+        clickedFloor.z < -4.4f || clickedFloor.z > 4.4f) return;
+    SetMoveTarget(clickedFloor.x, clickedFloor.z);
 }

@@ -48,7 +48,7 @@ public:
 
     static Vector3 FindSpawnPosition(const World& world);
     void Render(const World& world) const;
-    void RenderInterior(int buildingIndex) const;
+    void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition) const;
     void Update(const World& world, const NavigationSystem& navigation, float deltaTime, float timeOfDay);
     void SetBuildingModel(int index, Model* model);
     void SetNpcAssets(int index, Model* model, ModelAnimation* animations, int animationCount);
@@ -59,6 +59,7 @@ public:
     bool NpcAtInteriorRay(Ray ray, int buildingIndex, VillageNpc& outNpc) const;
     int BuildingDoorAtTile(int tileX, int tileZ) const;
     int BuildingDoorAtRay(const World& world, Ray ray) const;
+    Vector3 BuildingDoorPosition(int buildingIndex) const;
     std::vector<Vector3> NpcPositions() const;
     int NpcCount() const { return static_cast<int>(m_npcs.size()); }
     static std::string BuildingNameKey(int buildingIndex);
