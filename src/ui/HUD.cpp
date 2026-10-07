@@ -95,7 +95,7 @@ void HUD::DrawCharacterPanel(const core::Character& c) const
     // Layout: pannello in basso a sinistra
     const float margin  = 16.0f;
     const float panelW  = 320.0f;
-    const float panelH  = 150.0f;
+    const float panelH  = 180.0f;
     const float px      = margin;
     const float py      = sh - margin - panelH;
 
@@ -117,12 +117,14 @@ void HUD::DrawCharacterPanel(const core::Character& c) const
     const std::string className = lang::CharacterClassName(core::ToString(c.characterClass));
     const char* subtitle = TextFormat(lang::Get("hud.class_level").c_str(), className.c_str(),
         lang::Get("hud.level_word").c_str(), c.level);
-    DrawText(subtitle, (int)(px + 16), (int)(py + 38), 16, ui::theme::kGoldDim);
+    DrawText(subtitle, (int)(px + 16), (int)(py + 38), 18, ui::theme::kGoldDim);
+    DrawText(TextFormat(lang::Get("hud.gold").c_str(), c.gold),
+             (int)(px + 16), (int)(py + 58), 18, ui::theme::kGoldBright);
 
     // ── Barra vita (animata + flash) ────────────────────
     DrawHealthBar(c,
                   px + 16.0f,
-                  py + 66.0f,
+                  py + 80.0f,
                   panelW - 32.0f,
                   22.0f);
 
@@ -133,7 +135,7 @@ void HUD::DrawCharacterPanel(const core::Character& c) const
         if (const core::ItemDef* item = core::GetItem(weapon.id)) weaponName = lang::ItemName(item->key);
     }
     DrawText(TextFormat(lang::Get("hud.weapon").c_str(), weaponName.c_str()),
-             (int)(px + 16), (int)(py + 108), 16, ui::theme::kBone);
+             (int)(px + 16), (int)(py + 122), 18, ui::theme::kBone);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -184,7 +186,7 @@ void HUD::DrawHealthBar(const core::Character& c,
 
     // ── 6. Testo centrato ───────────────────────────────
     const char* label = TextFormat(lang::Get("hud.hp").c_str(), hp, maxHp);
-    const int fontSize = 16;
+    const int fontSize = 18;
     const int textW = MeasureText(label, fontSize);
     const int textX = (int)(x + (w - textW) / 2);
     const int textY = (int)(y + (h - fontSize) / 2);
@@ -224,7 +226,7 @@ void HUD::DrawResourceBar(const char* label, int current, int max,
 
     // Testo
     const char* text = TextFormat("%s  %d/%d", label, current, max);
-    const int fontSize = 14;
+    const int fontSize = 18;
     const int textW = MeasureText(text, fontSize);
     const int textX = (int)(x + (w - textW) / 2);
     const int textY = (int)(y + (h - fontSize) / 2);

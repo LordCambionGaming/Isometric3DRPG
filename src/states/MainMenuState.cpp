@@ -1,5 +1,6 @@
 #include "states/MainMenuState.h"
 #include <memory>
+#include "audio/AudioManager.h"
 #include "states/SettingsState.h"
 #include "states/CharacterCreationState.h"
 #include "core/KeyBindings.h"
@@ -9,7 +10,10 @@
 #include <raylib.h>
 
 MainMenuState::MainMenuState(class Game* game) : GameState(game), m_selectedOption(0) { m_type = GameStateType::MainMenu; }
-void MainMenuState::Enter() { m_selectedOption = 0; }
+void MainMenuState::Enter() {
+    m_selectedOption = 0;
+    if (AudioManager* audio = m_game->GetAudioManager()) audio->PlayMusic("music/MainTheme.mp3");
+}
 void MainMenuState::Exit() {}
 void MainMenuState::Update(float dt) {
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Down)) m_selectedOption = (m_selectedOption + 1) % 5;
@@ -24,7 +28,8 @@ void MainMenuState::Render() {
         { lang::Get("menu.settings"), "" },
         { lang::Get("menu.quit"), "" }
     };
-    ui::menu::Draw(lang::Get("menu.title").c_str(), lang::Get("menu.subtitle").c_str(), items, m_selectedOption);
+    ui::menu::Draw(lang::Get("menu.title").c_str(), lang::Get("menu.subtitle").c_str(),
+                   items, m_selectedOption, true);
 }
 
 void MainMenuState::HandleInput() {

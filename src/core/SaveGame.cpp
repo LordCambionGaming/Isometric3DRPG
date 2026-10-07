@@ -12,7 +12,7 @@ namespace {
 
 using Json = nlohmann::json;
 constexpr const char* kSavePath = "saves/quick_save.json";
-constexpr int kSaveVersion = 1;
+constexpr int kSaveVersion = 2;
 
 Json WritePosition(Vector3 position) {
     return Json{ { "x", position.x }, { "y", position.y }, { "z", position.z } };
@@ -42,6 +42,7 @@ Json WriteCharacter(const Character& character) {
         { "class", static_cast<int>(character.characterClass) },
         { "level", character.level },
         { "xp", character.xp },
+        { "gold", character.gold },
         { "abilities", character.abilities },
         { "inventory", inventory },
         { "equipment", {
@@ -73,6 +74,8 @@ bool ReadCharacter(const Json& value, Character& character) {
     character.characterClass = static_cast<CharacterClass>(characterClass);
     character.level = level;
     character.xp = xp;
+    character.gold = value.value("gold", 35);
+    if (character.gold < 0 || character.gold > 100000000) return false;
     for (std::size_t index = 0; index < kAbilityCount; ++index) {
         const int score = abilities.at(index).get<int>();
         if (score < 1 || score > 30) return false;
@@ -126,6 +129,7 @@ bool SaveGame::Write(const SaveGameData& data) {
             { "version", kSaveVersion },
             { "player_position", WritePosition(data.playerPosition) },
             { "character", WriteCharacter(data.character) },
+            { "quests", { { "village_letter", static_cast<int>(data.quests.villageLetter) } } },
             { "test_mob", data.hasTestMob ? Json{
                 { "position", WritePosition(data.testMobPosition) },
                 { "hp", data.testMobCurrentHP },
@@ -146,11 +150,20 @@ bool SaveGame::Read(SaveGameData& data) {
         std::ifstream file(kSavePath);
         if (!file) return false;
         const Json root = Json::parse(file);
-        if (!root.is_object() || root.at("version").get<int>() != kSaveVersion) return false;
+        if (!root.is_object()) return false;
+        const int version = root.at("version").get<int>();
+        if (version < 1 || version > kSaveVersion) return false;
 
         SaveGameData loaded;
         if (!ReadPosition(root.at("player_position"), loaded.playerPosition) ||
             !ReadCharacter(root.at("character"), loaded.character)) return false;
+
+        if (version >= 2 && root.contains("quests")) {
+            const int questStatus = root.at("quests").at("village_letter").get<int>();
+            if (questStatus < static_cast<int>(QuestStatus::NotStarted) ||
+                questStatus > static_cast<int>(QuestStatus::Completed)) return false;
+            loaded.quests.villageLetter = static_cast<QuestStatus>(questStatus);
+        }
 
         const Json& mob = root.at("test_mob");
         if (!mob.is_null()) {

@@ -1,12 +1,14 @@
 #pragma once
 
 #include "core/Character.h"
+#include "core/QuestLog.h"
 #include <raylib.h>
 
 namespace core {
 
 struct SaveGameData {
     Character character;
+    QuestLog quests;
     Vector3 playerPosition{};
     bool hasTestMob = false;
     Vector3 testMobPosition{};

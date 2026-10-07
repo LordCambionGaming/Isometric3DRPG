@@ -157,6 +157,8 @@ Music* AudioManager::LoadMusic(const std::string& filename) {
 }
 
 void AudioManager::PlayMusic(const std::string& filename) {
+    if (m_currentMusic == filename && IsMusicPlaying()) return;
+
     // Stop current music if playing
     StopMusic();
 

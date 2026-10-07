@@ -26,6 +26,8 @@ public:
     int GetChunkX() const;
     int GetChunkZ() const;
     void SetPosition(Vector3 pos) { m_position = pos; }
+    void MoveBy(Vector3 displacement, float deltaTime);
+    void StopMovement(Vector3 pos) { m_position = pos; m_target = pos; m_path.clear(); m_pathIndex = 0; m_moving = false; }
     void SetTileSize(float size) { m_tileSize = size; }
     float GetTileSize() const { return m_tileSize; }
     int GetTileX() const;

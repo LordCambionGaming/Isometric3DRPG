@@ -83,6 +83,24 @@ void Player::Update(float dt) {
     }
 }
 
+void Player::MoveBy(Vector3 displacement, float deltaTime) {
+    const Vector3 posBefore = m_position;
+    m_path.clear();
+    m_pathIndex = 0;
+    const float distance = std::sqrt(displacement.x * displacement.x + displacement.z * displacement.z);
+    if (distance > 0.0001f) {
+        m_position.x += displacement.x;
+        m_position.y += displacement.y;
+        m_position.z += displacement.z;
+        m_target = { m_position.x + displacement.x, m_position.y, m_position.z + displacement.z };
+        m_moving = true;
+    } else {
+        m_target = m_position;
+        m_moving = false;
+    }
+    UpdateVisual(deltaTime, posBefore);
+}
+
 void Player::SetModel(Model* model) {
     m_model = nullptr;
     m_handBoneR = -1;

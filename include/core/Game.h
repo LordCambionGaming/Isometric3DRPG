@@ -5,6 +5,7 @@
 #include "entities/Player.h"
 #include "navigation/NavigationSystem.h"
 #include "core/CombatSystem.h"
+#include "core/QuestLog.h"
 #include <entities/Mob.h>
 #include "ui/HUD.h"
 #include "ui/InteractionMenu.h"
@@ -20,6 +21,8 @@ class AudioManager;
 class Timer;
 class HUD;
 class ItemVisuals; 
+class Village;
+struct VillageNpc;
 
 class Game {
 public:
@@ -32,6 +35,9 @@ public:
     bool SaveGame();
     bool LoadGame();
     bool HasSave() const;
+    core::QuestLog& GetQuestLog() { return m_questLog; }
+    void EnterVillageBuilding(int buildingIndex);
+    void ExitVillageBuilding();
     void Run();
     void Shutdown();
 
@@ -52,6 +58,7 @@ public:
     void SetHoveredMob(Mob* mob) { m_hoveredMob = mob; }
     core::LightingSystem* GetLightingSystem() const { return m_lightingSystem.get(); }
     ItemVisuals* GetItemVisuals() const { return m_itemVisuals.get(); }
+    Village* GetVillage() const { return m_village.get(); }
 private:
     void Update(float deltaTime);
     void Render();
@@ -80,6 +87,16 @@ private:
     int m_hoverTileZ = -1;
     std::unique_ptr<ItemVisuals> m_itemVisuals;
     std::unique_ptr<core::LightingSystem> m_lightingSystem;
+    std::unique_ptr<Village> m_village;
+    const VillageNpc* m_hoveredNpc = nullptr;
+    core::QuestLog m_questLog;
+    Vector3 m_exteriorPosition{};
+    Vector3 m_exteriorCameraTarget{};
+    float m_exteriorCameraRotation = 0.0f;
+    float m_exteriorCameraZoom = 1.0f;
+    int m_activeBuilding = -1;
+    int m_pendingBuildingIndex = -1;
+    float m_doorTransitionTimer = 0.0f;
 
     ui::InteractionMenu m_interactionMenu;
 

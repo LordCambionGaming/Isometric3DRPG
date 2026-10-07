@@ -1,0 +1,154 @@
+#include "states/VillageInteriorState.h"
+
+#include "core/Game.h"
+#include "core/KeyBindings.h"
+#include "core/Localization.h"
+#include "entities/Player.h"
+#include "rendering/Camera3DController.h"
+#include "states/VillageInteractionState.h"
+#include "world/Village.h"
+#include "ui/GothicTheme.h"
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <raylib.h>
+#include <raymath.h>
+
+namespace {
+
+bool HitsInteriorFurniture(int buildingIndex, float x, float z) {
+    const Vector2 point{ x, z };
+    if (buildingIndex == 0) {
+        return CheckCollisionPointRec(point, { -4.0f, -2.65f, 2.0f, 1.3f }) ||
+               CheckCollisionPointRec(point, { -0.2f, -0.5f, 2.4f, 1.0f });
+    }
+    if (buildingIndex == 1)
+        return CheckCollisionPointRec(point, { -1.9f, -2.23f, 3.8f, 1.25f });
+    if (buildingIndex == 2)
+        return CheckCollisionPointRec(point, { -1.3f, -3.2f, 2.6f, 1.0f });
+    return CheckCollisionPointRec(point, { -3.3f, -3.4f, 6.6f, 0.8f }) ||
+           CheckCollisionPointRec(point, { -3.45f, -0.35f, 1.5f, 0.7f }) ||
+           CheckCollisionPointRec(point, { 1.95f, -0.35f, 1.5f, 0.7f });
+}
+
+}
+
+VillageInteriorState::VillageInteriorState(Game* game, int buildingIndex)
+    : GameState(game), m_buildingIndex(buildingIndex) {
+    m_type = GameStateType::VillageInterior;
+}
+
+void VillageInteriorState::Enter() {
+    if (Player* player = m_game->GetPlayer()) m_moveTarget = player->GetPosition();
+}
+void VillageInteriorState::Exit() {}
+void VillageInteriorState::Update(float deltaTime) {
+    if (!m_moving) return;
+    Player* player = m_game->GetPlayer();
+    if (!player) return;
+
+    const Vector3 before = player->GetPosition();
+    const float dx = m_moveTarget.x - before.x;
+    const float dz = m_moveTarget.z - before.z;
+    const float distance = std::sqrt(dx * dx + dz * dz);
+    const float step = 3.2f * std::min(deltaTime, 0.05f);
+    const float ratio = distance > 0.001f ? std::min(1.0f, step / distance) : 1.0f;
+    float nextX = std::clamp(before.x + dx * ratio, -4.42f, 4.42f);
+    float nextZ = std::clamp(before.z + dz * ratio, -4.12f, 4.12f);
+
+    if (std::fabs(nextX) <= 0.48f && before.z < 3.9f && nextZ >= 3.9f) {
+        m_game->ExitVillageBuilding();
+        return;
+    }
+    if (HitsInteriorFurniture(m_buildingIndex, nextX, before.z)) nextX = before.x;
+    if (HitsInteriorFurniture(m_buildingIndex, nextX, nextZ)) nextZ = before.z;
+    if (std::fabs(nextX - before.x) + std::fabs(nextZ - before.z) < 0.0001f) {
+        m_moving = false;
+        player->MoveBy({}, deltaTime);
+        return;
+    }
+
+    player->MoveBy({ nextX - before.x, 0.0f, nextZ - before.z }, deltaTime);
+    if (distance <= step + 0.02f) m_moving = false;
+}
+
+void VillageInteriorState::Render() {
+    const Font& font = ui::theme::UIFont();
+    const std::string title = lang::Get(Village::BuildingNameKey(m_buildingIndex));
+    const std::string hint = lang::Get("village.interior.exit_hint");
+    const std::string movementHint = lang::Get("village.interior.move_hint");
+    const Rectangle button = { GetScreenWidth() * 0.5f - 126.0f, GetScreenHeight() - 76.0f, 252.0f, 48.0f };
+    DrawRectangleRounded(button, 0.08f, 6, Color{ 18, 15, 15, 230 });
+    DrawRectangleRoundedLines(button, 0.08f, 6, ui::theme::kGoldDim);
+    ui::theme::DrawTextCentered(font, title.c_str(), GetScreenWidth() * 0.5f, 18.0f, 24.0f, ui::theme::kGoldBright);
+    ui::theme::DrawTextCentered(font, movementHint.c_str(), GetScreenWidth() * 0.5f, button.y - 30.0f,
+                                18.0f, ui::theme::kBone);
+    ui::theme::DrawTextCentered(font, hint.c_str(), GetScreenWidth() * 0.5f, button.y + 14.0f, 18.0f, ui::theme::kBone);
+
+    if (Village* village = m_game->GetVillage()) {
+        if (Camera3DController* camera = m_game->GetCamera()) {
+            VillageNpc hoveredNpc;
+            const Ray ray = GetMouseRay(GetMousePosition(), camera->GetCamera());
+            if (village->NpcAtInteriorRay(ray, m_buildingIndex, hoveredNpc)) {
+                const Vector3 anchor{ hoveredNpc.position.x, hoveredNpc.position.y + 2.0f,
+                                      hoveredNpc.position.z };
+                const Vector2 screen = GetWorldToScreen(anchor, camera->GetCamera());
+                const std::string name = lang::Get(hoveredNpc.id);
+                const Vector2 size = MeasureTextEx(font, name.c_str(), 22.0f, 1.5f);
+                const Rectangle label = { screen.x - size.x * 0.5f - 10.0f, screen.y - 34.0f,
+                                           size.x + 20.0f, 30.0f };
+                DrawRectangleRounded(label, 0.12f, 5, Color{ 18, 15, 15, 235 });
+                DrawRectangleRoundedLines(label, 0.12f, 5, ui::theme::kGoldDim);
+                DrawTextEx(font, name.c_str(), { label.x + 10.0f, label.y + 4.0f },
+                           22.0f, 1.5f, ui::theme::kGoldBright);
+            }
+        }
+    }
+}
+
+void VillageInteriorState::HandleInput() {
+    const Rectangle exitButton = { GetScreenWidth() * 0.5f - 126.0f, GetScreenHeight() - 76.0f, 252.0f, 48.0f };
+    if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back) ||
+        (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), exitButton))) {
+        m_game->ExitVillageBuilding();
+        return;
+    }
+
+    Player* player = m_game->GetPlayer();
+    Camera3DController* camera = m_game->GetCamera();
+    if (!player || !camera || !IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) return;
+
+    const Ray ray = GetMouseRay(GetMousePosition(), camera->GetCamera());
+    VillageNpc clickedNpc;
+    if (Village* village = m_game->GetVillage();
+        village && village->NpcAtInteriorRay(ray, m_buildingIndex, clickedNpc)) {
+        const Vector3 playerPosition = player->GetPosition();
+        const float dx = playerPosition.x - clickedNpc.position.x;
+        const float dz = playerPosition.z - clickedNpc.position.z;
+        const float distance = std::sqrt(dx * dx + dz * dz);
+        if (distance <= 2.2f) {
+            m_moving = false;
+            m_game->SetState(std::make_unique<VillageInteractionState>(m_game, clickedNpc, m_buildingIndex));
+        } else {
+            const float inverseDistance = distance > 0.001f ? 1.0f / distance : 0.0f;
+            m_moveTarget = { clickedNpc.position.x + dx * inverseDistance * 1.05f, 0.0f,
+                             clickedNpc.position.z + dz * inverseDistance * 1.05f };
+            m_moving = true;
+        }
+        return;
+    }
+
+    if (std::fabs(ray.direction.y) < 0.0001f) return;
+    const float floorDistance = -ray.position.y / ray.direction.y;
+    if (floorDistance <= 0.0f) return;
+    const Vector3 clickedFloor = {
+        ray.position.x + ray.direction.x * floorDistance,
+        0.0f,
+        ray.position.z + ray.direction.z * floorDistance
+    };
+    if (clickedFloor.x < -4.6f || clickedFloor.x > 4.6f ||
+        clickedFloor.z < -4.3f || clickedFloor.z > 4.6f ||
+        HitsInteriorFurniture(m_buildingIndex, clickedFloor.x, clickedFloor.z)) return;
+    m_moveTarget = clickedFloor;
+    m_moving = true;
+}

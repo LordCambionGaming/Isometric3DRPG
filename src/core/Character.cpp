@@ -72,6 +72,7 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
     c.characterClass = cls;
     c.level = 1;
     c.xp = 0;
+    c.gold = 35;
     c.abilities = abilities;
     c.AddItem(StartingWeaponId(cls));
     c.AddItem(items::Arrow, 20);

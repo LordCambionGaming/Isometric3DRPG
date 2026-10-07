@@ -7,12 +7,12 @@ namespace ui::menu {
 namespace {
 
 float RowHeight(int count) {
-    return count > 7 ? 43.0f : 54.0f;
+    return count > 7 ? 52.0f : 64.0f;
 }
 
 Rectangle PanelBounds(int count) {
     const float width = std::min(620.0f, static_cast<float>(GetScreenWidth()) - 40.0f);
-    const float height = 174.0f + RowHeight(count) * count;
+    const float height = 192.0f + RowHeight(count) * count;
     return { (GetScreenWidth() - width) * 0.5f, (GetScreenHeight() - height) * 0.5f, width, height };
 }
 
@@ -21,7 +21,7 @@ Rectangle PanelBounds(int count) {
 Rectangle OptionBounds(int index, int count) {
     const Rectangle panel = PanelBounds(count);
     const float rowHeight = RowHeight(count);
-    return { panel.x + 28.0f, panel.y + 132.0f + rowHeight * index,
+    return { panel.x + 28.0f, panel.y + 138.0f + rowHeight * index,
              panel.width - 56.0f, rowHeight };
 }
 
@@ -37,10 +37,12 @@ int OptionAt(Vector2 point, int count) {
     return -1;
 }
 
-void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& items, int selected) {
+void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& items, int selected,
+          bool useTitleFont) {
     const int count = static_cast<int>(items.size());
     const Rectangle panel = PanelBounds(count);
     const Font& font = theme::UIFont();
+    const Font& headingFont = useTitleFont ? theme::TitleFont() : font;
 
     DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(),
                            Color{ 8, 9, 11, 255 }, Color{ 27, 16, 17, 255 });
@@ -57,10 +59,17 @@ void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& 
     DrawPoly({ centerX, panel.y + 26.0f }, 4, 7.0f, 45.0f, theme::kGoldBright);
     DrawLineEx({ centerX - 68.0f, panel.y + 26.0f }, { centerX - 14.0f, panel.y + 26.0f }, 1.0f, theme::kGoldDim);
     DrawLineEx({ centerX + 14.0f, panel.y + 26.0f }, { centerX + 68.0f, panel.y + 26.0f }, 1.0f, theme::kGoldDim);
-    theme::DrawTextCentered(font, title, centerX, panel.y + 42.0f, 32.0f, theme::kGoldBright);
-    theme::DrawTextCentered(font, subtitle, centerX, panel.y + 86.0f, 15.0f, theme::kBone);
-    DrawLineEx({ panel.x + 30.0f, panel.y + 119.0f },
-               { panel.x + panel.width - 30.0f, panel.y + 119.0f }, 1.0f, Fade(theme::kGoldDim, 0.8f));
+    float titleSize = useTitleFont ? 48.0f : 38.0f;
+    while (titleSize > 30.0f && MeasureTextEx(headingFont, title, titleSize, titleSize / 10.0f).x > panel.width - 64.0f)
+        titleSize -= 2.0f;
+    theme::DrawTextCentered(headingFont, title, centerX, panel.y + (useTitleFont ? 32.0f : 36.0f),
+                            titleSize, theme::kGoldBright);
+    float subtitleSize = 28.0f;
+    while (subtitleSize > 20.0f && MeasureTextEx(font, subtitle, subtitleSize, subtitleSize / 10.0f).x > panel.width - 48.0f)
+        subtitleSize -= 2.0f;
+    theme::DrawTextCentered(font, subtitle, centerX, panel.y + 82.0f, subtitleSize, theme::kGoldBright);
+    DrawLineEx({ panel.x + 30.0f, panel.y + 121.0f },
+               { panel.x + panel.width - 30.0f, panel.y + 121.0f }, 1.0f, Fade(theme::kGoldDim, 0.8f));
 
     for (int index = 0; index < count; ++index) {
         const Rectangle row = OptionBounds(index, count);
@@ -71,8 +80,8 @@ void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& 
             DrawPoly({ row.x + 16.0f, row.y + row.height * 0.5f }, 4, 4.0f, 45.0f, theme::kGoldBright);
         }
 
-        const float textY = row.y + (row.height - 22.0f) * 0.5f;
-        DrawTextEx(font, items[index].label.c_str(), { row.x + 34.0f, textY }, 20.0f, 1.0f,
+        const float textY = row.y + (row.height - 33.0f) * 0.5f;
+        DrawTextEx(font, items[index].label.c_str(), { row.x + 36.0f, textY }, 30.0f, 1.0f,
                    active ? theme::kGoldBright : theme::kBone);
         if (items[index].sliderValue >= 0.0f) {
             const Rectangle slider = SliderBounds(index, count);
@@ -82,23 +91,23 @@ void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& 
             DrawCircleV({ slider.x + slider.width * items[index].sliderValue, slider.y + slider.height * 0.5f },
                         6.0f, active ? theme::kGoldBright : theme::kBone);
             DrawTextEx(font, items[index].detail.c_str(),
-                       { slider.x + slider.width + 12.0f, textY + 3.0f },
-                       16.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
+                       { slider.x + slider.width + 12.0f, textY + 2.0f },
+                       26.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
         } else if (items[index].hasStepper) {
             const float arrowsY = textY + 1.0f;
-            DrawTextEx(font, "<", { row.x + row.width - 150.0f, arrowsY }, 18.0f, 1.0f,
+            DrawTextEx(font, "<", { row.x + row.width - 162.0f, arrowsY }, 26.0f, 1.0f,
                        active ? theme::kGoldBright : theme::kGoldDim);
-            const Vector2 detailSize = MeasureTextEx(font, items[index].detail.c_str(), 16.0f, 1.0f);
+            const Vector2 detailSize = MeasureTextEx(font, items[index].detail.c_str(), 26.0f, 1.0f);
             DrawTextEx(font, items[index].detail.c_str(),
-                       { row.x + row.width - 112.0f - detailSize.x * 0.5f, textY + 3.0f },
-                       16.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
-            DrawTextEx(font, ">", { row.x + row.width - 38.0f, arrowsY }, 18.0f, 1.0f,
+                       { row.x + row.width - 112.0f - detailSize.x * 0.5f, textY + 2.0f },
+                       26.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
+            DrawTextEx(font, ">", { row.x + row.width - 40.0f, arrowsY }, 26.0f, 1.0f,
                        active ? theme::kGoldBright : theme::kGoldDim);
         } else if (!items[index].detail.empty()) {
-            const Vector2 detailSize = MeasureTextEx(font, items[index].detail.c_str(), 16.0f, 1.0f);
+            const Vector2 detailSize = MeasureTextEx(font, items[index].detail.c_str(), 26.0f, 1.0f);
             DrawTextEx(font, items[index].detail.c_str(),
-                       { row.x + row.width - detailSize.x - 16.0f, textY + 3.0f },
-                       16.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
+                       { row.x + row.width - detailSize.x - 16.0f, textY + 2.0f },
+                       26.0f, 1.0f, active ? theme::kGold : theme::kGoldDim);
         }
     }
 

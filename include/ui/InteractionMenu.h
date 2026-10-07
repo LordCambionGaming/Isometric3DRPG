@@ -49,12 +49,12 @@ private:
     Interactable m_target;
 
     // Layout cache (rebuilt in Draw)
-    static constexpr int   kItemH    = 28;
+    static constexpr int   kItemH    = 36;
     static constexpr int   kPadX     = 14;
     static constexpr int   kPadY     = 8;
     static constexpr int   kMinWidth = 140;
     static constexpr float kCorner   = 6.0f;
-    static constexpr int   kHeaderH  = 24;
+    static constexpr int   kHeaderH  = 34;
 
     mutable int m_hoveredIndex = -1;
     mutable Rectangle m_bounds = {};

@@ -1,6 +1,7 @@
 #include "ui/InteractionMenu.h"
 #include "core/KeyBindings.h"
 #include "core/Localization.h"
+#include "ui/GothicTheme.h"
 #include <algorithm>
 #include <cmath>
 
@@ -74,9 +75,14 @@ void InteractionMenu::Draw(const Camera3D& camera) const {
     int numActions = (int)m_target.actions.size();
 
     // Compute required width from longest label
-    int maxLabelW = MeasureText(m_target.name.c_str(), 13);
-    for (const auto& act : m_target.actions)
-        maxLabelW = std::max(maxLabelW, MeasureText(act.label.c_str(), 13));
+    const Font& font = theme::UIFont();
+    const float fontSize = 24.0f;
+    const std::string localizedName = lang::Get(m_target.name);
+    int maxLabelW = static_cast<int>(MeasureTextEx(font, localizedName.c_str(), fontSize, 1.0f).x);
+    for (const auto& act : m_target.actions) {
+        const std::string label = lang::Get(act.label);
+        maxLabelW = std::max(maxLabelW, static_cast<int>(MeasureTextEx(font, label.c_str(), fontSize, 1.0f).x));
+    }
 
     int panelW = std::max(kMinWidth, maxLabelW + kPadX * 2);
     int panelH = kHeaderH + kPadY + numActions * kItemH + kPadY;
@@ -113,9 +119,10 @@ void InteractionMenu::Draw(const Camera3D& camera) const {
                1.0f, Color{190, 150, 60, 180});
 
     const std::string targetName = lang::Get(m_target.name);
-    int nameW = MeasureText(targetName.c_str(), 13);
+    int nameW = static_cast<int>(MeasureTextEx(font, targetName.c_str(), fontSize, 1.0f).x);
     int nameX = px + (panelW - nameW) / 2;
-    DrawText(targetName.c_str(), nameX, py + 5, 13, Color{255, 215, 100, 255});
+    DrawTextEx(font, targetName.c_str(), { static_cast<float>(nameX), static_cast<float>(py + 6) },
+               fontSize, 1.0f, Color{255, 215, 100, 255});
 
     // ── Action items ──────────────────────────────────────────────────────────
     Vector2 mouse = GetMousePosition();
@@ -138,10 +145,10 @@ void InteractionMenu::Draw(const Camera3D& camera) const {
         DrawPoly({(float)bulletX, (float)bulletY}, 4, 4, 45, hov ? Color{255,215,100,255} : Color{150,120,60,200});
 
         int labelX = px + 22;
-        int labelY = ny + (kItemH - 13) / 2;
+        int labelY = ny + (kItemH - static_cast<int>(fontSize)) / 2;
         const std::string actionLabel = lang::Get(m_target.actions[i].label);
-        DrawText(actionLabel.c_str(), labelX, labelY, 13,
-                 hov ? Color{255,240,180,255} : Color{200,185,160,230});
+        DrawTextEx(font, actionLabel.c_str(), { static_cast<float>(labelX), static_cast<float>(labelY) },
+               fontSize, 1.0f, hov ? Color{255,240,180,255} : Color{200,185,160,230});
 
         ny += kItemH;
     }

@@ -95,6 +95,11 @@ void NavigationSystem::SetOccupiedTiles(const std::vector<Vector3>& mobPositions
     }
 }
 
+void NavigationSystem::SetStructureBounds(const std::vector<Rectangle>& bounds)
+{
+    m_structureBounds = bounds;
+}
+
 bool NavigationSystem::IsTileBlocked(int tileX, int tileZ) const
 {
     if (!m_world) {
@@ -107,6 +112,10 @@ bool NavigationSystem::IsTileBlocked(int tileX, int tileZ) const
 
     if (m_world->IsWaterAt(tx, tz)) {
         return true;
+    }
+
+    for (const Rectangle& bounds : m_structureBounds) {
+        if (CheckCollisionPointRec({ tx, tz }, bounds)) return true;
     }
 
     return false;
@@ -142,6 +151,11 @@ bool NavigationSystem::CanTraverse(
 
     // Both tiles must be walkable.
     if (!IsWalkable(fromX, fromZ) || !IsWalkable(toX, toZ)) {
+        return false;
+    }
+
+    if ((fromX != toX || fromZ != toZ) &&
+        m_occupiedTiles.count(MakeTileKey(toX, toZ)) != 0) {
         return false;
     }
 
@@ -212,13 +226,6 @@ float NavigationSystem::CalculateMovementCost(
 
     if (delta < -0.01f) {
         return 1.0f;
-    }
-
-    // Extra cost if the destination tile is occupied by a mob
-    // A* will naturally route around occupied tiles unless there is no other path
-    const std::int64_t toKey = MakeTileKey(toX, toZ);
-    if (m_occupiedTiles.count(toKey)) {
-        return 12.0f; // high penalty – still passable if no other route exists
     }
 
     return 1.0f;

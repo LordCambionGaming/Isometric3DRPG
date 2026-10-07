@@ -61,6 +61,7 @@ struct Character {
     CharacterClass characterClass = CharacterClass::Warrior;
     int level = 1;
     int xp = 0;
+    int gold = 35;
     AbilityScores abilities{};                 // valorizzato da CreateCharacter()
     std::vector<ItemStack> inventory;
     Equipment equipment;

@@ -58,6 +58,26 @@ inline Font& UIFont() {
     return font;
 }
 
+inline Font& TitleFont() {
+    static Font font{};
+    static bool loaded = false;
+
+    if (!loaded) {
+        loaded = true;
+        const char* path = "assets/fonts/title.ttf";
+        if (FileExists(path)) {
+            font = LoadFontEx(path, 160, nullptr, 0);
+            if (font.texture.id != 0) {
+                SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+                return font;
+            }
+        }
+        std::cerr << "[UI] ERRORE: assets/fonts/title.ttf non trovato" << std::endl;
+        font = UIFont();
+    }
+    return font;
+}
+
 inline void DrawTextCentered(const Font& font, const char* text, float cx, float y,
                               float size, Color color, bool shadow = true) {
     const float spacing = size / 10.0f;

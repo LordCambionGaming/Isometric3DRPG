@@ -37,15 +37,17 @@ public:
     // Find path using A* (returns empty vector if no path exists)
     std::vector<TileCoord> FindPath(int startX, int startZ, int targetX, int targetZ) const;
 
-    // Registers world-space positions of mob blockers (call once per frame before FindPath)
+    // Registers world-space positions of NPCs and mobs that block pathfinding.
     void SetOccupiedTiles(const std::vector<Vector3>& mobPositions);
+    void SetStructureBounds(const std::vector<Rectangle>& bounds);
 
 private:
     World* m_world;
     float m_maxStepHeight;
 
-    // Tiles currently occupied by mobs (penalised, not fully blocked)
+    // Tiles currently occupied by NPCs or mobs.
     std::unordered_set<std::int64_t> m_occupiedTiles;
+    std::vector<Rectangle> m_structureBounds;
 
     // A* helpers
     struct Node {

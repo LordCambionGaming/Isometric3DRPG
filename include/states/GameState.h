@@ -7,7 +7,9 @@ enum class GameStateType {
     Loading,
     DiceRoll,
     CharacterCreation,
-    Inventory
+    Inventory,
+    VillageDialogue,
+    VillageInterior
 };
 
 class Game;

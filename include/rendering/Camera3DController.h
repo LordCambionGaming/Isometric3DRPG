@@ -16,13 +16,14 @@ public:
     Camera3D& GetCamera() { return m_camera; }
 
     void SetPosition(Vector3 position) { m_camera.position = position; }
-    void SetTarget(Vector3 target) { m_camera.target = target; }
+    void SetTarget(Vector3 target);
 
     // Isometric camera controls
     void Rotate(float angle);
     void Zoom(float factor);
     void Pan(Vector2 delta);
     void SetIsometricView();
+    void SetView(Vector3 target, float rotation, float zoom);
 
     // Camera properties
     float GetZoom() const { return m_zoom; }
@@ -39,6 +40,9 @@ private:
     float m_rotation;
     float m_distance;
     float m_height;
+    Vector3 m_followTarget{};
+    Vector3 m_followOffset{};
+    bool m_followActive = false;
 
     // Input state
     bool m_mouseDragging;

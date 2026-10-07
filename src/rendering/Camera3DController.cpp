@@ -8,6 +8,9 @@ Camera3DController::Camera3DController()
     , m_rotation(0.0f)
     , m_distance(DEFAULT_DISTANCE)
     , m_height(DEFAULT_HEIGHT)
+    , m_followTarget({ 0.0f, 0.0f, 0.0f })
+    , m_followOffset({ 0.0f, 0.0f, 0.0f })
+    , m_followActive(false)
     , m_mouseDragging(false)
     , m_lastMousePosition({0.0f, 0.0f})
 {
@@ -101,13 +104,42 @@ void Camera3DController::Pan(Vector2 delta) {
         Vector3Scale(forward, delta.y)
     );
 
+    if (m_followActive) m_followOffset = Vector3Add(m_followOffset, movement);
     m_camera.target = Vector3Add(m_camera.target, movement);
+    UpdateCameraPosition();
+}
+
+void Camera3DController::FollowTarget(Vector3 target) {
+    if (!m_followActive) {
+        m_followOffset = Vector3Subtract(m_camera.target, target);
+        m_followActive = true;
+    }
+    m_followTarget = target;
+    m_camera.target = Vector3Add(target, m_followOffset);
+    UpdateCameraPosition();
+}
+
+void Camera3DController::SetTarget(Vector3 target) {
+    m_camera.target = target;
+    if (m_followActive) m_followOffset = Vector3Subtract(target, m_followTarget);
+    UpdateCameraPosition();
+}
+
+void Camera3DController::SetView(Vector3 target, float rotation, float zoom) {
+    m_followActive = false;
+    m_followOffset = { 0.0f, 0.0f, 0.0f };
+    m_rotation = rotation;
+    m_zoom = zoom;
+    ClampZoom();
+    m_camera.target = target;
     UpdateCameraPosition();
 }
 
 void Camera3DController::SetIsometricView() {
     m_rotation = 45.0f * DEG2RAD;  // 45 degrees for isometric view
     m_zoom = 1.0f;
+    m_followActive = false;
+    m_followOffset = { 0.0f, 0.0f, 0.0f };
     m_camera.target = { 0.0f, 0.0f, 0.0f };
     UpdateCameraPosition();
 }
