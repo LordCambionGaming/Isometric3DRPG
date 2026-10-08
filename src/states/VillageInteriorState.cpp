@@ -1,4 +1,5 @@
 #include "states/VillageInteriorState.h"
+#include "states/InventoryState.h"
 
 #include "core/Game.h"
 #include "core/KeyBindings.h"
@@ -167,6 +168,9 @@ void VillageInteriorState::Update(float deltaTime) {
         return;
     }
     player->MoveBy({ nextX - before.x, 0.0f, nextZ - before.z }, deltaTime);
+    if (Camera3DController* camera = m_game->GetCamera()) {
+        camera->FollowTarget(player->GetPosition());
+    }
     if (distance <= step + 0.001f) ++m_pathIndex;
     if (m_pathIndex >= m_path.size()) {
         m_path.clear();
@@ -205,6 +209,18 @@ void VillageInteriorState::Render() {
                 DrawRectangleRoundedLines(label, 0.12f, 5, ui::theme::kGoldDim);
                 DrawTextEx(font, name.c_str(), { label.x + 10.0f, label.y + 4.0f },
                            22.0f, 1.5f, ui::theme::kGoldBright);
+            } else if (InteriorChest* hoveredChest = village->ChestAtInteriorRay(ray, m_buildingIndex)) {
+                const Vector3 anchor{ hoveredChest->position.x, hoveredChest->position.y + 1.0f,
+                                      hoveredChest->position.z };
+                const Vector2 screen = GetWorldToScreen(anchor, camera->GetCamera());
+                const std::string name = hoveredChest->looted ? "Cassa (Vuota)" : "Cassa (Saccheggia)";
+                const Vector2 size = MeasureTextEx(font, name.c_str(), 20.0f, 1.5f);
+                const Rectangle label = { screen.x - size.x * 0.5f - 8.0f, screen.y - 30.0f,
+                                           size.x + 16.0f, 26.0f };
+                DrawRectangleRounded(label, 0.12f, 5, Color{ 18, 15, 15, 235 });
+                DrawRectangleRoundedLines(label, 0.12f, 5, hoveredChest->looted ? ui::theme::kBone : ui::theme::kGoldBright);
+                DrawTextEx(font, name.c_str(), { label.x + 8.0f, label.y + 3.0f },
+                           20.0f, 1.5f, hoveredChest->looted ? ui::theme::kBone : ui::theme::kGoldBright);
             }
         }
     }
@@ -241,6 +257,28 @@ void VillageInteriorState::HandleInput() {
                           clickedNpc.position.z + dz * inverseDistance * 1.05f);
         }
         return;
+    }
+
+    // Check chest interaction
+    if (Village* village = m_game->GetVillage()) {
+        if (InteriorChest* chest = village->ChestAtInteriorRay(ray, m_buildingIndex)) {
+            const Vector3 playerPosition = player->GetPosition();
+            const float dx = playerPosition.x - chest->position.x;
+            const float dz = playerPosition.z - chest->position.z;
+            const float distance = std::sqrt(dx * dx + dz * dz);
+            if (distance <= 2.2f) {
+                m_path.clear();
+                m_pathIndex = 0;
+                m_moving = false;
+                
+                m_game->SetState(std::make_unique<InventoryState>(m_game, chest));
+            } else {
+                const float inverseDistance = distance > 0.001f ? 1.0f / distance : 0.0f;
+                SetMoveTarget(chest->position.x + dx * inverseDistance * 1.05f,
+                              chest->position.z + dz * inverseDistance * 1.05f);
+            }
+            return;
+        }
     }
 
     if (std::fabs(ray.direction.y) < 0.0001f) return;

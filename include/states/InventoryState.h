@@ -4,9 +4,11 @@
 #include "core/Items.h"
 #include <raylib.h>
 
+struct InteriorChest;
+
 class InventoryState : public GameState {
 public:
-    explicit InventoryState(Game* game);
+    explicit InventoryState(Game* game, InteriorChest* chest = nullptr);
     ~InventoryState() override;
 
     void HandleInput() override;
@@ -22,6 +24,7 @@ private:
     enum DragSource {
         DRAG_NONE,
         DRAG_GRID,
+        DRAG_CHEST_GRID,
         DRAG_EQUIP_HEAD,
         DRAG_EQUIP_BODY,
         DRAG_EQUIP_LEGS,
@@ -30,6 +33,8 @@ private:
         DRAG_EQUIP_LEFT,
         DRAG_EQUIP_QUIVER
     };
+
+    InteriorChest* m_containerChest = nullptr;
 
     RenderTexture2D m_previewTexture;
     

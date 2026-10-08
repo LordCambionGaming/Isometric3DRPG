@@ -182,5 +182,6 @@
   "item.arrow": "Freccia",
   "item.quiver": "Faretra",
   "interaction.door": "Porta",
-  "interaction.open": "Apri"
+  "interaction.open": "Apri",
+  "inventory.take_all": "Prendi Tutto"
 }

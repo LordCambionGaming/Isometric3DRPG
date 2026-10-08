@@ -182,5 +182,6 @@
   "item.arrow": "Arrow",
   "item.quiver": "Quiver",
   "interaction.door": "Door",
-  "interaction.open": "Open"
+  "interaction.open": "Open",
+  "inventory.take_all": "Take All"
 }

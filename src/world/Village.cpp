@@ -142,19 +142,28 @@ void DrawCandle(Vector3 position, float radius, float height, int slices, Color 
 
 Village::Village(Vector3 center) : m_center(center) {
     m_npcs = {
-        MakeNpc("npc.blacksmith", VillageNpcRole::Blacksmith, { center.x - 2.0f, center.y, center.z - 3.0f },
-            Color{ 88, 79, 72, 255 }, 0, {{{-2, -3}, {-3, -2}, {-1, -2}}}, 1.2f),
-        MakeNpc("npc.mayor", VillageNpcRole::Mayor, { center.x + 5.0f, center.y, center.z + 2.0f },
-                Color{ 47, 65, 98, 255 }, 1, {{{5, 2}, {4, 3}, {3, 3}}}, 2.1f),
-        MakeNpc("npc.cleric", VillageNpcRole::Cleric, { center.x + 2.0f, center.y, center.z + 5.0f },
-                Color{ 211, 198, 166, 255 }, 2, {{{2, 5}, {1, 4}, {2, 6}}}, 0.8f),
-        MakeNpc("npc.farmer", VillageNpcRole::Farmer, { center.x - 6.0f, center.y, center.z + 8.0f },
-            Color{ 82, 105, 54, 255 }, 4, {{{-6, 8}, {-7, 8}, {-6, 9}}}, 3.0f),
-        MakeNpc("npc.innkeeper", VillageNpcRole::Innkeeper, { center.x - 5.0f, center.y, center.z - 2.0f },
-                Color{ 113, 66, 45, 255 }, 3, {{{-5, -2}, {-4, -3}, {-5, -4}}}, 1.7f)
+        MakeNpc("npc.blacksmith", VillageNpcRole::Blacksmith, { center.x - 2.1f, center.y, center.z - 3.8f },
+            Color{ 88, 79, 72, 255 }, 0, {{{-2.1f, -3.8f}}}, 5.0f), // Stay right at the anvil working
+        MakeNpc("npc.mayor", VillageNpcRole::Mayor, { center.x + 4.5f, center.y, center.z + 2.0f },
+                Color{ 47, 65, 98, 255 }, 1, {{{4.5f, 2.0f}, {4.0f, 3.0f}}}, 2.1f),
+        MakeNpc("npc.cleric", VillageNpcRole::Cleric, { center.x + 2.0f, center.y, center.z + 4.5f },
+                Color{ 211, 198, 166, 255 }, 2, {{{2.0f, 4.5f}, {1.0f, 4.0f}}}, 1.8f),
+        MakeNpc("npc.farmer", VillageNpcRole::Farmer, { center.x - 4.5f, center.y, center.z + 4.5f },
+            Color{ 82, 105, 54, 255 }, 4, {{{-4.5f, 4.5f}, {-4.5f, 6.0f}}}, 3.0f), // Safely outside building 4
+        MakeNpc("npc.innkeeper", VillageNpcRole::Innkeeper, { center.x - 4.0f, center.y, center.z - 3.0f },
+                Color{ 113, 66, 45, 255 }, 3, {{{-4.0f, -3.0f}, {-3.5f, -4.0f}}}, 1.7f)
     };
     m_npcs[1].insideHome = true;
     m_npcs[2].insideHome = true;
+
+    // Initialize chests
+    m_chests = {
+        {0, {-2.5f, 0.0f, -2.5f}, 50, {{core::items::Shortsword, 1}}, false}, // Blacksmith
+        {1, {3.0f, 0.0f, -2.0f}, 150, {{core::items::Longsword, 1}}, false}, // Mayor
+        {2, {-1.5f, 0.0f, -2.0f}, 0, {{core::items::Bow, 1}}, false}, // Cleric
+        {3, {2.0f, 0.0f, 0.0f}, 10, {{core::items::Dagger, 1}}, false}, // Inn
+        {4, {-2.0f, 0.0f, 1.0f}, 5, {{core::items::Arrow, 20}}, false} // Farm
+    };
 }
 
 void Village::SetBuildingModel(int index, Model* model) {
@@ -176,7 +185,7 @@ void Village::HighlightBuilding(int index) {
     m_highlightTimer = 0.55f;
 }
 
-void Village::Update(const World& world, const NavigationSystem& navigation, float deltaTime, float timeOfDay) {
+void Village::Update(const World& world, NavigationSystem& navigation, float deltaTime, float timeOfDay) {
     m_highlightTimer = std::max(0.0f, m_highlightTimer - deltaTime);
     if (m_highlightTimer == 0.0f) m_highlightedBuilding = -1;
     const bool night = timeOfDay < 0.18f || timeOfDay > 0.82f;
@@ -188,6 +197,14 @@ void Village::Update(const World& world, const NavigationSystem& navigation, flo
             (npc.role == VillageNpcRole::Innkeeper && timeOfDay >= 0.48f && timeOfDay < 0.66f);
         const bool wantsHome = night || daytimeIndoor;
         const auto setDestination = [&](Vector3 destination) {
+            // Refresh occupied tiles excluding this NPC so it can leave its own tile.
+            std::vector<Vector3> othersPos;
+            othersPos.reserve(m_npcs.size());
+            for (const VillageNpc& other : m_npcs) {
+                if (&other != &npc) othersPos.push_back(other.position);
+            }
+            navigation.SetOccupiedTiles(othersPos);
+
             const std::vector<TileCoord> path = navigation.FindPath(
                 static_cast<int>(std::floor(npc.position.x)), static_cast<int>(std::floor(npc.position.z)),
                 static_cast<int>(std::floor(destination.x)), static_cast<int>(std::floor(destination.z)));
@@ -217,7 +234,10 @@ void Village::Update(const World& world, const NavigationSystem& navigation, flo
             npc.waitTime = 0.4f;
         }
 
-        if (npc.insideHome) {
+        // Blacksmith stays at the anvil working — skip all routing.
+        if (npc.role == VillageNpcRole::Blacksmith) {
+            npc.walking = false;
+        } else if (npc.insideHome) {
             npc.walking = false;
         } else {
             if (npc.waypointIndex < npc.waypoints.size()) {
@@ -261,13 +281,19 @@ void Village::Update(const World& world, const NavigationSystem& navigation, flo
             }
         }
 
-        if (npc.model && npc.animations && npc.animationCount > 1) {
-            const bool worksAtTool = !night && !npc.walking &&
+        // Animation: clip 1 = walk, clip 0 = idle/work.
+        // Never access a clip index >= animationCount.
+        if (npc.model && npc.animations && npc.animationCount >= 1) {
+            const bool isWorking = !night &&
                 (npc.role == VillageNpcRole::Blacksmith || npc.role == VillageNpcRole::Farmer);
-            const int clip = npc.walking ? 1 : (worksAtTool && npc.animationCount > 7 ? 7 : 0);
+            int clip = 0; // default: idle / work
+            if (npc.walking && npc.animationCount >= 2) {
+                clip = 1; // walk clip
+            }
+            clip = std::clamp(clip, 0, npc.animationCount - 1);
             if (npc.appliedAnimation != clip) npc.animationTime = 0.0f;
             npc.animationTime += deltaTime;
-            const float duration = clip == 0 ? 2.4f : (clip == 1 ? 1.0f : 1.25f);
+            const float duration = isWorking ? 1.0f : (clip == 1 ? 1.0f : 2.4f);
             const ModelAnimation& animation = npc.animations[clip];
             int frame = static_cast<int>(std::fmod(npc.animationTime, duration) / duration * animation.frameCount);
             frame = std::clamp(frame, 0, animation.frameCount - 1);
@@ -451,6 +477,24 @@ bool Village::NpcAtInteriorRay(Ray ray, int buildingIndex, VillageNpc& outNpc) c
     return found;
 }
 
+InteriorChest* Village::ChestAtInteriorRay(Ray ray, int buildingIndex) {
+    float closestDistance = 100000.0f;
+    InteriorChest* foundChest = nullptr;
+    for (auto& chest : m_chests) {
+        if (chest.buildingIndex != buildingIndex) continue;
+        const BoundingBox bounds = {
+            { chest.position.x - 0.4f, chest.position.y, chest.position.z - 0.4f },
+            { chest.position.x + 0.4f, chest.position.y + 0.6f, chest.position.z + 0.4f }
+        };
+        const RayCollision hit = GetRayCollisionBox(ray, bounds);
+        if (hit.hit && hit.distance < closestDistance) {
+            closestDistance = hit.distance;
+            foundChest = &chest;
+        }
+    }
+    return foundChest;
+}
+
 int Village::BuildingDoorAtTile(int tileX, int tileZ) const {
     for (int index = 0; index < static_cast<int>(kBuildings.size()); ++index) {
         const Building& building = kBuildings[static_cast<std::size_t>(index)];
@@ -609,6 +653,14 @@ void Village::RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 
     drawInteriorCube({ 2.65f, 1.5f, 4.35f }, 4.7f, 3.0f, 0.3f, plaster);
     drawInteriorCube({ 0.0f, 2.95f, 4.35f }, 1.0f, 0.2f, 0.3f, timber);
 
+    // Render floor grid tiles (caselle)
+    const float step = 0.7f;
+    for (float gx = -4.2f; gx <= 4.2f; gx += step) {
+        for (float gz = -3.8f; gz <= 3.8f; gz += step) {
+            DrawCubeWires({ gx, 0.005f, gz }, step * 0.96f, 0.005f, step * 0.96f, Color{ 75, 55, 35, 140 });
+        }
+    }
+
     if (buildingIndex == 0) {
         drawInteriorCube({ -3.0f, 0.55f, -2.0f }, 2.0f, 1.1f, 1.3f, Color{ 65, 57, 50, 255 });
         drawInteriorCube({ -3.0f, 1.2f, -2.0f }, 1.0f, 0.35f, 0.6f, ORANGE);
@@ -639,5 +691,14 @@ void Village::RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 
                                 -0.5f + (interiorNpcIndex / 2) * 1.2f };
         DrawResident(npc, position);
         ++interiorNpcIndex;
+    }
+
+    // Render Chests
+    for (const auto& chest : m_chests) {
+        if (chest.buildingIndex != buildingIndex) continue;
+        Color chestColor = chest.looted ? Color{ 100, 80, 60, 255 } : Color{ 180, 120, 40, 255 };
+        drawInteriorCube({ chest.position.x, chest.position.y + 0.3f, chest.position.z }, 0.8f, 0.6f, 0.6f, chestColor);
+        // Lock / trim detail
+        drawInteriorCube({ chest.position.x, chest.position.y + 0.3f, chest.position.z + 0.31f }, 0.2f, 0.2f, 0.05f, GOLD);
     }
 }

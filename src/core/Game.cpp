@@ -370,7 +370,7 @@ void Game::EnterVillageBuilding(int buildingIndex) {
     m_activeBuilding = buildingIndex;
     m_player->StopMovement({ 0.0f, 0.0f, 2.8f });
     if (m_world) m_world->SetPlayerPosition(m_exteriorPosition);
-    if (m_camera) m_camera->SetView({ 0.0f, 1.0f, 0.0f }, 45.0f * DEG2RAD, 0.82f);
+    if (m_camera) m_camera->SetView({ 0.0f, 1.0f, 0.0f }, 0.0f, 0.82f);
     m_interactionMenu.Close();
     SetState(std::make_unique<VillageInteriorState>(this, buildingIndex));
 }
@@ -433,10 +433,11 @@ void Game::Update(float deltaTime) {
     }
     if (m_village && m_world && !frozen) {
         const float timeOfDay = m_lightingSystem ? m_lightingSystem->GetTimeOfDay() : 0.5f;
-        m_village->Update(*m_world, m_navigation, deltaTime, timeOfDay);
         std::vector<Vector3> occupiedPositions = m_village->NpcPositions();
+        if (m_player) occupiedPositions.push_back(m_player->GetPosition());
         if (m_testMob && m_testMob->IsAlive()) occupiedPositions.push_back(m_testMob->GetPosition());
         m_navigation.SetOccupiedTiles(occupiedPositions);
+        m_village->Update(*m_world, m_navigation, deltaTime, timeOfDay);
     }
 
     if (m_gameState) {
@@ -502,6 +503,8 @@ void Game::Render() {
         }
 
         if (m_lightingSystem) m_lightingSystem->EndLightingMode();
+
+
 
         if (worldVisible && m_hoveredMob) DrawBoundingBox(m_hoveredMob->GetBounds(), YELLOW);
         if (worldVisible && m_hoverTileX != -9999 && m_hoverTileZ != -9999) {

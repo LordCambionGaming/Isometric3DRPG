@@ -59,6 +59,7 @@ public:
     core::LightingSystem* GetLightingSystem() const { return m_lightingSystem.get(); }
     ItemVisuals* GetItemVisuals() const { return m_itemVisuals.get(); }
     Village* GetVillage() const { return m_village.get(); }
+    int GetActiveBuilding() const { return m_activeBuilding; }
 private:
     void Update(float deltaTime);
     void Render();

@@ -4,6 +4,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include "core/Items.h"
 
 class World;
 class NavigationSystem;
@@ -42,6 +43,14 @@ struct VillageNpc {
     int appliedFrame = -1;
 };
 
+struct InteriorChest {
+    int buildingIndex;
+    Vector3 position;
+    int gold;
+    std::vector<core::ItemStack> items;
+    bool looted;
+};
+
 class Village {
 public:
     explicit Village(Vector3 center);
@@ -49,7 +58,11 @@ public:
     static Vector3 FindSpawnPosition(const World& world);
     void Render(const World& world) const;
     void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition) const;
-    void Update(const World& world, const NavigationSystem& navigation, float deltaTime, float timeOfDay);
+    
+    // Chests
+    std::vector<InteriorChest>& GetChests() { return m_chests; }
+    InteriorChest* ChestAtInteriorRay(Ray ray, int buildingIndex);
+    void Update(const World& world, NavigationSystem& navigation, float deltaTime, float timeOfDay);
     void SetBuildingModel(int index, Model* model);
     void SetNpcAssets(int index, Model* model, ModelAnimation* animations, int animationCount);
     void HighlightBuilding(int index);
@@ -67,6 +80,7 @@ public:
 private:
     Vector3 m_center;
     std::vector<VillageNpc> m_npcs;
+    std::vector<InteriorChest> m_chests;
     std::array<Model*, 5> m_buildingModels{};
     int m_highlightedBuilding = -1;
     float m_highlightTimer = 0.0f;
