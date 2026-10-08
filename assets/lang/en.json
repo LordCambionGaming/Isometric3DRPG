@@ -1,0 +1,74 @@
+{
+    "menu.resume": "Resume",
+    "menu.quit": "Quit",
+    "menu.new_game": "New Game",
+    "menu.continue": "Continue",
+    "menu.settings": "Settings",
+    "menu.pause": "Pause",
+
+    "equip.head": "Head",
+    "equip.body": "Body",
+    "equip.legs": "Legs",
+    "equip.feet": "Feet",
+    "equip.right_hand": "Right Hand",
+    "equip.left_hand": "Left Hand",
+    "equip.title": "Equipment & Bag",
+    "equip.bag": "Bag",
+
+    "item.category.weapon": "Weapon",
+    "item.category.armor": "Armor",
+    "item.category.consumable": "Consumable",
+    "item.category.misc": "Misc",
+
+    "weapon.grip.unarmed": "Unarmed",
+    "weapon.grip.one_handed": "One-Handed",
+    "weapon.grip.two_handed": "Two-Handed",
+    "weapon.grip.bow": "Bow",
+
+    "combat.critical_hit": "Critical Hit! (Natural 20)",
+    "combat.critical_fail": "Critical Failure! (Natural 1)",
+    "combat.hit": "Hit!",
+    "combat.miss": "Miss!",
+    "combat.damage": "Damage",
+    "combat.too_far": "Target too far!",
+    "combat.roll_normal": "Normal roll.",
+    "combat.critical_failure_label": "CRITICAL FAILURE!",
+    "combat.critical_success_label": "CRITICAL SUCCESS!",
+
+    "interaction.attack": "Attack",
+    "interaction.approach": "Approach",
+    "interaction.interact": "Interact",
+    "interaction.loot": "Loot",
+    "interaction.open": "Open",`n    "interaction.door": "Door",
+    "interaction.talk": "Talk",
+
+    "quest.journal": "Quest Journal",
+    "quest.active": "Active",
+    "quest.completed": "Completed",
+    "quest.new": "New Quest!",
+    "quest.updated": "Quest Updated!",
+    "quest.completed_msg": "Quest Completed!",
+
+    "hud.level": "Lv",
+    "hud.hp": "HP",
+
+    "debug.fps": "FPS",
+    "debug.pos": "Pos",
+    "debug.zoom": "Zoom",
+    "debug.seed": "Seed",
+    "debug.chunks": "Chunks",
+    "debug.toggle": "[F1] Toggle  [ESC] Menu",
+
+    "class.warrior": "Warrior",
+    "class.ranger": "Ranger",
+    "class.rogue": "Rogue",
+
+    "race.human": "Human",
+
+    "ability.str": "STR",
+    "ability.dex": "DEX",
+    "ability.con": "CON",
+    "ability.int": "INT",
+    "ability.wis": "WIS",
+    "ability.cha": "CHA"
+}

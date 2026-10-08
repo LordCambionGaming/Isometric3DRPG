@@ -590,23 +590,33 @@ void Game::Render() {
             const Vector3 playerPosition = m_player->GetPosition();
             const float dx = door.x - playerPosition.x;
             const float dz = door.z - playerPosition.z;
-            if (dx * dx + dz * dz > 1.0f) {
-                const std::vector<TileCoord> path = m_navigation.FindPath(
-                    m_player->GetTileX(), m_player->GetTileZ(),
-                    static_cast<int>(std::floor(door.x)), static_cast<int>(std::floor(door.z)));
-                if (path.empty()) return;
-                std::vector<PathNode> pathWithHeight;
-                pathWithHeight.reserve(path.size());
-                for (const TileCoord& tile : path) {
-                    pathWithHeight.emplace_back(tile.x, tile.z,
-                        m_world->GetHeightAt(tile.x + 0.5f, tile.z + 0.5f));
-                }
-                m_player->SetPath(pathWithHeight);
+            
+            // If close enough, show Interaction Menu
+            if (dx * dx + dz * dz <= 2.2f * 2.2f) {
+                ui::Interactable target;
+                target.name = lang::Get("interaction.door"); // we will add this to localization
+                target.worldPosition = door;
+                target.actions.push_back({ lang::Get("interaction.open").c_str(), [this, buildingIndex]() {
+                    m_village->HighlightBuilding(buildingIndex);
+                    m_pendingBuildingIndex = buildingIndex;
+                    m_doorTransitionTimer = 0.42f;
+                }});
+                m_interactionMenu.Open(target);
                 return;
             }
-            m_village->HighlightBuilding(buildingIndex);
-            m_pendingBuildingIndex = buildingIndex;
-            m_doorTransitionTimer = 0.42f;
+
+            // Otherwise walk to it
+            const std::vector<TileCoord> path = m_navigation.FindPath(
+                m_player->GetTileX(), m_player->GetTileZ(),
+                static_cast<int>(std::floor(door.x)), static_cast<int>(std::floor(door.z)));
+            if (path.empty()) return;
+            std::vector<PathNode> pathWithHeight;
+            pathWithHeight.reserve(path.size());
+            for (const TileCoord& tile : path) {
+                pathWithHeight.emplace_back(tile.x, tile.z,
+                    m_world->GetHeightAt(tile.x + 0.5f, tile.z + 0.5f));
+            }
+            m_player->SetPath(pathWithHeight);
         };
         const auto interactWithNpc = [this](const VillageNpc* npc) {
             if (!npc || !m_player || !m_world) return;

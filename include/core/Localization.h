@@ -19,3 +19,6 @@ std::string CharacterClassName(std::string_view enumName);
 std::string RaceName(std::string_view enumName);
 
 }
+
+// Shorthand: L("key") => lang::Get("key")
+#define L(key) ::lang::Get(key)

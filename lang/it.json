@@ -180,5 +180,7 @@
   "item.bow": "Arco",
   "item.longbow": "Arco lungo",
   "item.arrow": "Freccia",
-  "item.quiver": "Faretra"
+  "item.quiver": "Faretra",
+  "interaction.door": "Porta",
+  "interaction.open": "Apri"
 }

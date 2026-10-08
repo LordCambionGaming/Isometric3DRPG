@@ -180,5 +180,7 @@
   "item.bow": "Bow",
   "item.longbow": "Longbow",
   "item.arrow": "Arrow",
-  "item.quiver": "Quiver"
+  "item.quiver": "Quiver",
+  "interaction.door": "Door",
+  "interaction.open": "Open"
 }

@@ -348,8 +348,8 @@ std::vector<Rectangle> Village::CollisionBounds() const {
         addLocalObstacle(building.halfWidth - wall * 0.5f, 0.0f, wall, building.halfDepth * 2.0f);
         addLocalObstacle(0.0f, -building.halfDepth + wall * 0.5f,
                          building.halfWidth * 2.0f, wall);
-        addLocalObstacle(-sideCenter, building.halfDepth - wall * 0.5f, sideLength, wall);
-        addLocalObstacle(sideCenter, building.halfDepth - wall * 0.5f, sideLength, wall);
+        // Block the door entirely on the main map
+        addLocalObstacle(0.0f, building.halfDepth - wall * 0.5f, building.halfWidth * 2.0f, wall);
 
         const auto addGeneratedProp = [&](float localX, float authorY, float halfWidth, float halfDepth) {
             addLocalObstacle(localX, -authorY, halfWidth * 2.0f, halfDepth * 2.0f);

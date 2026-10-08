@@ -1,0 +1,74 @@
+{
+    "menu.resume": "Riprendi",
+    "menu.quit": "Esci",
+    "menu.new_game": "Nuova Partita",
+    "menu.continue": "Continua",
+    "menu.settings": "Impostazioni",
+    "menu.pause": "Pausa",
+
+    "equip.head": "Testa",
+    "equip.body": "Corpo",
+    "equip.legs": "Gambe",
+    "equip.feet": "Piedi",
+    "equip.right_hand": "Mano Dx",
+    "equip.left_hand": "Mano Sx",
+    "equip.title": "Equipaggiamento e Zaino",
+    "equip.bag": "Zaino",
+
+    "item.category.weapon": "Arma",
+    "item.category.armor": "Armatura",
+    "item.category.consumable": "Consumabile",
+    "item.category.misc": "Varie",
+
+    "weapon.grip.unarmed": "Pugni",
+    "weapon.grip.one_handed": "Una mano",
+    "weapon.grip.two_handed": "Due mani",
+    "weapon.grip.bow": "Arco",
+
+    "combat.critical_hit": "Colpo Critico! (20 Naturale)",
+    "combat.critical_fail": "Fallimento Critico! (1 Naturale)",
+    "combat.hit": "Colpito!",
+    "combat.miss": "Mancato!",
+    "combat.damage": "Danno",
+    "combat.too_far": "Bersaglio troppo lontano!",
+    "combat.roll_normal": "Tiro normale.",
+    "combat.critical_failure_label": "FALLIMENTO CRITICO!",
+    "combat.critical_success_label": "SUCCESSO CRITICO!",
+
+    "interaction.attack": "Attacca",
+    "interaction.approach": "Avvicinati",
+    "interaction.interact": "Interagisci",
+    "interaction.loot": "Saccheggia",
+    "interaction.open": "Apri",`n    "interaction.door": "Porta",
+    "interaction.talk": "Parla",
+
+    "quest.journal": "Diario delle Quest",
+    "quest.active": "Attive",
+    "quest.completed": "Completate",
+    "quest.new": "Nuova Quest!",
+    "quest.updated": "Quest Aggiornata!",
+    "quest.completed_msg": "Quest Completata!",
+
+    "hud.level": "Liv",
+    "hud.hp": "PV",
+
+    "debug.fps": "FPS",
+    "debug.pos": "Pos",
+    "debug.zoom": "Zoom",
+    "debug.seed": "Seed",
+    "debug.chunks": "Chunks",
+    "debug.toggle": "[F1] Mostra/Nascondi  [ESC] Menu",
+
+    "class.warrior": "Guerriero",
+    "class.ranger": "Ranger",
+    "class.rogue": "Ladro",
+
+    "race.human": "Umano",
+
+    "ability.str": "FOR",
+    "ability.dex": "DES",
+    "ability.con": "COS",
+    "ability.int": "INT",
+    "ability.wis": "SAG",
+    "ability.cha": "CAR"
+}

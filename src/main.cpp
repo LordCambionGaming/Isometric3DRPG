@@ -1,8 +1,10 @@
 #include "core/Game.h"
+#include "core/Localization.h"
 #include <iostream>
 
 int main() {
     try {
+        lang::Initialize();
         Game game;
 
         if (!game.Initialize()) {

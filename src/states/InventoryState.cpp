@@ -230,8 +230,8 @@ void InventoryState::Render3DPreview(Rectangle bounds) {
     
     BeginMode3D(previewCamera);
     
-    core::LightingSystem* ls = m_game->GetLightingSystem();
-    if (ls) ls->BeginLightingMode();
+    // No LightingSystem here — inventory preview must always be fully lit
+    // regardless of in-game time of day.
     
     if (m_game->GetPlayer()) {
         Player* p = m_game->GetPlayer();
@@ -240,8 +240,6 @@ void InventoryState::Render3DPreview(Rectangle bounds) {
         p->Render();
         p->SetPosition(oldPos);
     }
-    
-    if (ls) ls->EndLightingMode();
     
     EndMode3D();
     EndTextureMode();
