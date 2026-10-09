@@ -26,7 +26,9 @@ public:
 
     void RenderWorld();
     void RenderUI();
-    void RenderDebugInfo();
+    void RenderDebugInfo(const Vector3* playerPos = nullptr,
+                         const Vector3* currentVillagePos = nullptr,
+                         const Vector3* nextVillagePos = nullptr);
 
     bool ShouldClose() const;
     bool IsFullscreen() const { return m_fullscreen; }

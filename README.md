@@ -53,6 +53,16 @@ The game uses deterministic procedural generation:
 - **Water Features**: Lakes, rivers, and sea generation
 - **Biome Manager**: Dynamic biome assignment based on environment conditions
 
+### Procedural Village
+Village models and their seeded spawn layout are generated with:
+
+```bash
+python src/assets/models/entities/generate_village_assets.py
+python src/assets/models/entities/compose_village.py --seed 12345 --houses 7
+```
+
+The layout is loaded relative to the player's spawn. Keep `--seed` aligned with the world seed in `Game.cpp` when regenerating it. Village models and NPCs are rendered only while their chunks are in the world's render range.
+
 ## Building
 
 ### Prerequisites

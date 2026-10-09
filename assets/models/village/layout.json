@@ -1,0 +1,839 @@
+{
+ "seed": 12345,
+ "instances": [
+  {
+   "asset": "village/props/pond.glb",
+   "pos": [
+    4.0,
+    0.0,
+    4.0
+   ],
+   "yaw_deg": 0.0,
+   "scale": 1.0,
+   "collision_radius": 2.16
+  },
+  {
+   "asset": "village/variants/inn_lilac.glb",
+   "pos": [
+    0.0,
+    0.0,
+    -20.0
+   ],
+   "yaw_deg": 0.0,
+   "scale": 1.0,
+   "kind": "inn",
+   "half_width": 2.5,
+   "half_depth": 2.5,
+   "door_step_pos": [
+    0,
+    0,
+    2.95
+   ],
+   "collision_radius": 3.226,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     -17.05
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/chimney_5_5.glb",
+   "pos": [
+    -2.8,
+    0,
+    -20.9
+   ],
+   "yaw_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/smoke.glb",
+   "pos": [
+    -2.8,
+    5.75,
+    -20.9
+   ],
+   "yaw_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/variants/awning_w5_0_sky.glb",
+   "pos": [
+    0.0,
+    0,
+    -17.5
+   ],
+   "yaw_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/hall_lilac.glb",
+   "pos": [
+    14.0,
+    0.0,
+    -14.0
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0,
+   "kind": "hall",
+   "half_width": 2.5,
+   "half_depth": 2.5,
+   "door_step_pos": [
+    0,
+    0,
+    2.95
+   ],
+   "collision_radius": 3.226,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     -14.0
+    ],
+    [
+     11.05,
+     -14.0
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/variants/awning_w5_0_lilac.glb",
+   "pos": [
+    11.5,
+    0,
+    -14.0
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/townhouse_sky.glb",
+   "pos": [
+    20.0,
+    0.0,
+    0.0
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0,
+   "kind": "townhouse",
+   "half_width": 2.4,
+   "half_depth": 2.2,
+   "door_step_pos": [
+    0,
+    0,
+    2.65
+   ],
+   "collision_radius": 2.926,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     17.35,
+     0.0
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/chimney_8_0.glb",
+   "pos": [
+    20.7,
+    0,
+    2.6
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/smoke.glb",
+   "pos": [
+    20.7,
+    8.25,
+    2.6
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/farmhouse_lilac.glb",
+   "pos": [
+    14.0,
+    0.0,
+    14.0
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0,
+   "kind": "farmhouse",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door_step_pos": [
+    0,
+    0,
+    2.95
+   ],
+   "collision_radius": 3.42,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     14.0
+    ],
+    [
+     11.05,
+     14.0
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/chimney_5_5.glb",
+   "pos": [
+    14.9,
+    0,
+    10.7
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/smoke.glb",
+   "pos": [
+    14.9,
+    5.75,
+    10.7
+   ],
+   "yaw_deg": -90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/chapel_lilac.glb",
+   "pos": [
+    0.0,
+    0.0,
+    20.0
+   ],
+   "yaw_deg": 180.0,
+   "scale": 1.0,
+   "kind": "chapel",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door_step_pos": [
+    0,
+    0,
+    2.95
+   ],
+   "collision_radius": 3.534,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     17.05
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/bell_tower.glb",
+   "pos": [
+    -0.0,
+    0,
+    22.8
+   ],
+   "yaw_deg": 180.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/forge_mint.glb",
+   "pos": [
+    -14.0,
+    0.0,
+    14.0
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0,
+   "kind": "forge",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door_step_pos": [
+    0,
+    0,
+    2.95
+   ],
+   "collision_radius": 3.42,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     14.0
+    ],
+    [
+     -11.05,
+     14.0
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/chimney_5_5.glb",
+   "pos": [
+    -14.9,
+    0,
+    10.7
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/smoke.glb",
+   "pos": [
+    -14.9,
+    5.75,
+    10.7
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/variants/cottage_sky.glb",
+   "pos": [
+    -20.0,
+    0.0,
+    0.0
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0,
+   "kind": "cottage",
+   "half_width": 2.2,
+   "half_depth": 2.0,
+   "door_step_pos": [
+    0,
+    0,
+    2.45
+   ],
+   "collision_radius": 2.726,
+   "road_path": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     -17.55,
+     0.0
+    ]
+   ]
+  },
+  {
+   "asset": "village/parts/chimney_5_5.glb",
+   "pos": [
+    -20.7,
+    0,
+    -2.4
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/parts/smoke.glb",
+   "pos": [
+    -20.7,
+    5.75,
+    -2.4
+   ],
+   "yaw_deg": 90.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -14.034,
+    0.0,
+    22.263
+   ],
+   "yaw_deg": 268.0,
+   "scale": 1.24,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    11.05,
+    0.0,
+    -6.711
+   ],
+   "yaw_deg": 43.1,
+   "scale": 0.87,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -9.315,
+    0.0,
+    -3.359
+   ],
+   "yaw_deg": 186.6,
+   "scale": 1.09,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    6.34,
+    0.0,
+    8.757
+   ],
+   "yaw_deg": 56.5,
+   "scale": 1.07,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -13.317,
+    0.0,
+    4.784
+   ],
+   "yaw_deg": 64.6,
+   "scale": 1.17,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -9.523,
+    0.0,
+    -19.817
+   ],
+   "yaw_deg": 22.1,
+   "scale": 1.04,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    24.8,
+    0.0,
+    -5.37
+   ],
+   "yaw_deg": 131.1,
+   "scale": 1.07,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    -5.618,
+    0.0,
+    -16.772
+   ],
+   "yaw_deg": 59.4,
+   "scale": 0.88,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    7.465,
+    0.0,
+    17.208
+   ],
+   "yaw_deg": 34.5,
+   "scale": 1.17,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/rock.glb",
+   "pos": [
+    10.492,
+    0.0,
+    23.019
+   ],
+   "yaw_deg": 134.2,
+   "scale": 0.92,
+   "collision_radius": 0.738
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    -7.686,
+    0.0,
+    5.979
+   ],
+   "yaw_deg": 186.6,
+   "scale": 1.12,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    -13.383,
+    0.0,
+    -16.974
+   ],
+   "yaw_deg": 205.6,
+   "scale": 1.1,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    -5.867,
+    0.0,
+    10.626
+   ],
+   "yaw_deg": 249.6,
+   "scale": 1.07,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    5.624,
+    0.0,
+    -4.565
+   ],
+   "yaw_deg": 15.9,
+   "scale": 1.16,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/flower_patch.glb",
+   "pos": [
+    -5.108,
+    0.0,
+    -5.391
+   ],
+   "yaw_deg": 255.1,
+   "scale": 1.0,
+   "collision_radius": 0.647
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -9.65,
+    0.0,
+    -8.022
+   ],
+   "yaw_deg": 18.1,
+   "scale": 1.05,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -18.041,
+    0.0,
+    -18.178
+   ],
+   "yaw_deg": 216.9,
+   "scale": 0.86,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    15.287,
+    0.0,
+    21.014
+   ],
+   "yaw_deg": 359.0,
+   "scale": 0.86,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -16.77,
+    0.0,
+    20.561
+   ],
+   "yaw_deg": 308.3,
+   "scale": 0.96,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -7.963,
+    0.0,
+    -15.425
+   ],
+   "yaw_deg": 114.9,
+   "scale": 1.09,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    12.062,
+    0.0,
+    3.565
+   ],
+   "yaw_deg": 45.2,
+   "scale": 1.17,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/rock.glb",
+   "pos": [
+    -12.906,
+    0.0,
+    -12.512
+   ],
+   "yaw_deg": 42.7,
+   "scale": 1.04,
+   "collision_radius": 0.738
+  },
+  {
+   "asset": "village/props/rock.glb",
+   "pos": [
+    -3.811,
+    0.0,
+    9.833
+   ],
+   "yaw_deg": 179.7,
+   "scale": 0.89,
+   "collision_radius": 0.738
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -22.124,
+    0.0,
+    11.562
+   ],
+   "yaw_deg": 282.4,
+   "scale": 0.98,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    22.106,
+    0.0,
+    -11.465
+   ],
+   "yaw_deg": 335.1,
+   "scale": 1.07,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    -21.086,
+    0.0,
+    6.061
+   ],
+   "yaw_deg": 26.4,
+   "scale": 1.11,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/flower_patch.glb",
+   "pos": [
+    20.794,
+    0.0,
+    9.745
+   ],
+   "yaw_deg": 204.1,
+   "scale": 0.89,
+   "collision_radius": 0.647
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    24.735,
+    0.0,
+    4.739
+   ],
+   "yaw_deg": 132.5,
+   "scale": 1.21,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -6.853,
+    0.0,
+    20.135
+   ],
+   "yaw_deg": 337.0,
+   "scale": 1.0,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    7.202,
+    0.0,
+    24.236
+   ],
+   "yaw_deg": 54.5,
+   "scale": 0.85,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/rock.glb",
+   "pos": [
+    -4.112,
+    0.0,
+    7.663
+   ],
+   "yaw_deg": 110.3,
+   "scale": 1.09,
+   "collision_radius": 0.738
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -26.326,
+    0.0,
+    3.864
+   ],
+   "yaw_deg": 43.6,
+   "scale": 1.13,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -10.874,
+    0.0,
+    -22.711
+   ],
+   "yaw_deg": 112.3,
+   "scale": 1.0,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/mushroom_red.glb",
+   "pos": [
+    -12.112,
+    0.0,
+    -8.896
+   ],
+   "yaw_deg": 248.7,
+   "scale": 0.99,
+   "collision_radius": 0.45
+  },
+  {
+   "asset": "village/props/flower_patch.glb",
+   "pos": [
+    3.197,
+    0.0,
+    26.315
+   ],
+   "yaw_deg": 183.0,
+   "scale": 0.94,
+   "collision_radius": 0.647
+  },
+  {
+   "asset": "village/props/bush.glb",
+   "pos": [
+    -7.435,
+    0.0,
+    25.305
+   ],
+   "yaw_deg": 149.6,
+   "scale": 0.94,
+   "collision_radius": 0.877
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    3.224,
+    0.0,
+    10.01
+   ],
+   "yaw_deg": 93.9,
+   "scale": 0.89,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/tree_pine.glb",
+   "pos": [
+    25.14,
+    0.0,
+    -8.275
+   ],
+   "yaw_deg": 113.4,
+   "scale": 0.97,
+   "collision_radius": 1.201
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -16.035,
+    0.0,
+    -8.949
+   ],
+   "yaw_deg": 113.6,
+   "scale": 1.03,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    -20.765,
+    0.0,
+    -15.101
+   ],
+   "yaw_deg": 252.9,
+   "scale": 0.95,
+   "collision_radius": 1.512
+  },
+  {
+   "asset": "village/props/rock.glb",
+   "pos": [
+    -19.238,
+    0.0,
+    -8.27
+   ],
+   "yaw_deg": 135.6,
+   "scale": 1.07,
+   "collision_radius": 0.738
+  },
+  {
+   "asset": "village/props/tree_round.glb",
+   "pos": [
+    3.236,
+    0.0,
+    -9.334
+   ],
+   "yaw_deg": 211.2,
+   "scale": 1.11,
+   "collision_radius": 1.512
+  }
+ ]
+}

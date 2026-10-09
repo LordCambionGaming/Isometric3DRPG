@@ -3,6 +3,7 @@
 #include <raylib.h>
 #include <array>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "core/Items.h"
 
@@ -58,14 +59,20 @@ public:
     explicit Village(Vector3 center);
 
     static Vector3 FindSpawnPosition(const World& world);
-    void Render(const World& world) const;
-    void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition) const;
+    static Vector3 FindNearestVillage(const World& world, Vector3 position);
+    static Vector3 FindNearestVillage(const World& world, Vector3 position, Vector3 excludedVillage);
+    Vector3 CenterPosition() const { return m_center; }
+    int BuildingCount() const { return static_cast<int>(m_buildings.size()); }
+    void Render(const World& world, Vector3 playerPosition) const;
+    void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition,
+                        Ray hoverRay) const;
     
     // Chests
     std::vector<InteriorChest>& GetChests() { return m_chests; }
     InteriorChest* ChestAtInteriorRay(Ray ray, int buildingIndex);
     void Update(const World& world, NavigationSystem& navigation, float deltaTime, float timeOfDay);
-    void SetBuildingModel(int index, Model* model);
+    const std::vector<std::string>& RequiredModelAssets() const { return m_modelAssets; }
+    void SetModel(const std::string& asset, Model* model);
     void SetNpcAssets(int index, Model* model, ModelAnimation* animations, int animationCount);
     void HighlightBuilding(int index);
     std::vector<Rectangle> CollisionBounds() const;
@@ -77,13 +84,44 @@ public:
     Vector3 BuildingDoorPosition(int buildingIndex) const;
     std::vector<Vector3> NpcPositions() const;
     int NpcCount() const { return static_cast<int>(m_npcs.size()); }
-    static std::string BuildingNameKey(int buildingIndex);
+    std::string BuildingNameKey(int buildingIndex) const;
+    std::string BuildingKind(int buildingIndex) const;
 
 private:
+    struct Building {
+        std::string kind;
+        Vector3 position{};
+        float yawDegrees = 0.0f;
+        float halfWidth = 0.0f;
+        float halfDepth = 0.0f;
+        Vector3 doorStep{};
+        std::vector<Vector2> roadPath;
+        int instanceIndex = -1;
+    };
+
+    struct Instance {
+        std::string asset;
+        Vector3 position{};
+        float yawDegrees = 0.0f;
+        float scale = 1.0f;
+        float collisionRadius = 0.0f;
+        int buildingIndex = -1;
+    };
+
+    struct RoadRun {
+        Vector2 start{};
+        int tileCount = 0;
+        bool alongX = true;
+    };
+
     Vector3 m_center;
+    std::vector<Building> m_buildings;
+    std::vector<Instance> m_instances;
+    std::vector<RoadRun> m_roadRuns;
+    std::vector<std::string> m_modelAssets;
+    std::unordered_map<std::string, Model*> m_models;
     std::vector<VillageNpc> m_npcs;
     std::vector<InteriorChest> m_chests;
-    std::array<Model*, 5> m_buildingModels{};
     int m_highlightedBuilding = -1;
     float m_highlightTimer = 0.0f;
 };

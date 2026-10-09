@@ -19,20 +19,22 @@
 
 namespace {
 
-constexpr int kInteriorGridSize = 25;
-constexpr float kInteriorGridStep = 0.35f;
-constexpr float kInteriorGridMinimum = -4.2f;
-constexpr int kInteriorCellCount = kInteriorGridSize * kInteriorGridSize;
+constexpr int kInteriorGridSizeX = 10;
+constexpr int kInteriorGridSizeZ = 9;
+constexpr float kInteriorGridStep = 1.0f;
+constexpr float kInteriorGridMinimumX = -5.0f;
+constexpr float kInteriorGridMinimumZ = -4.5f;
+constexpr int kInteriorCellCount = kInteriorGridSizeX * kInteriorGridSizeZ;
 
-bool HitsInteriorFurniture(int buildingIndex, float x, float z) {
+bool HitsInteriorFurniture(const std::string& buildingKind, float x, float z) {
     const Vector2 point{ x, z };
-    if (buildingIndex == 0) {
+    if (buildingKind == "forge") {
         return CheckCollisionPointRec(point, { -4.0f, -2.65f, 2.0f, 1.3f }) ||
                CheckCollisionPointRec(point, { -0.2f, -0.5f, 2.4f, 1.0f });
     }
-    if (buildingIndex == 1)
+    if (buildingKind == "hall")
         return CheckCollisionPointRec(point, { -1.9f, -2.23f, 3.8f, 1.25f });
-    if (buildingIndex == 2)
+    if (buildingKind == "chapel")
         return CheckCollisionPointRec(point, { -1.3f, -3.2f, 2.6f, 1.0f });
     return CheckCollisionPointRec(point, { -3.3f, -3.4f, 6.6f, 0.8f }) ||
            CheckCollisionPointRec(point, { -3.45f, -0.35f, 1.5f, 0.7f }) ||
@@ -40,24 +42,24 @@ bool HitsInteriorFurniture(int buildingIndex, float x, float z) {
 }
 
 Vector2 InteriorGridPosition(int cellX, int cellZ) {
-    return { kInteriorGridMinimum + cellX * kInteriorGridStep,
-             kInteriorGridMinimum + cellZ * kInteriorGridStep };
+    return { kInteriorGridMinimumX + (cellX + 0.5f) * kInteriorGridStep,
+             kInteriorGridMinimumZ + (cellZ + 0.5f) * kInteriorGridStep };
 }
 
 int InteriorCellIndex(int cellX, int cellZ) {
-    return cellZ * kInteriorGridSize + cellX;
+    return cellZ * kInteriorGridSizeX + cellX;
 }
 
 Vector2 InteriorCellForPosition(float x, float z) {
     return {
-        static_cast<float>(std::clamp(static_cast<int>(std::round((x - kInteriorGridMinimum) /
-            kInteriorGridStep)), 0, kInteriorGridSize - 1)),
-        static_cast<float>(std::clamp(static_cast<int>(std::round((z - kInteriorGridMinimum) /
-            kInteriorGridStep)), 0, kInteriorGridSize - 1))
+        static_cast<float>(std::clamp(static_cast<int>(std::floor((x - kInteriorGridMinimumX) /
+            kInteriorGridStep)), 0, kInteriorGridSizeX - 1)),
+        static_cast<float>(std::clamp(static_cast<int>(std::floor((z - kInteriorGridMinimumZ) /
+            kInteriorGridStep)), 0, kInteriorGridSizeZ - 1))
     };
 }
 
-bool IsInteriorCellWalkable(int buildingIndex, int cellX, int cellZ) {
+bool IsInteriorCellWalkable(const std::string& buildingKind, int cellX, int cellZ) {
     const Vector2 center = InteriorGridPosition(cellX, cellZ);
     constexpr float bodyRadius = 0.24f;
     const std::array<Vector2, 5> footprint = {{
@@ -67,7 +69,7 @@ bool IsInteriorCellWalkable(int buildingIndex, int cellX, int cellZ) {
     for (const Vector2 offset : footprint) {
         const float x = center.x + offset.x;
         const float z = center.y + offset.y;
-        if (HitsInteriorFurniture(buildingIndex, x, z)) return false;
+        if (HitsInteriorFurniture(buildingKind, x, z)) return false;
     }
     return true;
 }
@@ -96,7 +98,9 @@ void VillageInteriorState::SetMoveTarget(float x, float z) {
     const int startZ = static_cast<int>(startCell.y);
     const int targetX = static_cast<int>(targetCell.x);
     const int targetZ = static_cast<int>(targetCell.y);
-    if (!IsInteriorCellWalkable(m_buildingIndex, targetX, targetZ)) return;
+    const Village* village = m_game->GetVillage();
+    const std::string buildingKind = village ? village->BuildingKind(m_buildingIndex) : std::string{};
+    if (!IsInteriorCellWalkable(buildingKind, targetX, targetZ)) return;
 
     std::array<int, kInteriorCellCount> parents;
     parents.fill(-1);
@@ -112,13 +116,13 @@ void VillageInteriorState::SetMoveTarget(float x, float z) {
     while (!open.empty() && parents[static_cast<std::size_t>(targetIndex)] < 0) {
         const int current = open.front();
         open.pop();
-        const int currentX = current % kInteriorGridSize;
-        const int currentZ = current / kInteriorGridSize;
+        const int currentX = current % kInteriorGridSizeX;
+        const int currentZ = current / kInteriorGridSizeX;
         for (const Vector2 direction : directions) {
             const int nextX = currentX + static_cast<int>(direction.x);
             const int nextZ = currentZ + static_cast<int>(direction.y);
-            if (nextX < 0 || nextX >= kInteriorGridSize || nextZ < 0 || nextZ >= kInteriorGridSize ||
-                !IsInteriorCellWalkable(m_buildingIndex, nextX, nextZ)) continue;
+            if (nextX < 0 || nextX >= kInteriorGridSizeX || nextZ < 0 || nextZ >= kInteriorGridSizeZ ||
+                !IsInteriorCellWalkable(buildingKind, nextX, nextZ)) continue;
             const int next = InteriorCellIndex(nextX, nextZ);
             if (parents[static_cast<std::size_t>(next)] >= 0) continue;
             parents[static_cast<std::size_t>(next)] = current;
@@ -137,7 +141,7 @@ void VillageInteriorState::SetMoveTarget(float x, float z) {
     m_path.clear();
     m_path.reserve(reversedPath.size());
     for (const int cell : reversedPath) {
-        const Vector2 position = InteriorGridPosition(cell % kInteriorGridSize, cell / kInteriorGridSize);
+        const Vector2 position = InteriorGridPosition(cell % kInteriorGridSizeX, cell / kInteriorGridSizeX);
         m_path.push_back({ position.x, 0.0f, position.y });
     }
     m_pathIndex = 0;
@@ -163,7 +167,7 @@ void VillageInteriorState::Update(float deltaTime) {
     const float nextX = before.x + deltaX * ratio;
     const float nextZ = before.z + deltaZ * ratio;
 
-    if (std::fabs(nextX) <= 0.42f && before.z < 3.95f && nextZ >= 3.95f) {
+    if (std::fabs(nextX) <= 0.55f && before.z < 3.95f && nextZ >= 3.95f) {
         m_game->ExitVillageBuilding();
         return;
     }
@@ -182,7 +186,9 @@ void VillageInteriorState::Update(float deltaTime) {
 
 void VillageInteriorState::Render() {
     const Font& font = ui::theme::UIFont();
-    const std::string title = lang::Get(Village::BuildingNameKey(m_buildingIndex));
+    const Village* village = m_game->GetVillage();
+    const std::string title = lang::Get(village
+        ? village->BuildingNameKey(m_buildingIndex) : "village.building.home");
     const std::string hint = lang::Get("village.interior.exit_hint");
     const std::string movementHint = lang::Get("village.interior.move_hint");
     const Rectangle button = { GetScreenWidth() * 0.5f - 126.0f, GetScreenHeight() - 76.0f, 252.0f, 48.0f };

@@ -1,0 +1,1438 @@
+{
+ "coordinate_system": "glTF Y-up, fronte +Z, origine a terra al centro",
+ "palettes": {
+  "cream": {
+   "wall": [
+    0.98,
+    0.91,
+    0.72
+   ],
+   "roof": [
+    0.84,
+    0.34,
+    0.24
+   ],
+   "roof_dark": [
+    0.66,
+    0.24,
+    0.18
+   ],
+   "shutter": [
+    0.28,
+    0.62,
+    0.64
+   ],
+   "awn_a": [
+    0.92,
+    0.3,
+    0.3
+   ]
+  },
+  "mint": {
+   "wall": [
+    0.74,
+    0.92,
+    0.8
+   ],
+   "roof": [
+    0.58,
+    0.38,
+    0.7
+   ],
+   "roof_dark": [
+    0.44,
+    0.27,
+    0.56
+   ],
+   "shutter": [
+    0.96,
+    0.62,
+    0.7
+   ],
+   "awn_a": [
+    0.6,
+    0.4,
+    0.75
+   ]
+  },
+  "sky": {
+   "wall": [
+    0.72,
+    0.86,
+    0.97
+   ],
+   "roof": [
+    0.95,
+    0.52,
+    0.38
+   ],
+   "roof_dark": [
+    0.8,
+    0.38,
+    0.28
+   ],
+   "shutter": [
+    0.98,
+    0.84,
+    0.35
+   ],
+   "awn_a": [
+    0.3,
+    0.55,
+    0.92
+   ]
+  },
+  "peach": {
+   "wall": [
+    1.0,
+    0.82,
+    0.68
+   ],
+   "roof": [
+    0.25,
+    0.62,
+    0.62
+   ],
+   "roof_dark": [
+    0.17,
+    0.47,
+    0.5
+   ],
+   "shutter": [
+    0.9,
+    0.35,
+    0.4
+   ],
+   "awn_a": [
+    0.25,
+    0.62,
+    0.62
+   ]
+  },
+  "lilac": {
+   "wall": [
+    0.86,
+    0.8,
+    0.96
+   ],
+   "roof": [
+    0.96,
+    0.74,
+    0.25
+   ],
+   "roof_dark": [
+    0.8,
+    0.56,
+    0.16
+   ],
+   "shutter": [
+    0.4,
+    0.7,
+    0.45
+   ],
+   "awn_a": [
+    0.96,
+    0.74,
+    0.25
+   ]
+  },
+  "brick": {
+   "wall": [
+    0.92,
+    0.58,
+    0.4
+   ],
+   "roof": [
+    0.38,
+    0.48,
+    0.68
+   ],
+   "roof_dark": [
+    0.27,
+    0.35,
+    0.54
+   ],
+   "shutter": [
+    0.97,
+    0.9,
+    0.7
+   ],
+   "awn_a": [
+    0.38,
+    0.48,
+    0.68
+   ]
+  }
+ },
+ "base_materials": {
+  "stone": [
+   0.66,
+   0.62,
+   0.56
+  ],
+  "wall": [
+   0.97,
+   0.9,
+   0.72
+  ],
+  "trim": [
+   0.52,
+   0.32,
+   0.18
+  ],
+  "roof": [
+   0.82,
+   0.32,
+   0.22
+  ],
+  "roof_dark": [
+   0.64,
+   0.22,
+   0.17
+  ],
+  "shutter": [
+   0.28,
+   0.6,
+   0.62
+  ],
+  "door": [
+   0.62,
+   0.36,
+   0.17
+  ],
+  "glass": [
+   1.0,
+   0.87,
+   0.45
+  ],
+  "iron": [
+   0.32,
+   0.34,
+   0.38
+  ],
+  "gold": [
+   0.96,
+   0.75,
+   0.22
+  ],
+  "wood": [
+   0.66,
+   0.43,
+   0.22
+  ],
+  "wood_dark": [
+   0.45,
+   0.28,
+   0.14
+  ],
+  "hay": [
+   0.94,
+   0.79,
+   0.3
+  ],
+  "leaf": [
+   0.42,
+   0.74,
+   0.3
+  ],
+  "leaf_dark": [
+   0.22,
+   0.56,
+   0.32
+  ],
+  "bark": [
+   0.5,
+   0.34,
+   0.21
+  ],
+  "flower_a": [
+   0.96,
+   0.4,
+   0.52
+  ],
+  "flower_b": [
+   1.0,
+   0.83,
+   0.26
+  ],
+  "flower_c": [
+   0.64,
+   0.46,
+   0.92
+  ],
+  "mush_red": [
+   0.9,
+   0.22,
+   0.22
+  ],
+  "white": [
+   0.98,
+   0.97,
+   0.94
+  ],
+  "brick": [
+   0.8,
+   0.4,
+   0.28
+  ],
+  "awn_a": [
+   0.92,
+   0.3,
+   0.3
+  ],
+  "awn_b": [
+   0.99,
+   0.95,
+   0.86
+  ],
+  "water": [
+   0.38,
+   0.74,
+   0.92
+  ],
+  "pumpkin": [
+   0.98,
+   0.56,
+   0.14
+  ],
+  "glow": [
+   1.0,
+   0.55,
+   0.18
+  ]
+ },
+ "houses": {
+  "forge": {
+   "category": "house",
+   "min": [
+    -3.42,
+    0.0,
+    -2.98
+   ],
+   "max": [
+    3.42,
+    4.824,
+    3.473
+   ],
+   "size": [
+    6.84,
+    4.824,
+    6.453
+   ],
+   "radius": 3.42,
+   "palette_default": "brick",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.5
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.95
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "chimney": {
+     "asset": "parts/chimney_5_5",
+     "pos": [
+      3.3,
+      0,
+      -0.9
+     ],
+     "width": 0.9
+    },
+    "smoke": {
+     "asset": "parts/smoke",
+     "pos": [
+      3.3,
+      5.75,
+      -0.9
+     ]
+    },
+    "awning": {
+     "asset": "parts/awning_w6_0",
+     "pos": [
+      0,
+      0,
+      2.5
+     ],
+     "note": "sostituisce il tettuccio della porta"
+    }
+   },
+   "file": "village/forge.glb",
+   "variants": [
+    "village/variants/forge_cream.glb",
+    "village/variants/forge_mint.glb",
+    "village/variants/forge_sky.glb",
+    "village/variants/forge_peach.glb",
+    "village/variants/forge_lilac.glb",
+    "village/variants/forge_brick.glb"
+   ]
+  },
+  "hall": {
+   "category": "house",
+   "min": [
+    -2.92,
+    0.0,
+    -2.98
+   ],
+   "max": [
+    2.92,
+    6.971,
+    3.473
+   ],
+   "size": [
+    5.84,
+    6.971,
+    6.453
+   ],
+   "radius": 3.226,
+   "palette_default": "lilac",
+   "half_width": 2.5,
+   "half_depth": 2.5,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.5
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.95
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "awning": {
+     "asset": "parts/awning_w5_0",
+     "pos": [
+      0,
+      0,
+      2.5
+     ],
+     "note": "sostituisce il tettuccio della porta"
+    }
+   },
+   "file": "village/hall.glb",
+   "variants": [
+    "village/variants/hall_cream.glb",
+    "village/variants/hall_mint.glb",
+    "village/variants/hall_sky.glb",
+    "village/variants/hall_peach.glb",
+    "village/variants/hall_lilac.glb",
+    "village/variants/hall_brick.glb"
+   ]
+  },
+  "chapel": {
+   "category": "house",
+   "min": [
+    -3.534,
+    0.0,
+    -2.98
+   ],
+   "max": [
+    3.534,
+    5.894,
+    3.473
+   ],
+   "size": [
+    7.068,
+    5.894,
+    6.453
+   ],
+   "radius": 3.534,
+   "palette_default": "sky",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.5
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.95
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "tower": {
+     "asset": "parts/bell_tower",
+     "pos": [
+      0,
+      0,
+      -2.8
+     ]
+    }
+   },
+   "file": "village/chapel.glb",
+   "variants": [
+    "village/variants/chapel_cream.glb",
+    "village/variants/chapel_mint.glb",
+    "village/variants/chapel_sky.glb",
+    "village/variants/chapel_peach.glb",
+    "village/variants/chapel_lilac.glb",
+    "village/variants/chapel_brick.glb"
+   ]
+  },
+  "inn": {
+   "category": "house",
+   "min": [
+    -2.92,
+    0.0,
+    -2.98
+   ],
+   "max": [
+    2.92,
+    4.897,
+    3.473
+   ],
+   "size": [
+    5.84,
+    4.897,
+    6.453
+   ],
+   "radius": 3.226,
+   "palette_default": "peach",
+   "half_width": 2.5,
+   "half_depth": 2.5,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.5
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.95
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "chimney": {
+     "asset": "parts/chimney_5_5",
+     "pos": [
+      -2.8,
+      0,
+      -0.9
+     ],
+     "width": 0.9
+    },
+    "smoke": {
+     "asset": "parts/smoke",
+     "pos": [
+      -2.8,
+      5.75,
+      -0.9
+     ]
+    },
+    "awning": {
+     "asset": "parts/awning_w5_0",
+     "pos": [
+      0,
+      0,
+      2.5
+     ],
+     "note": "sostituisce il tettuccio della porta"
+    },
+    "hanging_sign": {
+     "asset": "parts/hanging_sign",
+     "pos": [
+      1.6,
+      2.7,
+      2.5
+     ]
+    }
+   },
+   "file": "village/inn.glb",
+   "variants": [
+    "village/variants/inn_cream.glb",
+    "village/variants/inn_mint.glb",
+    "village/variants/inn_sky.glb",
+    "village/variants/inn_peach.glb",
+    "village/variants/inn_lilac.glb",
+    "village/variants/inn_brick.glb"
+   ]
+  },
+  "farmhouse": {
+   "category": "house",
+   "min": [
+    -3.42,
+    0.0,
+    -2.98
+   ],
+   "max": [
+    3.42,
+    4.824,
+    3.473
+   ],
+   "size": [
+    6.84,
+    4.824,
+    6.453
+   ],
+   "radius": 3.42,
+   "palette_default": "mint",
+   "half_width": 3.0,
+   "half_depth": 2.5,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.5
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.95
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "chimney": {
+     "asset": "parts/chimney_5_5",
+     "pos": [
+      -3.3,
+      0,
+      -0.9
+     ],
+     "width": 0.9
+    },
+    "smoke": {
+     "asset": "parts/smoke",
+     "pos": [
+      -3.3,
+      5.75,
+      -0.9
+     ]
+    }
+   },
+   "file": "village/farmhouse.glb",
+   "variants": [
+    "village/variants/farmhouse_cream.glb",
+    "village/variants/farmhouse_mint.glb",
+    "village/variants/farmhouse_sky.glb",
+    "village/variants/farmhouse_peach.glb",
+    "village/variants/farmhouse_lilac.glb",
+    "village/variants/farmhouse_brick.glb"
+   ]
+  },
+  "cottage": {
+   "category": "house",
+   "min": [
+    -2.62,
+    0.0,
+    -2.48
+   ],
+   "max": [
+    2.62,
+    4.96,
+    2.973
+   ],
+   "size": [
+    5.24,
+    4.96,
+    5.453
+   ],
+   "radius": 2.726,
+   "palette_default": "cream",
+   "half_width": 2.2,
+   "half_depth": 2.0,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.0
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.45
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "chimney": {
+     "asset": "parts/chimney_5_5",
+     "pos": [
+      2.4,
+      0,
+      -0.7
+     ],
+     "width": 0.7
+    },
+    "smoke": {
+     "asset": "parts/smoke",
+     "pos": [
+      2.4,
+      5.75,
+      -0.7
+     ]
+    }
+   },
+   "file": "village/cottage.glb",
+   "variants": [
+    "village/variants/cottage_cream.glb",
+    "village/variants/cottage_mint.glb",
+    "village/variants/cottage_sky.glb",
+    "village/variants/cottage_peach.glb",
+    "village/variants/cottage_lilac.glb",
+    "village/variants/cottage_brick.glb"
+   ]
+  },
+  "townhouse": {
+   "category": "house",
+   "min": [
+    -2.82,
+    0.0,
+    -2.68
+   ],
+   "max": [
+    2.82,
+    6.986,
+    3.173
+   ],
+   "size": [
+    5.64,
+    6.986,
+    5.853
+   ],
+   "radius": 2.926,
+   "palette_default": "lilac",
+   "half_width": 2.4,
+   "half_depth": 2.2,
+   "door": {
+    "pos": [
+     0,
+     0.42,
+     2.2
+    ],
+    "width": 1.2,
+    "height": 2.1,
+    "step_pos": [
+     0,
+     0,
+     2.65
+    ]
+   },
+   "front_dir": [
+    0,
+    0,
+    1
+   ],
+   "slots": {
+    "chimney": {
+     "asset": "parts/chimney_8_0",
+     "pos": [
+      2.6,
+      0,
+      -0.7
+     ],
+     "width": 0.7
+    },
+    "smoke": {
+     "asset": "parts/smoke",
+     "pos": [
+      2.6,
+      8.25,
+      -0.7
+     ]
+    }
+   },
+   "file": "village/townhouse.glb",
+   "variants": [
+    "village/variants/townhouse_cream.glb",
+    "village/variants/townhouse_mint.glb",
+    "village/variants/townhouse_sky.glb",
+    "village/variants/townhouse_peach.glb",
+    "village/variants/townhouse_lilac.glb",
+    "village/variants/townhouse_brick.glb"
+   ]
+  }
+ },
+ "parts": {
+  "chimney_4_5": {
+   "category": "part",
+   "min": [
+    -0.575,
+    0.0,
+    -0.575
+   ],
+   "max": [
+    0.575,
+    4.92,
+    0.575
+   ],
+   "size": [
+    1.15,
+    4.92,
+    1.15
+   ],
+   "radius": 0.575,
+   "top": 4.92,
+   "file": "village/parts/chimney_4_5.glb"
+  },
+  "chimney_5_5": {
+   "category": "part",
+   "min": [
+    -0.575,
+    0.0,
+    -0.575
+   ],
+   "max": [
+    0.575,
+    5.92,
+    0.575
+   ],
+   "size": [
+    1.15,
+    5.92,
+    1.15
+   ],
+   "radius": 0.575,
+   "top": 5.92,
+   "file": "village/parts/chimney_5_5.glb"
+  },
+  "chimney_6_5": {
+   "category": "part",
+   "min": [
+    -0.575,
+    0.0,
+    -0.575
+   ],
+   "max": [
+    0.575,
+    6.92,
+    0.575
+   ],
+   "size": [
+    1.15,
+    6.92,
+    1.15
+   ],
+   "radius": 0.575,
+   "top": 6.92,
+   "file": "village/parts/chimney_6_5.glb"
+  },
+  "chimney_8_0": {
+   "category": "part",
+   "min": [
+    -0.575,
+    0.0,
+    -0.575
+   ],
+   "max": [
+    0.575,
+    8.42,
+    0.575
+   ],
+   "size": [
+    1.15,
+    8.42,
+    1.15
+   ],
+   "radius": 0.575,
+   "top": 8.42,
+   "file": "village/parts/chimney_8_0.glb"
+  },
+  "smoke": {
+   "category": "part",
+   "min": [
+    -0.148,
+    -0.028,
+    -0.316
+   ],
+   "max": [
+    0.951,
+    1.954,
+    0.316
+   ],
+   "size": [
+    1.099,
+    1.982,
+    0.632
+   ],
+   "radius": 0.549,
+   "file": "village/parts/smoke.glb"
+  },
+  "hanging_sign": {
+   "category": "part",
+   "min": [
+    -0.4,
+    -0.8,
+    -0.0
+   ],
+   "max": [
+    0.4,
+    0.08,
+    1.1
+   ],
+   "size": [
+    0.8,
+    0.88,
+    1.1
+   ],
+   "radius": 0.55,
+   "file": "village/parts/hanging_sign.glb"
+  },
+  "bell_tower": {
+   "category": "part",
+   "min": [
+    -1.34,
+    0.0,
+    -1.34
+   ],
+   "max": [
+    1.34,
+    9.65,
+    1.34
+   ],
+   "size": [
+    2.679,
+    9.65,
+    2.679
+   ],
+   "radius": 1.34,
+   "file": "village/parts/bell_tower.glb"
+  },
+  "awning_w4_4": {
+   "category": "part",
+   "min": [
+    -2.2,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    2.2,
+    3.05,
+    1.5
+   ],
+   "size": [
+    4.4,
+    3.05,
+    1.5
+   ],
+   "radius": 2.2,
+   "file": "village/parts/awning_w4_4.glb",
+   "variants": [
+    "village/parts/variants/awning_w4_4_cream.glb",
+    "village/parts/variants/awning_w4_4_mint.glb",
+    "village/parts/variants/awning_w4_4_sky.glb",
+    "village/parts/variants/awning_w4_4_peach.glb",
+    "village/parts/variants/awning_w4_4_lilac.glb",
+    "village/parts/variants/awning_w4_4_brick.glb"
+   ]
+  },
+  "awning_w4_8": {
+   "category": "part",
+   "min": [
+    -2.4,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    2.4,
+    3.05,
+    1.5
+   ],
+   "size": [
+    4.8,
+    3.05,
+    1.5
+   ],
+   "radius": 2.4,
+   "file": "village/parts/awning_w4_8.glb",
+   "variants": [
+    "village/parts/variants/awning_w4_8_cream.glb",
+    "village/parts/variants/awning_w4_8_mint.glb",
+    "village/parts/variants/awning_w4_8_sky.glb",
+    "village/parts/variants/awning_w4_8_peach.glb",
+    "village/parts/variants/awning_w4_8_lilac.glb",
+    "village/parts/variants/awning_w4_8_brick.glb"
+   ]
+  },
+  "awning_w5_0": {
+   "category": "part",
+   "min": [
+    -2.5,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    2.5,
+    3.05,
+    1.5
+   ],
+   "size": [
+    5.0,
+    3.05,
+    1.5
+   ],
+   "radius": 2.5,
+   "file": "village/parts/awning_w5_0.glb",
+   "variants": [
+    "village/parts/variants/awning_w5_0_cream.glb",
+    "village/parts/variants/awning_w5_0_mint.glb",
+    "village/parts/variants/awning_w5_0_sky.glb",
+    "village/parts/variants/awning_w5_0_peach.glb",
+    "village/parts/variants/awning_w5_0_lilac.glb",
+    "village/parts/variants/awning_w5_0_brick.glb"
+   ]
+  },
+  "awning_w6_0": {
+   "category": "part",
+   "min": [
+    -3.0,
+    0.0,
+    -0.0
+   ],
+   "max": [
+    3.0,
+    3.05,
+    1.5
+   ],
+   "size": [
+    6.0,
+    3.05,
+    1.5
+   ],
+   "radius": 3.0,
+   "file": "village/parts/awning_w6_0.glb",
+   "variants": [
+    "village/parts/variants/awning_w6_0_cream.glb",
+    "village/parts/variants/awning_w6_0_mint.glb",
+    "village/parts/variants/awning_w6_0_sky.glb",
+    "village/parts/variants/awning_w6_0_peach.glb",
+    "village/parts/variants/awning_w6_0_lilac.glb",
+    "village/parts/variants/awning_w6_0_brick.glb"
+   ]
+  }
+ },
+ "props": {
+  "barrel": {
+   "category": "prop",
+   "min": [
+    -0.323,
+    -0.03,
+    -0.34
+   ],
+   "max": [
+    0.323,
+    0.88,
+    0.34
+   ],
+   "size": [
+    0.647,
+    0.91,
+    0.68
+   ],
+   "radius": 0.34,
+   "file": "village/props/barrel.glb"
+  },
+  "crate_stack": {
+   "category": "prop",
+   "min": [
+    -0.36,
+    0.0,
+    -0.41
+   ],
+   "max": [
+    1.06,
+    1.25,
+    0.36
+   ],
+   "size": [
+    1.42,
+    1.25,
+    0.77
+   ],
+   "radius": 0.71,
+   "file": "village/props/crate_stack.glb"
+  },
+  "bench": {
+   "category": "prop",
+   "min": [
+    -0.75,
+    0.0,
+    -0.21
+   ],
+   "max": [
+    0.75,
+    0.85,
+    0.21
+   ],
+   "size": [
+    1.5,
+    0.85,
+    0.42
+   ],
+   "radius": 0.75,
+   "file": "village/props/bench.glb"
+  },
+  "anvil": {
+   "category": "prop",
+   "min": [
+    -0.425,
+    0.0,
+    -0.296
+   ],
+   "max": [
+    0.663,
+    0.84,
+    0.296
+   ],
+   "size": [
+    1.088,
+    0.84,
+    0.591
+   ],
+   "radius": 0.544,
+   "file": "village/props/anvil.glb"
+  },
+  "haystack": {
+   "category": "prop",
+   "min": [
+    -0.923,
+    0.0,
+    -0.97
+   ],
+   "max": [
+    0.923,
+    1.75,
+    0.97
+   ],
+   "size": [
+    1.845,
+    1.75,
+    1.94
+   ],
+   "radius": 0.97,
+   "file": "village/props/haystack.glb"
+  },
+  "well": {
+   "category": "prop",
+   "min": [
+    -1.25,
+    0.0,
+    -0.95
+   ],
+   "max": [
+    1.25,
+    3.15,
+    0.95
+   ],
+   "size": [
+    2.5,
+    3.15,
+    1.9
+   ],
+   "radius": 1.25,
+   "file": "village/props/well.glb"
+  },
+  "fence_2m": {
+   "category": "prop",
+   "min": [
+    -1.071,
+    0.0,
+    -0.071
+   ],
+   "max": [
+    1.071,
+    1.07,
+    0.071
+   ],
+   "size": [
+    2.141,
+    1.07,
+    0.141
+   ],
+   "radius": 1.071,
+   "file": "village/props/fence_2m.glb"
+  },
+  "lantern_post": {
+   "category": "prop",
+   "min": [
+    -0.121,
+    0.0,
+    -0.18
+   ],
+   "max": [
+    0.516,
+    2.3,
+    0.18
+   ],
+   "size": [
+    0.637,
+    2.3,
+    0.36
+   ],
+   "radius": 0.319,
+   "file": "village/props/lantern_post.glb"
+  },
+  "tree_round": {
+   "category": "prop",
+   "min": [
+    -1.439,
+    0.0,
+    -1.201
+   ],
+   "max": [
+    1.585,
+    3.7,
+    1.304
+   ],
+   "size": [
+    3.024,
+    3.7,
+    2.505
+   ],
+   "radius": 1.512,
+   "file": "village/props/tree_round.glb"
+  },
+  "tree_pine": {
+   "category": "prop",
+   "min": [
+    -1.201,
+    0.0,
+    -1.201
+   ],
+   "max": [
+    1.201,
+    4.37,
+    1.201
+   ],
+   "size": [
+    2.402,
+    4.37,
+    2.402
+   ],
+   "radius": 1.201,
+   "file": "village/props/tree_pine.glb"
+  },
+  "bush": {
+   "category": "prop",
+   "min": [
+    -0.838,
+    -0.05,
+    -0.554
+   ],
+   "max": [
+    0.916,
+    0.95,
+    0.569
+   ],
+   "size": [
+    1.754,
+    1.0,
+    1.124
+   ],
+   "radius": 0.877,
+   "file": "village/props/bush.glb"
+  },
+  "mushroom_red": {
+   "category": "prop",
+   "min": [
+    -0.428,
+    0.0,
+    -0.45
+   ],
+   "max": [
+    0.428,
+    0.74,
+    0.45
+   ],
+   "size": [
+    0.856,
+    0.74,
+    0.9
+   ],
+   "radius": 0.45,
+   "file": "village/props/mushroom_red.glb"
+  },
+  "flower_patch": {
+   "category": "prop",
+   "min": [
+    -0.647,
+    0.0,
+    -0.647
+   ],
+   "max": [
+    0.647,
+    0.38,
+    0.647
+   ],
+   "size": [
+    1.293,
+    0.38,
+    1.293
+   ],
+   "radius": 0.647,
+   "file": "village/props/flower_patch.glb"
+  },
+  "pumpkin_patch": {
+   "category": "prop",
+   "min": [
+    -0.585,
+    0.0,
+    -0.485
+   ],
+   "max": [
+    0.772,
+    0.58,
+    0.296
+   ],
+   "size": [
+    1.357,
+    0.58,
+    0.78
+   ],
+   "radius": 0.678,
+   "file": "village/props/pumpkin_patch.glb"
+  },
+  "signpost": {
+   "category": "prop",
+   "min": [
+    -0.65,
+    0.0,
+    -0.078
+   ],
+   "max": [
+    0.65,
+    2.24,
+    0.078
+   ],
+   "size": [
+    1.3,
+    2.24,
+    0.156
+   ],
+   "radius": 0.65,
+   "file": "village/props/signpost.glb"
+  },
+  "market_stall": {
+   "category": "prop",
+   "min": [
+    -1.25,
+    0.0,
+    -0.65
+   ],
+   "max": [
+    1.25,
+    2.3,
+    0.825
+   ],
+   "size": [
+    2.5,
+    2.3,
+    1.475
+   ],
+   "radius": 1.25,
+   "file": "village/props/market_stall.glb"
+  },
+  "rock": {
+   "category": "prop",
+   "min": [
+    -0.606,
+    -0.08,
+    -0.464
+   ],
+   "max": [
+    0.87,
+    0.7,
+    0.464
+   ],
+   "size": [
+    1.476,
+    0.78,
+    0.929
+   ],
+   "radius": 0.738,
+   "file": "village/props/rock.glb"
+  },
+  "stepping_stone": {
+   "category": "prop",
+   "min": [
+    -0.462,
+    0.0,
+    -0.462
+   ],
+   "max": [
+    0.462,
+    0.09,
+    0.462
+   ],
+   "size": [
+    0.924,
+    0.09,
+    0.924
+   ],
+   "radius": 0.462,
+   "file": "village/props/stepping_stone.glb"
+  },
+  "pond": {
+   "category": "prop",
+   "min": [
+    -2.16,
+    -0.08,
+    -1.634
+   ],
+   "max": [
+    2.16,
+    0.32,
+    1.634
+   ],
+   "size": [
+    4.32,
+    0.4,
+    3.269
+   ],
+   "radius": 2.16,
+   "file": "village/props/pond.glb"
+  }
+ }
+}

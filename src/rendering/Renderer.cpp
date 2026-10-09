@@ -154,14 +154,15 @@ void Renderer::RenderUI() {
     // Basic UI rendering - placeholder for future UI systems
 }
 
-void Renderer::RenderDebugInfo() {
+void Renderer::RenderDebugInfo(const Vector3* playerPos, const Vector3* currentVillagePos,
+                               const Vector3* nextVillagePos) {
     const int x = 10;
     const int lh = 18;
     int y = 8;
 
     // Semi-transparent background panel
-    DrawRectangle(4, 4, 260, 100, Color{0, 0, 0, 140});
-    DrawRectangleLines(4, 4, 260, 100, Color{80, 80, 80, 180});
+    DrawRectangle(4, 4, 340, 165, Color{0, 0, 0, 140});
+    DrawRectangleLines(4, 4, 340, 165, Color{80, 80, 80, 180});
 
     DrawText(TextFormat(lang::Get("debug.fps").c_str(), GetFPS()), x, y, 15, Color{100, 255, 100, 255});
     y += lh;
@@ -171,6 +172,23 @@ void Renderer::RenderDebugInfo() {
         DrawText(TextFormat(lang::Get("debug.position").c_str(), pos.x, pos.y, pos.z), x, y, 14, Color{200, 200, 255, 255});
         y += lh;
         DrawText(TextFormat(lang::Get("debug.zoom").c_str(), m_camera->GetZoom()), x, y, 14, Color{200, 200, 255, 255});
+        y += lh;
+    }
+
+    if (playerPos) {
+        DrawText(TextFormat("Player: [%.1f, %.1f, %.1f]", playerPos->x, playerPos->y, playerPos->z), x, y, 14, Color{255, 150, 200, 255});
+        y += lh;
+    }
+
+    if (currentVillagePos) {
+        DrawText(TextFormat("Current village: X %.1f  Z %.1f", currentVillagePos->x,
+                            currentVillagePos->z), x, y, 14, Color{255, 215, 160, 255});
+        y += lh;
+    }
+
+    if (nextVillagePos) {
+        DrawText(TextFormat("Next village site: X %.1f  Z %.1f", nextVillagePos->x,
+                            nextVillagePos->z), x, y, 14, Color{180, 230, 255, 255});
         y += lh;
     }
 

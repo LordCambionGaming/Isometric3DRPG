@@ -269,17 +269,14 @@ void Game::CreateGameSession() {
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
     m_village = std::make_unique<Village>(spawn);
     m_hoveredNpc = nullptr;
-    const std::array<const char*, 5> houseAssets = {{
-        "models/village/forge.glb", "models/village/hall.glb", "models/village/chapel.glb",
-        "models/village/inn.glb", "models/village/farmhouse.glb"
-    }};
-    for (int index = 0; index < static_cast<int>(houseAssets.size()); ++index) {
-        Model* model = m_assetManager->LoadModel(houseAssets[static_cast<std::size_t>(index)]);
+    for (const std::string& asset : m_village->RequiredModelAssets()) {
+        const std::string modelPath = "models/" + asset;
+        Model* model = m_assetManager->LoadModel(modelPath);
         if (model) {
             for (int material = 0; material < model->materialCount; ++material)
                 model->materials[material].shader = m_lightingSystem->GetShader();
         }
-        m_village->SetBuildingModel(index, model);
+        m_village->SetModel(asset, model);
     }
 
     const std::array<const char*, 5> residentAssets = {{
@@ -358,7 +355,8 @@ bool Game::LoadGame() {
 }
 
 void Game::EnterVillageBuilding(int buildingIndex) {
-    if (!m_player || !m_village || buildingIndex < 0 || buildingIndex >= 5) return;
+    if (!m_player || !m_village || buildingIndex < 0 ||
+        buildingIndex >= m_village->BuildingCount()) return;
     m_pendingBuildingIndex = -1;
     m_doorTransitionTimer = 0.0f;
     m_exteriorPosition = m_player->GetPosition();
@@ -485,11 +483,13 @@ void Game::Render() {
 
         if (interiorVisible) {
             const Vector3 playerPosition = m_player ? m_player->GetPosition() : camera.target;
-            m_village->RenderInterior(m_activeBuilding, camera.position, playerPosition);
+            const Ray hoverRay = GetMouseRay(GetMousePosition(), camera);
+            m_village->RenderInterior(m_activeBuilding, camera.position, playerPosition, hoverRay);
             if (m_player) m_player->Render();
         } else {
             m_world->Render();
-            if (m_village) m_village->Render(*m_world);
+            if (m_village) m_village->Render(*m_world,
+                m_player ? m_player->GetPosition() : camera.target);
             if (m_hoveredNpc) {
                 const Vector3 position = m_hoveredNpc->position;
                 DrawBoundingBox({ { position.x - 0.4f, position.y, position.z - 0.4f },
@@ -541,7 +541,19 @@ void Game::Render() {
     }
 
     if (m_debugMode) {
-        m_renderer->RenderDebugInfo();
+        Vector3 playerPos = m_player ? m_player->GetPosition() : Vector3{0,0,0};
+        Vector3 currentVillage{};
+        Vector3 nextVillage{};
+        const Vector3* currentVillagePos = nullptr;
+        const Vector3* nextVillagePos = nullptr;
+        if (m_world && m_player && m_village) {
+            currentVillage = m_village->CenterPosition();
+            nextVillage = Village::FindNearestVillage(*m_world, playerPos, currentVillage);
+            currentVillagePos = &currentVillage;
+            nextVillagePos = &nextVillage;
+        }
+        m_renderer->RenderDebugInfo(m_player ? &playerPos : nullptr,
+                                    currentVillagePos, nextVillagePos);
     }
 
     m_renderer->EndFrame();
