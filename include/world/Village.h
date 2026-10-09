@@ -21,6 +21,7 @@ struct VillageNpc {
     std::string id;
     VillageNpcRole role;
     Vector3 position;
+    Vector3 spawnPos{};       // origin for random wandering
     Vector3 target{};
     Color clothing;
     int homeBuilding = 0;
@@ -33,6 +34,7 @@ struct VillageNpc {
     float animationTime = 0.0f;
     float oneShotTime = 0.0f;
     float facing = 0.0f;
+    float wanderRadius = 6.0f; // max wander distance from spawnPos
     bool walking = false;
     bool insideHome = false;
     bool returningHome = false;

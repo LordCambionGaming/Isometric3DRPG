@@ -141,13 +141,28 @@ WeaponDef Character::ActiveWeapon() const {
 
 void Character::AddItem(ItemId id, int count) {
     if (count <= 0) return;
+    const ItemDef* def = GetItem(id);
+    if (!def) return;
+    
+    // Fill existing stacks first
     for (auto& stack : inventory) {
-        if (stack.id == id) {
-            stack.count += count;
-            return;
+        if (stack.id == id && stack.count < def->maxStack) {
+            int canAdd = def->maxStack - stack.count;
+            if (count <= canAdd) {
+                stack.count += count;
+                return;
+            } else {
+                stack.count = def->maxStack;
+                count -= canAdd;
+            }
         }
     }
-    inventory.push_back({ id, count });
+    // Add remaining in new stacks
+    while (count > 0) {
+        int add = std::min(count, def->maxStack);
+        inventory.push_back({ id, add });
+        count -= add;
+    }
 }
 
 int Character::QuiverArrowCount() const {

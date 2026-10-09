@@ -370,7 +370,7 @@ void Game::EnterVillageBuilding(int buildingIndex) {
     m_activeBuilding = buildingIndex;
     m_player->StopMovement({ 0.0f, 0.0f, 2.8f });
     if (m_world) m_world->SetPlayerPosition(m_exteriorPosition);
-    if (m_camera) m_camera->SetView({ 0.0f, 1.0f, 0.0f }, 0.0f, 0.82f);
+    if (m_camera) m_camera->SetView(Vector3{ 0.0f, 0.8f, 0.0f }, 3.14159265f * 0.5f, 1.45f);
     m_interactionMenu.Close();
     SetState(std::make_unique<VillageInteriorState>(this, buildingIndex));
 }

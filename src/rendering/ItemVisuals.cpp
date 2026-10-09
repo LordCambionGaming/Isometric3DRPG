@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr int   kIconSize     = 64;      // lato della texture dell'icona
+constexpr int   kIconSize     = 128;     // lato della texture dell'icona
 constexpr float kIconMargin   = 1.14f;   // aria intorno all'oggetto nell'icona
 constexpr float kGripY        = -0.05f;  // centro del pugno nello spazio dell'osso mano (= GRIP_OFFSET nel generatore)
 

@@ -46,6 +46,7 @@ struct ItemDef {
     WeaponDef weapon{};                          // valido solo se category == Weapon
     const char* model = "";                      // asset .glb sotto assets/ ("" finche' non esiste)
     const char* icon = "";                       // immagine dell'inventario ("" finche' non esiste)
+    int maxStack = 1;                            // massima quantita' impilabile in uno slot
 };
 
 // Una riga della lista oggetti di chi li possiede (Character, Mob, bauli...).

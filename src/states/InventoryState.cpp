@@ -74,218 +74,267 @@ void InventoryState::Update(float deltaTime) {
     Vector2 mousePos = GetMousePosition();
     
     const int sw = GetScreenWidth(), sh = GetScreenHeight();
-    const float panelW = m_containerChest ? 1020.0f : 800.0f, panelH = 500.0f;
-    const float px = (sw - panelW) / 2.0f;
-    const float py = (sh - panelH) / 2.0f;
-    
-    const float gridX = px + 450.0f;
-    const float gridY = py + 60.0f;
 
-    const float chestGridX = px + 740.0f;
-    const float chestGridY = py + 100.0f;
-    constexpr int CHEST_COLS = 4;
-    constexpr int CHEST_ROWS = 4;
-
-    // "Prendi Tutto" (Take All) button check
-    if (m_containerChest && !m_isDragging && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        Rectangle takeAllBtn = { px + 740.0f, py + 380.0f, 200.0f, 36.0f };
-        if (CheckCollisionPointRec(mousePos, takeAllBtn)) {
-            c.gold += m_containerChest->gold;
-            m_containerChest->gold = 0;
-            for (const auto& stack : m_containerChest->items) {
-                if (stack.id != core::kNoItem && stack.count > 0) {
-                    c.AddItem(stack.id, stack.count);
-                }
-            }
-            m_containerChest->items.clear();
-            m_containerChest->looted = true;
-        }
-    }
-    
     int totalItems = (int)c.inventory.size();
     int totalRows = (totalItems + GRID_COLS - 1) / GRID_COLS;
     m_maxScroll = std::max(0, totalRows - GRID_ROWS);
     if (m_scrollOffset > m_maxScroll) m_scrollOffset = m_maxScroll;
-    
+
+    // ── Compute layout coordinates (must match Render) ──────────────────────
+    // Chest mode: two panels side-by-side
+    constexpr int CHEST_COLS = 4;
+    constexpr int CHEST_ROWS = 4;
+
+    const float panelH = 520.0f;
+    const float topY   = (sh - panelH) / 2.0f;
+
+    // Left panel (backpack)
+    const float leftW  = 420.0f;
+    const float leftX  = sw / 2.0f - leftW - 20.0f;
+    const float bgridX = leftX + 120.0f;
+    const float bgridY = topY + 60.0f;
+
+    // Right panel (chest)
+    const float rightX     = sw / 2.0f + 20.0f;
+    const float chestGridX = rightX + 20.0f;
+    const float chestGridY = topY + 90.0f;
+
+    // Normal-mode panel
+    const float normPanelW = 800.0f, normPanelH = 500.0f;
+    const float px = (sw - normPanelW) / 2.0f;
+    const float py = (sh - normPanelH) / 2.0f;
+    const float gridX = px + 450.0f;
+    const float gridY = py + 60.0f;
+
+    // ── Take-All button & Gold Pickup ────────────────────────────────────────
+    if (m_containerChest && !m_isDragging && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        Rectangle takeAllBtn = { rightX + 20.0f, topY + panelH - 70.0f, 200.0f, 40.0f };
+        Rectangle goldTextRect = { rightX + 20.0f, topY + 52.0f, 200.0f, 24.0f }; // rough bounds for gold text
+        
+        if (CheckCollisionPointRec(mousePos, takeAllBtn)) {
+            c.gold += m_containerChest->gold;
+            m_containerChest->gold = 0;
+            for (const auto& stack : m_containerChest->items) {
+                if (stack.id != core::kNoItem && stack.count > 0) c.AddItem(stack.id, stack.count);
+            }
+            m_containerChest->items.clear();
+            m_containerChest->looted = true;
+        } else if (CheckCollisionPointRec(mousePos, goldTextRect) && m_containerChest->gold > 0) {
+            c.gold += m_containerChest->gold;
+            m_containerChest->gold = 0;
+            if (m_containerChest->items.empty()) m_containerChest->looted = true;
+        }
+    }
+
+    // ── Drag start ──────────────────────────────────────────────────────────
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !m_isDragging) {
-        for (int row = 0; row < GRID_ROWS; ++row) {
-            for (int col = 0; col < GRID_COLS; ++col) {
-                int itemIndex = (m_scrollOffset + row) * GRID_COLS + col;
-                if (itemIndex < totalItems) {
-                    float x = gridX + col * (SLOT_SIZE + SLOT_PADDING);
-                    float y = gridY + row * (SLOT_SIZE + SLOT_PADDING);
-                    Rectangle slotRec = { x, y, SLOT_SIZE, SLOT_SIZE };
-                    
-                    if (CheckCollisionPointRec(mousePos, slotRec)) {
-                        m_isDragging = true;
-                        m_draggedItemId = c.inventory[itemIndex].id;
-                        m_draggedItemCount = c.inventory[itemIndex].count;
-                        m_dragSource = DRAG_GRID;
-                        m_dragSourceIndex = itemIndex;
-                        
-                        c.inventory[itemIndex].id = core::kNoItem;
-                        c.inventory[itemIndex].count = 0;
-                        break;
-                    }
+
+        if (m_containerChest) {
+            // CHEST MODE: equip slots on left panel
+            struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
+            SlotDef eqSlots[] = {
+                { DRAG_EQUIP_HEAD,  leftX+20, topY+ 60, &c.equipment.head,      core::EquipSlot::Head },
+                { DRAG_EQUIP_BODY,  leftX+20, topY+130, &c.equipment.body,      core::EquipSlot::Body },
+                { DRAG_EQUIP_LEGS,  leftX+20, topY+200, &c.equipment.legs,      core::EquipSlot::Legs },
+                { DRAG_EQUIP_FEET,  leftX+20, topY+270, &c.equipment.feet,      core::EquipSlot::Feet },
+                { DRAG_EQUIP_RIGHT, leftX+20, topY+340, &c.equipment.rightHand, core::EquipSlot::RightHand },
+                { DRAG_EQUIP_LEFT,  leftX+20, topY+410, &c.equipment.leftHand,  core::EquipSlot::LeftHand },
+            };
+            for (auto& s : eqSlots) {
+                Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+                if (CheckCollisionPointRec(mousePos, r) && *s.idPtr != core::kNoItem) {
+                    m_isDragging = true; m_draggedItemId = *s.idPtr; m_draggedItemCount = 1;
+                    m_dragSource = s.src; *s.idPtr = core::kNoItem; break;
                 }
             }
-        }
-
-        // Check chest slots drag start
-        if (m_containerChest && !m_isDragging) {
-            int chestTotalItems = (int)m_containerChest->items.size();
-            for (int row = 0; row < CHEST_ROWS; ++row) {
-                for (int col = 0; col < CHEST_COLS; ++col) {
-                    int itemIndex = row * CHEST_COLS + col;
-                    if (itemIndex < chestTotalItems) {
-                        float x = chestGridX + col * (SLOT_SIZE + SLOT_PADDING);
-                        float y = chestGridY + row * (SLOT_SIZE + SLOT_PADDING);
-                        Rectangle slotRec = { x, y, SLOT_SIZE, SLOT_SIZE };
-
-                        if (CheckCollisionPointRec(mousePos, slotRec)) {
-                            m_isDragging = true;
-                            m_draggedItemId = m_containerChest->items[itemIndex].id;
-                            m_draggedItemCount = m_containerChest->items[itemIndex].count;
-                            m_dragSource = DRAG_CHEST_GRID;
-                            m_dragSourceIndex = itemIndex;
-
-                            m_containerChest->items.erase(m_containerChest->items.begin() + itemIndex);
-                            break;
+            // Backpack grid
+            if (!m_isDragging) {
+                for (int row = 0; row < GRID_ROWS && !m_isDragging; ++row) {
+                    for (int col = 0; col < GRID_COLS; ++col) {
+                        int idx = (m_scrollOffset + row) * GRID_COLS + col;
+                        if (idx < totalItems && c.inventory[idx].id != core::kNoItem) {
+                            Rectangle r = { bgridX + col*(SLOT_SIZE+SLOT_PADDING), bgridY + row*(SLOT_SIZE+SLOT_PADDING), SLOT_SIZE, SLOT_SIZE };
+                            if (CheckCollisionPointRec(mousePos, r)) {
+                                m_isDragging = true; m_draggedItemId = c.inventory[idx].id;
+                                m_draggedItemCount = c.inventory[idx].count;
+                                m_dragSource = DRAG_GRID; m_dragSourceIndex = idx;
+                                c.inventory[idx].id = core::kNoItem; c.inventory[idx].count = 0;
+                            }
                         }
                     }
                 }
-                if (m_isDragging) break;
             }
-        }
-        
-        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
-        SlotDef equipSlots[] = {
-            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head, core::EquipSlot::Head },
-            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body, core::EquipSlot::Body },
-            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs, core::EquipSlot::Legs },
-            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet, core::EquipSlot::Feet },
-            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand, core::EquipSlot::RightHand },
-            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand, core::EquipSlot::LeftHand }
-        };
-        
-        for (const auto& s : equipSlots) {
-            Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
-            if (CheckCollisionPointRec(mousePos, r) && *s.idPtr != core::kNoItem) {
-                m_isDragging = true;
-                m_draggedItemId = *s.idPtr;
-                m_draggedItemCount = 1;
-                m_dragSource = s.src;
-                *s.idPtr = core::kNoItem;
-                break;
+            // Chest grid
+            if (!m_isDragging) {
+                int chestTotal = (int)m_containerChest->items.size();
+                for (int row = 0; row < CHEST_ROWS && !m_isDragging; ++row) {
+                    for (int col = 0; col < CHEST_COLS; ++col) {
+                        int idx = row * CHEST_COLS + col;
+                        if (idx < chestTotal) {
+                            Rectangle r = { chestGridX + col*(SLOT_SIZE+SLOT_PADDING), chestGridY + row*(SLOT_SIZE+SLOT_PADDING), SLOT_SIZE, SLOT_SIZE };
+                            if (CheckCollisionPointRec(mousePos, r)) {
+                                m_isDragging = true; m_draggedItemId = m_containerChest->items[idx].id;
+                                m_draggedItemCount = m_containerChest->items[idx].count;
+                                m_dragSource = DRAG_CHEST_GRID; m_dragSourceIndex = idx;
+                                m_containerChest->items.erase(m_containerChest->items.begin() + idx);
+                            }
+                        }
+                    }
+                }
             }
-        }
-
-        const Rectangle quiverRect = { px + 350, py + 320, SLOT_SIZE, SLOT_SIZE };
-        if (!m_isDragging && CheckCollisionPointRec(mousePos, quiverRect) &&
-            c.equipment.quiver.id != core::kNoItem) {
-            m_isDragging = true;
-            m_draggedItemId = c.equipment.quiver.id;
-            m_draggedItemCount = c.equipment.quiver.count;
-            m_dragSource = DRAG_EQUIP_QUIVER;
-            c.equipment.quiver = { core::kNoItem, 0 };
+        } else {
+            // NORMAL MODE
+            struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
+            SlotDef equipSlots[] = {
+                { DRAG_EQUIP_HEAD,  px+ 50, py+ 80, &c.equipment.head,      core::EquipSlot::Head },
+                { DRAG_EQUIP_BODY,  px+ 50, py+160, &c.equipment.body,      core::EquipSlot::Body },
+                { DRAG_EQUIP_LEGS,  px+ 50, py+240, &c.equipment.legs,      core::EquipSlot::Legs },
+                { DRAG_EQUIP_FEET,  px+ 50, py+320, &c.equipment.feet,      core::EquipSlot::Feet },
+                { DRAG_EQUIP_RIGHT, px+350, py+160, &c.equipment.rightHand, core::EquipSlot::RightHand },
+                { DRAG_EQUIP_LEFT,  px+350, py+240, &c.equipment.leftHand,  core::EquipSlot::LeftHand }
+            };
+            for (auto& s : equipSlots) {
+                Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+                if (CheckCollisionPointRec(mousePos, r) && *s.idPtr != core::kNoItem) {
+                    m_isDragging = true; m_draggedItemId = *s.idPtr; m_draggedItemCount = 1;
+                    m_dragSource = s.src; *s.idPtr = core::kNoItem; break;
+                }
+            }
+            const Rectangle quiverRect = { px+350, py+320, SLOT_SIZE, SLOT_SIZE };
+            if (!m_isDragging && CheckCollisionPointRec(mousePos, quiverRect) && c.equipment.quiver.id != core::kNoItem) {
+                m_isDragging = true; m_draggedItemId = c.equipment.quiver.id;
+                m_draggedItemCount = c.equipment.quiver.count;
+                m_dragSource = DRAG_EQUIP_QUIVER; c.equipment.quiver = { core::kNoItem, 0 };
+            }
+            for (int row = 0; row < GRID_ROWS && !m_isDragging; ++row) {
+                for (int col = 0; col < GRID_COLS; ++col) {
+                    int idx = (m_scrollOffset + row) * GRID_COLS + col;
+                    if (idx < totalItems) {
+                        Rectangle r = { gridX + col*(SLOT_SIZE+SLOT_PADDING), gridY + row*(SLOT_SIZE+SLOT_PADDING), SLOT_SIZE, SLOT_SIZE };
+                        if (CheckCollisionPointRec(mousePos, r)) {
+                            m_isDragging = true; m_draggedItemId = c.inventory[idx].id;
+                            m_draggedItemCount = c.inventory[idx].count;
+                            m_dragSource = DRAG_GRID; m_dragSourceIndex = idx;
+                            c.inventory[idx].id = core::kNoItem; c.inventory[idx].count = 0;
+                        }
+                    }
+                }
+            }
         }
     }
+    // ── Drag release ─────────────────────────────────────────────────────────
     else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && m_isDragging) {
         bool dropped = false;
 
-        // Check drop on chest grid
         if (m_containerChest) {
-            Rectangle chestArea = { chestGridX - 10, chestGridY - 10, CHEST_COLS * (SLOT_SIZE + SLOT_PADDING) + 20, CHEST_ROWS * (SLOT_SIZE + SLOT_PADDING) + 20 };
-            if (CheckCollisionPointRec(mousePos, chestArea)) {
+            // Drop on chest grid
+            Rectangle chestArea = { chestGridX - 10, chestGridY - 10,
+                CHEST_COLS*(SLOT_SIZE+SLOT_PADDING)+20, CHEST_ROWS*(SLOT_SIZE+SLOT_PADDING)+20 };
+            if (!dropped && CheckCollisionPointRec(mousePos, chestArea)) {
                 m_containerChest->items.push_back({ m_draggedItemId, m_draggedItemCount });
                 dropped = true;
             }
-        }
-        
-        struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
-        SlotDef equipSlots[] = {
-            { DRAG_EQUIP_HEAD, px + 50, py + 80, &c.equipment.head, core::EquipSlot::Head },
-            { DRAG_EQUIP_BODY, px + 50, py + 160, &c.equipment.body, core::EquipSlot::Body },
-            { DRAG_EQUIP_LEGS, px + 50, py + 240, &c.equipment.legs, core::EquipSlot::Legs },
-            { DRAG_EQUIP_FEET, px + 50, py + 320, &c.equipment.feet, core::EquipSlot::Feet },
-            { DRAG_EQUIP_RIGHT, px + 350, py + 160, &c.equipment.rightHand, core::EquipSlot::RightHand },
-            { DRAG_EQUIP_LEFT, px + 350, py + 240, &c.equipment.leftHand, core::EquipSlot::LeftHand }
-        };
-        
-        if (!dropped) {
-            for (const auto& s : equipSlots) {
-                Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
-                if (CheckCollisionPointRec(mousePos, r)) {
-                    if (c.CanEquip(m_draggedItemId, s.eSlot)) {
-                        if (*s.idPtr != core::kNoItem) {
-                            c.AddItem(*s.idPtr, 1);
+            // Drop on backpack grid
+            for (int row = 0; row < GRID_ROWS && !dropped; ++row) {
+                for (int col = 0; col < GRID_COLS; ++col) {
+                    Rectangle r = { bgridX + col*(SLOT_SIZE+SLOT_PADDING), bgridY + row*(SLOT_SIZE+SLOT_PADDING), SLOT_SIZE, SLOT_SIZE };
+                    if (CheckCollisionPointRec(mousePos, r)) {
+                        int idx = (m_scrollOffset + row) * GRID_COLS + col;
+                        if (idx < totalItems && c.inventory[idx].id != core::kNoItem) {
+                            c.AddItem(m_draggedItemId, m_draggedItemCount);
+                        } else {
+                            c.AddItem(m_draggedItemId, m_draggedItemCount);
                         }
-                        *s.idPtr = m_draggedItemId;
-                        dropped = true;
+                        dropped = true; break;
                     }
-                    break;
+                }
+            }
+            // Drop on equip slots
+            struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
+            SlotDef eqSlots[] = {
+                { DRAG_EQUIP_HEAD,  leftX+20, topY+ 60, &c.equipment.head,      core::EquipSlot::Head },
+                { DRAG_EQUIP_BODY,  leftX+20, topY+130, &c.equipment.body,      core::EquipSlot::Body },
+                { DRAG_EQUIP_LEGS,  leftX+20, topY+200, &c.equipment.legs,      core::EquipSlot::Legs },
+                { DRAG_EQUIP_FEET,  leftX+20, topY+270, &c.equipment.feet,      core::EquipSlot::Feet },
+                { DRAG_EQUIP_RIGHT, leftX+20, topY+340, &c.equipment.rightHand, core::EquipSlot::RightHand },
+                { DRAG_EQUIP_LEFT,  leftX+20, topY+410, &c.equipment.leftHand,  core::EquipSlot::LeftHand },
+            };
+            if (!dropped) {
+                for (auto& s : eqSlots) {
+                    Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+                    if (CheckCollisionPointRec(mousePos, r)) {
+                        if (c.CanEquip(m_draggedItemId, s.eSlot)) {
+                            if (*s.idPtr != core::kNoItem) c.AddItem(*s.idPtr, 1);
+                            *s.idPtr = m_draggedItemId; dropped = true;
+                        }
+                        break;
+                    }
+                }
+            }
+        } else {
+            // NORMAL MODE drops
+            struct SlotDef { DragSource src; float x; float y; core::ItemId* idPtr; core::EquipSlot eSlot; };
+            SlotDef equipSlots[] = {
+                { DRAG_EQUIP_HEAD,  px+ 50, py+ 80, &c.equipment.head,      core::EquipSlot::Head },
+                { DRAG_EQUIP_BODY,  px+ 50, py+160, &c.equipment.body,      core::EquipSlot::Body },
+                { DRAG_EQUIP_LEGS,  px+ 50, py+240, &c.equipment.legs,      core::EquipSlot::Legs },
+                { DRAG_EQUIP_FEET,  px+ 50, py+320, &c.equipment.feet,      core::EquipSlot::Feet },
+                { DRAG_EQUIP_RIGHT, px+350, py+160, &c.equipment.rightHand, core::EquipSlot::RightHand },
+                { DRAG_EQUIP_LEFT,  px+350, py+240, &c.equipment.leftHand,  core::EquipSlot::LeftHand }
+            };
+            if (!dropped) {
+                for (auto& s : equipSlots) {
+                    Rectangle r = { s.x, s.y, SLOT_SIZE, SLOT_SIZE };
+                    if (CheckCollisionPointRec(mousePos, r)) {
+                        if (c.CanEquip(m_draggedItemId, s.eSlot)) {
+                            if (*s.idPtr != core::kNoItem) c.AddItem(*s.idPtr, 1);
+                            *s.idPtr = m_draggedItemId; dropped = true;
+                        }
+                        break;
+                    }
+                }
+            }
+            const Rectangle quiverRect = { px+350, py+320, SLOT_SIZE, SLOT_SIZE };
+            if (!dropped && CheckCollisionPointRec(mousePos, quiverRect)) {
+                if (c.CanEquip(m_draggedItemId, core::EquipSlot::Quiver)) {
+                    if (c.equipment.quiver.id != core::kNoItem) c.AddItem(c.equipment.quiver.id, c.equipment.quiver.count);
+                    c.equipment.quiver = { m_draggedItemId, m_draggedItemCount }; dropped = true;
+                }
+            }
+            if (!dropped) {
+                for (int row = 0; row < GRID_ROWS && !dropped; ++row) {
+                    for (int col = 0; col < GRID_COLS; ++col) {
+                        Rectangle r = { gridX + col*(SLOT_SIZE+SLOT_PADDING), gridY + row*(SLOT_SIZE+SLOT_PADDING), SLOT_SIZE, SLOT_SIZE };
+                        if (CheckCollisionPointRec(mousePos, r)) {
+                            int idx = (m_scrollOffset + row) * GRID_COLS + col;
+                            if (idx < totalItems && c.inventory[idx].id != core::kNoItem) {
+                                core::ItemId tmp = c.inventory[idx].id; int tmpC = c.inventory[idx].count;
+                                c.inventory[idx].id = m_draggedItemId; c.inventory[idx].count = m_draggedItemCount;
+                                c.AddItem(tmp, tmpC);
+                            } else {
+                                c.AddItem(m_draggedItemId, m_draggedItemCount);
+                            }
+                            dropped = true; break;
+                        }
+                    }
                 }
             }
         }
 
-        const Rectangle quiverRect = { px + 350, py + 320, SLOT_SIZE, SLOT_SIZE };
-        if (!dropped && CheckCollisionPointRec(mousePos, quiverRect)) {
-            if (c.CanEquip(m_draggedItemId, core::EquipSlot::Quiver)) {
-                if (c.equipment.quiver.id != core::kNoItem) {
-                    c.AddItem(c.equipment.quiver.id, c.equipment.quiver.count);
-                }
-                c.equipment.quiver = { m_draggedItemId, m_draggedItemCount };
-                dropped = true;
-            }
-        }
-        
         if (!dropped) {
-            for (int row = 0; row < GRID_ROWS; ++row) {
-                for (int col = 0; col < GRID_COLS; ++col) {
-                    float x = gridX + col * (SLOT_SIZE + SLOT_PADDING);
-                    float y = gridY + row * (SLOT_SIZE + SLOT_PADDING);
-                    Rectangle r = { x, y, SLOT_SIZE, SLOT_SIZE };
-                    
-                    if (CheckCollisionPointRec(mousePos, r)) {
-                        int itemIndex = (m_scrollOffset + row) * GRID_COLS + col;
-                        if (itemIndex < totalItems) {
-                            if (c.inventory[itemIndex].id == core::kNoItem) {
-                                c.inventory[itemIndex].id = m_draggedItemId;
-                                c.inventory[itemIndex].count = m_draggedItemCount;
-                            } else {
-                                core::ItemId temp = c.inventory[itemIndex].id;
-                                int tempCount = c.inventory[itemIndex].count;
-                                c.inventory[itemIndex].id = m_draggedItemId;
-                                c.inventory[itemIndex].count = m_draggedItemCount;
-                                c.AddItem(temp, tempCount);
-                            }
-                        } else {
-                            c.AddItem(m_draggedItemId, m_draggedItemCount);
-                        }
-                        dropped = true;
-                        break;
-                    }
-                }
-                if (dropped) break;
-            }
-        }
-        
-        if (!dropped) {
-            if (m_dragSource == DRAG_CHEST_GRID && m_containerChest) {
+            if (m_dragSource == DRAG_CHEST_GRID && m_containerChest)
                 m_containerChest->items.push_back({ m_draggedItemId, m_draggedItemCount });
-            } else {
+            else
                 c.AddItem(m_draggedItemId, m_draggedItemCount);
-            }
         }
-        
-        c.inventory.erase(
-            std::remove_if(c.inventory.begin(), c.inventory.end(),
-                           [](const core::ItemStack& stack) { return stack.id == core::kNoItem || stack.count <= 0; }),
-            c.inventory.end());
-            
+
+        c.inventory.erase(std::remove_if(c.inventory.begin(), c.inventory.end(),
+            [](const core::ItemStack& s) { return s.id == core::kNoItem || s.count <= 0; }), c.inventory.end());
         m_isDragging = false;
     }
 }
+
+
 
 void InventoryState::Render3DPreview(Rectangle bounds) {
     BeginTextureMode(m_previewTexture);

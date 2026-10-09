@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
+#include <random>
+
 
 namespace {
 
@@ -108,16 +111,16 @@ void DrawResident(const VillageNpc& npc, Vector3 position) {
                 { 1.0f, 1.0f, 1.0f }, WHITE);
 }
 
-VillageNpc MakeNpc(const char* id, VillageNpcRole role, Vector3 position, Color clothing, int homeBuilding,
-                   std::array<Vector2, 3> route, float waitTime) {
+VillageNpc MakeNpc(const char* id, VillageNpcRole role, Vector3 position, Color clothing,
+                   int homeBuilding, float wanderRadius, float waitTime) {
     VillageNpc npc;
     npc.id = id;
     npc.role = role;
     npc.position = position;
+    npc.spawnPos = position;
     npc.clothing = clothing;
     npc.homeBuilding = homeBuilding;
-    npc.route = route;
-    npc.routeCount = static_cast<int>(route.size());
+    npc.wanderRadius = wanderRadius;
     npc.target = position;
     npc.waitTime = waitTime;
     return npc;
@@ -138,20 +141,26 @@ void DrawCandle(Vector3 position, float radius, float height, int slices, Color 
     DrawSphere({ position.x, position.y + height + radius, position.z }, radius * 1.15f, flameColor);
 }
 
+// Thread-local RNG for NPC wandering — avoids global state issues.
+std::mt19937& NpcRng() {
+    static thread_local std::mt19937 rng(std::random_device{}());
+    return rng;
 }
+
+} // namespace
 
 Village::Village(Vector3 center) : m_center(center) {
     m_npcs = {
         MakeNpc("npc.blacksmith", VillageNpcRole::Blacksmith, { center.x - 2.1f, center.y, center.z - 3.8f },
-            Color{ 88, 79, 72, 255 }, 0, {{{-2.1f, -3.8f}}}, 5.0f), // Stay right at the anvil working
+            Color{ 88, 79, 72, 255 }, 0, 0.0f, 5.0f),   // Blacksmith never wanders (radius=0)
         MakeNpc("npc.mayor", VillageNpcRole::Mayor, { center.x + 4.5f, center.y, center.z + 2.0f },
-                Color{ 47, 65, 98, 255 }, 1, {{{4.5f, 2.0f}, {4.0f, 3.0f}}}, 2.1f),
+                Color{ 47, 65, 98, 255 }, 1, 5.0f, 2.1f),
         MakeNpc("npc.cleric", VillageNpcRole::Cleric, { center.x + 2.0f, center.y, center.z + 4.5f },
-                Color{ 211, 198, 166, 255 }, 2, {{{2.0f, 4.5f}, {1.0f, 4.0f}}}, 1.8f),
+                Color{ 211, 198, 166, 255 }, 2, 4.5f, 1.8f),
         MakeNpc("npc.farmer", VillageNpcRole::Farmer, { center.x - 4.5f, center.y, center.z + 4.5f },
-            Color{ 82, 105, 54, 255 }, 4, {{{-4.5f, 4.5f}, {-4.5f, 6.0f}}}, 3.0f), // Safely outside building 4
+            Color{ 82, 105, 54, 255 }, 4, 7.0f, 3.0f),
         MakeNpc("npc.innkeeper", VillageNpcRole::Innkeeper, { center.x - 4.0f, center.y, center.z - 3.0f },
-                Color{ 113, 66, 45, 255 }, 3, {{{-4.0f, -3.0f}, {-3.5f, -4.0f}}}, 1.7f)
+                Color{ 113, 66, 45, 255 }, 3, 4.0f, 1.7f)
     };
     m_npcs[1].insideHome = true;
     m_npcs[2].insideHome = true;
@@ -257,7 +266,9 @@ void Village::Update(const World& world, NavigationSystem& navigation, float del
                             npc.insideHome = true;
                             npc.returningHome = false;
                         } else {
-                            npc.waitTime = 2.4f + static_cast<float>(npc.routeIndex % 3) * 0.8f;
+                            // Random wait between 1.5 and 4 seconds
+                            std::uniform_real_distribution<float> waitDist(1.5f, 4.0f);
+                            npc.waitTime = waitDist(NpcRng());
                         }
                     }
                 } else {
@@ -270,11 +281,22 @@ void Village::Update(const World& world, NavigationSystem& navigation, float del
             } else {
                 npc.walking = false;
                 npc.waitTime = std::max(0.0f, npc.waitTime - deltaTime);
-                if (!wantsHome && npc.waitTime <= 0.0f) {
-                    npc.routeIndex = (npc.routeIndex + 1) % npc.routeCount;
-                    const Vector2 offset = npc.route[static_cast<std::size_t>(npc.routeIndex)];
-                    const Vector3 destination{ m_center.x + offset.x, 0.0f, m_center.z + offset.y };
-                    if (!setDestination(destination)) npc.waitTime = 1.0f;
+                if (!wantsHome && npc.waitTime <= 0.0f && npc.wanderRadius > 0.5f) {
+                    // Pick a random destination within wanderRadius of spawnPos
+                    std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * 3.14159265f);
+                    std::uniform_real_distribution<float> radiusDist(1.0f, npc.wanderRadius);
+                    bool found = false;
+                    for (int attempt = 0; attempt < 8; ++attempt) {
+                        const float angle = angleDist(NpcRng());
+                        const float r     = radiusDist(NpcRng());
+                        const Vector3 dest{
+                            npc.spawnPos.x + std::cos(angle) * r,
+                            0.0f,
+                            npc.spawnPos.z + std::sin(angle) * r
+                        };
+                        if (setDestination(dest)) { found = true; break; }
+                    }
+                    if (!found) npc.waitTime = 1.5f;
                 } else if (wantsHome && !npc.returningHome) {
                     npc.returningHome = setDestination(homeDoor);
                 }
@@ -632,8 +654,27 @@ void Village::RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 
             { position.x - width * 0.5f, position.y - height * 0.5f, position.z - depth * 0.5f },
             { position.x + width * 0.5f, position.y + height * 0.5f, position.z + depth * 0.5f }
         };
-        const RayCollision hit = GetRayCollisionBox(viewRay, bounds);
-        const bool occludesPlayer = viewDistance > 0.001f && hit.hit && hit.distance < viewDistance - 0.18f;
+        // Thick raycast approximation: check if object is in front of player (z > player.z)
+        // AND within a horizontal corridor to the camera. Since camera is at +Z looking -Z,
+        // we check if the object's X bounds overlap the player's X (with some margin) 
+        // and its Z is greater than the player's Z.
+        bool occludesPlayer = false;
+        if (viewDistance > 0.001f) {
+            if (bounds.min.z > playerPosition.z - 0.2f && 
+                bounds.min.y < playerPosition.y + 2.0f &&
+                bounds.max.y > playerPosition.y) {
+                // Check X overlap with a 1.0f wide corridor around the player
+                if (bounds.max.x > playerPosition.x - 1.0f && bounds.min.x < playerPosition.x + 1.0f) {
+                    occludesPlayer = true;
+                }
+            }
+            // Also keep the exact raycast as fallback for edge cases
+            if (!occludesPlayer) {
+                const RayCollision hit = GetRayCollisionBox(viewRay, bounds);
+                occludesPlayer = hit.hit && hit.distance < viewDistance - 0.18f;
+            }
+        }
+
         if (occludesPlayer) {
             BeginBlendMode(BLEND_ALPHA);
             rlDisableDepthMask();
