@@ -113,14 +113,10 @@ float Chunk::GetHeightAt(float localX, float localZ) const {
 }
 
 void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* world) {
-    auto tStart = std::chrono::high_resolution_clock::now();
     const int chunkOffsetX = m_x * m_size;
     const int chunkOffsetZ = m_z * m_size;
     const int waterLevel = 2;
-    int tileWaterCount = 0;
-    int minHeight = 999, maxHeight = -1;
 
-    auto tHeightStart = std::chrono::high_resolution_clock::now();
     for (int z = 0; z < m_size; z++) {
         for (int x = 0; x < m_size; x++) {
             const int index = z * m_size + x;
@@ -130,8 +126,6 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
 
             int level = terrainGenerator.GenerateHeightLevel(worldX, worldZ);
             tile.height = static_cast<float>(level);
-            if (level < minHeight) minHeight = level;
-            if (level > maxHeight) maxHeight = level;
 
             tile.temperature = terrainGenerator.GenerateTemperature(worldX, worldZ);
             tile.humidity = terrainGenerator.GenerateHumidity(worldX, worldZ);
@@ -139,9 +133,6 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             tile.hasVegetation = false;
         }
     }
-    auto tHeightEnd = std::chrono::high_resolution_clock::now();
-
-    auto tWaterStart = std::chrono::high_resolution_clock::now();
     // Usa WorldFeatureGenerator se disponibile (via world pointer), altrimenti fallback deterministico
     WorldFeatureGenerator featureGen;
     featureGen.Initialize(terrainGenerator.GetSeed());
@@ -174,7 +165,6 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
                 tile.hasWater = true;
                 tile.waterHeight = static_cast<float>(waterLevel); // 2 = SEA_LEVEL
                 tile.waterFeature = waterFeatureCode;
-                tileWaterCount++;
             } else {
                 tile.hasWater = false;
                 tile.waterHeight = 0.0f;
@@ -182,65 +172,6 @@ void Chunk::GenerateTerrain(const TerrainGenerator& terrainGenerator, World* wor
             }
         }
     }
-    int stats[5][2] = {{0,0},{0,0},{0,0},{0,0},{0,0}}; // [height-1][0=water,1=dry]
-    for (int z = 0; z < m_size; z++) {
-        for (int x = 0; x < m_size; x++) {
-            const int index = z * m_size + x;
-            TerrainTile& tile = m_tiles[index];
-            int h = static_cast<int>(tile.height); if (h < 1) h = 1; if (h > 5) h = 5;
-            bool w = tile.hasWater;
-            stats[h-1][w ? 0 : 1]++;
-        }
-    }
-    if (m_x == 0 && m_z == 0) {
-        std::cout << "[SPAWN TERRAIN STATS] chunk=(0,0)" << std::endl;
-        for (int h = 1; h <= 5; ++h) {
-            std::cout << "  h" << h << " water=" << stats[h-1][0] << " dry=" << stats[h-1][1] << std::endl;
-        }
-    }
-
-    auto tWaterEnd = std::chrono::high_resolution_clock::now();
-    auto tEnd = std::chrono::high_resolution_clock::now();
-
-    long heightMs = std::chrono::duration_cast<std::chrono::milliseconds>(tHeightEnd - tHeightStart).count();
-    long waterMs = std::chrono::duration_cast<std::chrono::milliseconds>(tWaterEnd - tWaterStart).count();
-    long totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart).count();
-
-    if (minHeight < 1) minHeight = 1;
-    int dryTiles = (m_size * m_size) - tileWaterCount;
-    int sea=0, lake=0, river=0, totalWater=0;
-    int minH=999, maxH=-1;
-    for (int z = 0; z < m_size; z++) {
-        for (int x = 0; x < m_size; x++) {
-            const int index = z * m_size + x;
-            TerrainTile& tile = m_tiles[index];
-            int h = static_cast<int>(tile.height); if (h < 1) h = 1; if (h > 5) h = 5;
-            if (tile.hasWater) totalWater++;
-            if (tile.waterFeature == 3) sea++;
-            else if (tile.waterFeature == 1) lake++;
-            else if (tile.waterFeature == 2) river++;
-            if (h < minH) minH = h;
-            if (h > maxH) maxH = h;
-        }
-    }
-    int dry = (m_size * m_size) - totalWater;
-    std::cout << "[WATER AUDIT] chunk=(" << m_x << "," << m_z << ") sea=" << sea << " lake=" << lake << " river=" << river << " water=" << totalWater << " dry=" << dry << " minH=" << minH << " maxH=" << maxH << std::endl;
-    int h1=0,h2=0,h3=0,h4=0,h5=0;
-    for (int z=0; z<m_size; z++) {
-        for (int x=0; x<m_size; x++) {
-            int idx=z*m_size+x;
-            int h=static_cast<int>(m_tiles[idx].height);
-            if (h<1) h=1; if (h>5) h=5;
-            switch(h){case 1:h1++;break;case 2:h2++;break;case 3:h3++;break;case 4:h4++;break;case 5:h5++;break;}
-        }
-    }
-    std::cout << "[WORLD GEN AUDIT] chunk=(" << m_x << "," << m_z << ") h1=" << h1 << " h2=" << h2 << " h3=" << h3 << " h4=" << h4 << " h5=" << h5 << std::endl;
-    std::cout << "[GEN PERF] Chunk (" << m_x << "," << m_z << ")" << std::endl;
-    std::cout << "  Height+Biome: " << heightMs << " ms" << std::endl;
-    std::cout << "  Water: " << waterMs << " ms" << std::endl;
-    std::cout << "  Generate total: " << totalMs << " ms" << std::endl;
-    std::cout << "  dry=" << dryTiles << " lake+river=" << tileWaterCount
-              << " minH=" << minHeight << " maxH=" << maxHeight << std::endl;
 }
 
 void Chunk::GenerateColors() {
