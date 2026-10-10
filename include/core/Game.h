@@ -1,11 +1,15 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 #include <raylib.h>
 #include "entities/Player.h"
 #include "navigation/NavigationSystem.h"
 #include "core/CombatSystem.h"
 #include "core/QuestLog.h"
+#include "core/SaveGame.h"
 #include <entities/Mob.h>
 #include "ui/HUD.h"
 #include "ui/InteractionMenu.h"
@@ -32,6 +36,10 @@ public:
     bool Initialize();
     void ResetGameSession();
     void CreateGameSession();
+    void StartNewGameLoading(const core::Character& character);
+    void AdvanceSessionLoading(float deltaTime);
+    float GetLoadingProgress() const;
+    const std::string& GetLoadingMessage() const { return m_loadingMessage; }
     bool SaveGame();
     bool LoadGame();
     bool HasSave() const;
@@ -64,10 +72,15 @@ private:
     void Update(float deltaTime);
     void Render();
     void HandleInput();
+    void FinishSessionLoading();
 
     bool m_isRunning;
     bool m_debugMode;
     bool m_stateChangedThisFrame = false;
+    bool m_sessionLoading = false;
+    bool m_sessionLoadComplete = false;
+    bool m_loadingSave = false;
+    bool m_hasPendingCharacter = false;
 
     std::unique_ptr<GameState> m_gameState;
     std::unique_ptr<Renderer> m_renderer;
@@ -89,6 +102,18 @@ private:
     std::unique_ptr<ItemVisuals> m_itemVisuals;
     std::unique_ptr<core::LightingSystem> m_lightingSystem;
     std::unique_ptr<Village> m_village;
+    std::vector<std::pair<int, int>> m_sessionChunks;
+    std::size_t m_sessionChunkIndex = 0;
+    std::vector<std::string> m_sessionVillageAssets;
+    std::size_t m_sessionVillageAssetIndex = 0;
+    int m_sessionNpcAssetIndex = 0;
+    int m_sessionNpcLoadStage = 0;
+    int m_sessionLoadTotalSteps = 1;
+    int m_sessionLoadCompletedSteps = 0;
+    float m_sessionLoadTimer = 0.0f;
+    std::string m_loadingMessage = "Preparazione del mondo";
+    core::Character m_pendingCharacter;
+    core::SaveGameData m_pendingSaveData;
     const VillageNpc* m_hoveredNpc = nullptr;
     core::QuestLog m_questLog;
     Vector3 m_exteriorPosition{};

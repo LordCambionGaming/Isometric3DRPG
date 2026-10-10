@@ -1,4 +1,4 @@
-﻿#include "states/PlayingState.h"
+#include "states/PlayingState.h"
 #include "states/DiceRollState.h"
 #include "core/Game.h"
 #include "core/KeyBindings.h"
@@ -8,6 +8,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <memory>
+#include "audio/AudioManager.h"
 #include <states/InventoryState.h>
 
 PlayingState::PlayingState(Game* game)
@@ -17,7 +18,11 @@ PlayingState::PlayingState(Game* game)
     m_type = GameStateType::Playing;
 }
 
-void PlayingState::Enter() {}
+void PlayingState::Enter() {
+    if (AudioManager* audio = m_game->GetAudioManager()) {
+        audio->SetPlaylist({ "music/adventureTogether.mp3", "music/luter.mp3" }, true);
+    }
+}
 
 void PlayingState::Exit() {}
 

@@ -3,9 +3,9 @@
 #include <raylib.h>
 #include <vector>
 #include "world/WorldFeatureGenerator.h"
-#include <memory>
 
 class TerrainGenerator;
+class World;
 
 struct TerrainTile {
     float height = 0.0f;
@@ -17,12 +17,10 @@ struct TerrainTile {
     float roughness = 0.5f;
     bool hasVegetation = false;
     bool hasWater = false;
-    float waterHeight = 2.0f; // WATER_LEVEL = 2
-    int waterFeature = 0; // 0=Dry, 1=Lake, 2=River, 3=Sea
+    float waterHeight = 2.0f;
+    int waterFeature = 0;
     int tileWaterCount = 0;
 };
-
-class World;
 
 class Chunk {
 public:
@@ -53,6 +51,9 @@ private:
     void GenerateTerrain(const TerrainGenerator& terrainGenerator, World* world = nullptr);
     void GenerateColors();
     void CreateTerrainMesh();
+    void BuildGridLines();
+    void RenderGrid() const;
+
     void AddQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
                  std::vector<Vector3>& normals, std::vector<Color>& colors,
                  Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, Vector3 normal);
@@ -62,28 +63,22 @@ private:
 
     bool ShouldHaveVegetation(int biomeType, float randomValue) const;
     void GenerateTileColors(TerrainTile& tile) const;
-
-    // Enhanced mesh generation
     Color BlendColors(Color color1, Color color2, float factor) const;
-    void AddEnhancedQuad(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
-                        std::vector<Vector3>& normals, std::vector<Color>& colors,
-                        Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, Color color, const TerrainTile& tile);
 
-    int m_x, m_z;           // Chunk coordinates
-    int m_size;             // Size in tiles (e.g., 16x16)
-    float m_tileSize;       // Size of each tile in world units
+    int m_x, m_z;
+    int m_size;
+    float m_tileSize;
 
     std::vector<TerrainTile> m_tiles;
+    std::vector<Vector3> m_gridLines;
 
-    // Rendering
-    Mesh m_mesh;
-    Model m_model;
+    Mesh m_mesh{};
+    Model m_model{};
     bool m_generated;
     bool m_hasMesh;
-    Shader m_shader;
+    Shader m_shader{};
     bool m_hasShader = false;
 
-    // Terrain generation parameters
     static constexpr float NOISE_SCALE = 0.05f;
     static constexpr float HEIGHT_MULTIPLIER = 5.0f;
 };

@@ -21,6 +21,7 @@ enum class VillageNpcRole {
 struct VillageNpc {
     std::string id;
     VillageNpcRole role;
+    Vector3 villageCenter{};
     Vector3 position;
     Vector3 spawnPos{};       // origin for random wandering
     Vector3 target{};
@@ -43,6 +44,7 @@ struct VillageNpc {
     ModelAnimation* animations = nullptr;
     int animationCount = 0;
     int appliedAnimation = -1;
+
     int appliedFrame = -1;
 };
 
@@ -61,7 +63,11 @@ public:
     static Vector3 FindSpawnPosition(const World& world);
     static Vector3 FindNearestVillage(const World& world, Vector3 position);
     static Vector3 FindNearestVillage(const World& world, Vector3 position, Vector3 excludedVillage);
+    bool EnsureVillagesNear(const World& world, Vector3 position);
+    bool PruneDistantVillages(Vector3 position, float maxDistance);
+    Vector3 NearestVillageCenter(Vector3 position) const;
     Vector3 CenterPosition() const { return m_center; }
+    const std::vector<Vector3>& GetVillageCenters() const { return m_villageCenters; }
     int BuildingCount() const { return static_cast<int>(m_buildings.size()); }
     void Render(const World& world, Vector3 playerPosition) const;
     void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition,
@@ -70,19 +76,21 @@ public:
     // Chests
     std::vector<InteriorChest>& GetChests() { return m_chests; }
     InteriorChest* ChestAtInteriorRay(Ray ray, int buildingIndex);
-    void Update(const World& world, NavigationSystem& navigation, float deltaTime, float timeOfDay);
+    void Update(const World& world, NavigationSystem& navigation, Vector3 playerPosition,
+                float deltaTime, float timeOfDay);
     const std::vector<std::string>& RequiredModelAssets() const { return m_modelAssets; }
     void SetModel(const std::string& asset, Model* model);
     void SetNpcAssets(int index, Model* model, ModelAnimation* animations, int animationCount);
     void HighlightBuilding(int index);
     std::vector<Rectangle> CollisionBounds() const;
     const VillageNpc* NpcAtTile(int tileX, int tileZ) const;
-    const VillageNpc* NpcAtRay(Ray ray) const;
+    const VillageNpc* NpcAtRay(const World& world, Ray ray) const;
     bool NpcAtInteriorRay(Ray ray, int buildingIndex, VillageNpc& outNpc) const;
     int BuildingDoorAtTile(int tileX, int tileZ) const;
     int BuildingDoorAtRay(const World& world, Ray ray) const;
     Vector3 BuildingDoorPosition(int buildingIndex) const;
     std::vector<Vector3> NpcPositions() const;
+    std::vector<Vector3> NpcPositions(Vector3 center, float maxDistance) const;
     int NpcCount() const { return static_cast<int>(m_npcs.size()); }
     std::string BuildingNameKey(int buildingIndex) const;
     std::string BuildingKind(int buildingIndex) const;
@@ -90,6 +98,7 @@ public:
 private:
     struct Building {
         std::string kind;
+        Vector3 center{};
         Vector3 position{};
         float yawDegrees = 0.0f;
         float halfWidth = 0.0f;
@@ -101,6 +110,7 @@ private:
 
     struct Instance {
         std::string asset;
+        Vector3 center{};
         Vector3 position{};
         float yawDegrees = 0.0f;
         float scale = 1.0f;
@@ -114,12 +124,20 @@ private:
         bool alongX = true;
     };
 
+    bool AddVillageLayout(Vector3 center, float yawDegrees, unsigned int variantSeed = 0);
+    void RebuildRoadRuns();
+    void ApplyNpcAssets(VillageNpc& npc);
+
     Vector3 m_center;
+    std::vector<Vector3> m_villageCenters;
     std::vector<Building> m_buildings;
     std::vector<Instance> m_instances;
     std::vector<RoadRun> m_roadRuns;
     std::vector<std::string> m_modelAssets;
     std::unordered_map<std::string, Model*> m_models;
+    std::array<Model*, 5> m_npcModels{};
+    std::array<ModelAnimation*, 5> m_npcAnimations{};
+    std::array<int, 5> m_npcAnimationCounts{};
     std::vector<VillageNpc> m_npcs;
     std::vector<InteriorChest> m_chests;
     int m_highlightedBuilding = -1;

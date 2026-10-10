@@ -42,6 +42,12 @@ public:
     Vector3 ChunkToWorld(int chunkX, int chunkZ) const;
     Vector3 ChunkToWorldCenter(int chunkX, int chunkZ) const;
 
+    void ForceDryArea(float centerX, float centerZ, float radius);
+    struct FlattenArea { float x, z, radius, height; };
+    std::vector<FlattenArea> m_flattenAreas;
+
+    bool GetFlattenedHeight(float wx, float wz, float& outHeight) const;
+
     // Chunk management
     void UpdateChunkStreaming(Vector3 centerPosition);
     void SetPlayerPosition(Vector3 pos);
@@ -59,6 +65,18 @@ public:
     int GetBiomeAt(float worldX, float worldZ) const;
 
     const WorldConfig& GetConfig() const { return m_config; }
+
+    static float VillageHash(float x, float z) {
+    // rumore veloce pseudo-random
+    float n = sinf(x * 12.9898f + z * 78.233f) * 43758.5453f;
+    return n - floorf(n); // 0..1
+    }
+    static float VillageHashAngle(float cx, float cz, float angle) {
+    // rumore stabile solo per angolo, non per ogni tile
+    float a = sinf(angle * 3.7f) * 0.5f + 0.5f;
+    float b = sinf(angle * 7.3f + cx * 0.1f) * 0.5f + 0.5f;
+    return (a * 0.6f + b * 0.4f); // 0..1 stabile per angolo
+}
 
 private:
     struct ChunkKey {
@@ -93,6 +111,7 @@ private:
     int m_lastChunkX = 0;
     int m_lastChunkZ = 0;
     float m_lastUpdateTime;
+    float m_chunkLoadTimer = 0.0f;
     bool m_initialized;
 
     Shader m_globalShader;
@@ -100,6 +119,7 @@ private:
 
     // Streaming parameters: generation / render / unload separated for player-centered design
     static constexpr float CHUNK_UPDATE_INTERVAL = 0.5f;
+    static constexpr float CHUNK_LOAD_INTERVAL = 0.12f;
     static constexpr float GENERATION_RADIUS = 4; // chunks around player to generate
     static constexpr float RENDER_RADIUS = 5;     // chunks visible
     static constexpr float UNLOAD_RADIUS = 7;     // chunks to unload (beyond this)

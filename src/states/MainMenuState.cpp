@@ -12,7 +12,10 @@
 MainMenuState::MainMenuState(class Game* game) : GameState(game), m_selectedOption(0) { m_type = GameStateType::MainMenu; }
 void MainMenuState::Enter() {
     m_selectedOption = 0;
-    if (AudioManager* audio = m_game->GetAudioManager()) audio->PlayMusic("music/MainTheme.mp3");
+    if (AudioManager* audio = m_game->GetAudioManager()) {
+        audio->ClearPlaylist();
+        audio->PlayMusic("music/MainTheme.mp3");
+    }
 }
 void MainMenuState::Exit() {}
 void MainMenuState::Update(float dt) {

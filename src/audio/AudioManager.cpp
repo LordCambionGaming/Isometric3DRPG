@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <fstream>
 #include <raymath.h>
+#include <chrono>
+#include <algorithm>
 
 AudioManager::AudioManager()
     : m_masterVolume(1.0f)
@@ -178,6 +180,7 @@ void AudioManager::StopMusic() {
         }
         m_currentMusic.clear();
     }
+    m_playlistActive = false;
 }
 
 void AudioManager::PauseMusic() {
@@ -203,8 +206,50 @@ void AudioManager::UpdateMusic() {
         auto it = m_music.find(m_currentMusic);
         if (it != m_music.end()) {
             ::UpdateMusicStream(*it->second);
+            
+            // If playlist is active and the current track finished, advance
+            if (m_playlistActive && !::IsMusicStreamPlaying(*it->second)) {
+                AdvancePlaylist();
+            }
         }
+    } else if (m_playlistActive) {
+        // No music playing but playlist is active — start next track
+        AdvancePlaylist();
     }
+}
+
+void AudioManager::SetPlaylist(const std::vector<std::string>& tracks, bool shuffle) {
+    m_playlist = tracks;
+    if (m_playlist.empty()) {
+        ClearPlaylist();
+        return;
+    }
+    if (shuffle) {
+        m_rng.seed(static_cast<unsigned int>(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::shuffle(m_playlist.begin(), m_playlist.end(), m_rng);
+    }
+    m_playlistIndex = -1;
+    m_playlistActive = true;
+    AdvancePlaylist();
+}
+
+void AudioManager::ClearPlaylist() {
+    m_playlist.clear();
+    m_playlistIndex = -1;
+    m_playlistActive = false;
+}
+
+void AudioManager::AdvancePlaylist() {
+    if (m_playlist.empty()) return;
+    m_playlistIndex = (m_playlistIndex + 1) % static_cast<int>(m_playlist.size());
+    
+    // Re-shuffle when we loop back to the start
+    if (m_playlistIndex == 0 && m_playlist.size() > 1) {
+        std::shuffle(m_playlist.begin(), m_playlist.end(), m_rng);
+    }
+    
+    PlayMusic(m_playlist[static_cast<size_t>(m_playlistIndex)]);
+    m_playlistActive = true; // PlayMusic->StopMusic clears this, so re-set it
 }
 
 void AudioManager::SetMasterVolume(float volume) {

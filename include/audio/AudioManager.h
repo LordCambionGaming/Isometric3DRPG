@@ -2,8 +2,10 @@
 
 #include <raylib.h>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <memory>
+#include <random>
 
 class AudioManager {
 public:
@@ -26,6 +28,10 @@ public:
     void ResumeMusic();
     void UpdateMusic();
 
+    // Playlist management
+    void SetPlaylist(const std::vector<std::string>& tracks, bool shuffle = true);
+    void ClearPlaylist();
+
     // Volume control
     void SetMasterVolume(float volume);
     void SetSoundVolume(float volume);
@@ -40,6 +46,7 @@ public:
 private:
     std::string GetFullPath(const std::string& filename) const;
     void SaveSettings() const;
+    void AdvancePlaylist();
 
     std::unordered_map<std::string, std::unique_ptr<Sound>> m_sounds;
     std::unordered_map<std::string, std::unique_ptr<Music>> m_music;
@@ -50,6 +57,12 @@ private:
 
     std::string m_currentMusic;
     bool m_initialized;
+
+    // Playlist
+    std::vector<std::string> m_playlist;
+    int m_playlistIndex = -1;
+    bool m_playlistActive = false;
+    std::mt19937 m_rng;
 
     static constexpr const char* AUDIO_PATH = "assets/audio/";
 };

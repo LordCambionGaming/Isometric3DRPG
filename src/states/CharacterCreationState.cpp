@@ -133,15 +133,15 @@ void CharacterCreationState::AutoRollRemaining() {
             m_rolled[static_cast<size_t>(i)] = true;
         }
     }
-    std::cout << "[CHARACTER] 4d6 drop lowest (auto) ->";
-    for (int score : m_pool) std::cout << ' ' << score;
-    std::cout << std::endl;
+    TraceLog(LOG_INFO, "[CHARACTER] 4d6 drop lowest (auto) -> %d %d %d %d %d %d",
+        m_pool[0], m_pool[1], m_pool[2], m_pool[3], m_pool[4], m_pool[5]);
     if (m_row == kRowRoll) m_row = kRowFirstAbility;
 }
 
 // Apre la board gotica per il prossimo punteggio da lanciare: 4d6, un dado per volta, poi si scarta il piu' basso.
 // La board sostituisce questo stato (SetState lo distrugge): per tornare qui se ne ricrea uno con il punteggio dentro.
 void CharacterCreationState::StartBoardRoll() {
+    // TODO: suono lancio dadi
     if (!m_game) return;
     int slot = -1;
     for (int i = 0; i < core::kAbilityCount; ++i) {
@@ -161,9 +161,7 @@ void CharacterCreationState::StartBoardRoll() {
         if (completed && dice.size() == 4) {
             snap.pool[static_cast<size_t>(slot)] = core::AbilityScoreFromDice(dice);
             snap.rolled[static_cast<size_t>(slot)] = true;
-            std::cout << "[CHARACTER] 4d6 drop lowest (board) slot " << slot << " ->";
-            for (int d : dice) std::cout << ' ' << d;
-            std::cout << " = " << snap.pool[static_cast<size_t>(slot)] << std::endl;
+            TraceLog(LOG_INFO, "[CHARACTER] 4d6 drop lowest (board) slot %d = %d", slot, snap.pool[static_cast<size_t>(slot)]);
         }
         const int rolledNow = static_cast<int>(std::count(snap.rolled.begin(), snap.rolled.end(), true));
         snap.row = (rolledNow < core::kAbilityCount) ? kRowRoll : kRowFirstAbility;
@@ -207,7 +205,7 @@ core::Character CharacterCreationState::Build() const {
 
 void CharacterCreationState::HandleInput() {
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) {
-        std::cout << "STATE CHANGE: CharacterCreationState -> MainMenuState" << std::endl;
+        TraceLog(LOG_INFO, "STATE CHANGE: CharacterCreationState -> MainMenuState");
         if (m_game) m_game->SetState(std::make_unique<MainMenuState>(m_game));
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
@@ -236,21 +234,7 @@ void CharacterCreationState::HandleInput() {
 
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm) && m_row == kRowConfirm && AllAssigned()) {
         const core::Character character = Build();   // prima di SetState: lo stato viene distrutto
-        std::cout << "STATE CHANGE: CharacterCreationState -> PlayingState (" << core::ToString(character.characterClass)
-                  << ", STR " << character.Score(core::Ability::Str)
-                  << " DEX " << character.Score(core::Ability::Dex)
-                  << " CON " << character.Score(core::Ability::Con)
-                  << " INT " << character.Score(core::Ability::Int)
-                  << " WIS " << character.Score(core::Ability::Wis)
-                  << " CHA " << character.Score(core::Ability::Cha)
-                  << ", HP " << character.vitals.currentHP << "/" << character.MaxHP()<<")" << std::endl;
-        if (m_game) {
-            // Stessa sequenza che prima faceva "Nuova partita" nel menu, ora dopo la conferma.
-            m_game->ResetGameSession();
-            m_game->CreateGameSession();
-            if (Player* player = m_game->GetPlayer()) player->SetCharacter(character);
-            m_game->SetState(std::make_unique<PlayingState>(m_game));
-        }
+        if (m_game) m_game->StartNewGameLoading(character);
         return;   // questo stato e' stato distrutto: non toccare i membri
     }
 }

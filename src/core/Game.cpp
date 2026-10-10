@@ -5,6 +5,7 @@
 #include "states/MainMenuState.h"
 #include "states/DiceRollState.h"
 #include "states/PlayingState.h"
+#include "states/LoadingState.h"
 #include "states/VillageInteractionState.h"
 #include "states/VillageInteriorState.h"
 #include "entities/Player.h"
@@ -51,6 +52,8 @@ Game::~Game() {
 bool Game::Initialize() {
     try {
         lang::Initialize();
+        SetTraceLogLevel(LOG_WARNING); // la console non va piu' controllata: silenzia i log informativi di raylib, restano warning/errori
+
         m_timer = std::make_unique<Timer>();
         m_assetManager = std::make_unique<AssetManager>();
         m_audioManager = std::make_unique<AudioManager>();
@@ -60,27 +63,27 @@ bool Game::Initialize() {
         m_hud = std::make_unique<HUD>();
         m_combatSystem = std::make_unique<core::CombatSystem>();
         m_combatSystem->Initialize();
-        
+
         m_lightingSystem = std::make_unique<core::LightingSystem>();
         // NOTE: LightingSystem::Initialize() (LoadShader) is called AFTER InitWindow below.
 
         if (!m_renderer->Initialize(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE)) {
-            std::cerr << "Failed to initialize renderer!" << std::endl;
+            TraceLog(LOG_ERROR, "Failed to initialize renderer!");
             return false;
         }
 
         core::KeyBindings::Load();
-        
+
         // Shaders require an active OpenGL context: must be loaded after InitWindow.
         m_lightingSystem->Initialize();
 
         if (!m_assetManager->Initialize()) {
-            std::cerr << "Failed to initialize asset manager!" << std::endl;
+            TraceLog(LOG_ERROR, "Failed to initialize asset manager!");
             return false;
         }
 
         if (!m_audioManager->Initialize()) {
-            std::cerr << "Failed to initialize audio manager!" << std::endl;
+            TraceLog(LOG_ERROR, "Failed to initialize audio manager!");
             return false;
         }
 
@@ -95,64 +98,19 @@ bool Game::Initialize() {
 
         m_world->SetGlobalShader(m_lightingSystem->GetShader());
         if (!m_world->Initialize(worldConfig)) {
-            std::cerr << "Failed to initialize world!" << std::endl;
+            TraceLog(LOG_ERROR, "Failed to initialize world!");
             return false;
         }
 
-        float spawnX = 0.5f * worldConfig.tileSize;
-        float spawnZ = 0.5f * worldConfig.tileSize;
-        float spawnY = 0.0f;
-        bool found = false;
-        int foundTx = 0, foundTz = 0;
-        float foundHeight = 0.0f;
-        const int MAX_SPAWN_SEARCH_RADIUS = 64;
-        
-        const int preRadius = 1;
-        for (int cx = -preRadius; cx <= preRadius; ++cx) {
-            for (int cz = -preRadius; cz <= preRadius; ++cz) {
-                if (!m_world->GetChunk(cx, cz)) m_world->LoadChunkAt(cx, cz);
-            }
-        }
+        // Spawn provvisorio all'origine: quello vero (Village::FindSpawnPosition, costoso: scansiona
+        // chunk su chunk) viene calcolato solo quando si avvia davvero una sessione, in modo incrementale,
+        // in Game::CreateGameSession() + Game::AdvanceSessionLoading() (loading screen), cosi' l'avvio
+        // dell'app non resta bloccato a cercare uno spawn prima ancora di mostrare il menu principale.
+        const float spawnX = 0.5f * worldConfig.tileSize;
+        const float spawnY = 0.0f;
+        const float spawnZ = 0.5f * worldConfig.tileSize;
 
-        for (int r = 0; r <= MAX_SPAWN_SEARCH_RADIUS && !found; ++r) {
-            for (int dx = -r; dx <= r && !found; ++dx) {
-                for (int dz = -r; dz <= r && !found; ++dz) {
-                    if (r > 0 && std::abs(dx) != r && std::abs(dz) != r) continue;
-                    const int tx = dx;
-                    const int tz = dz;
-
-                    const int cx = (tx >= 0) ? (tx / worldConfig.chunkSize) : ((tx - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
-                    const int cz = (tz >= 0) ? (tz / worldConfig.chunkSize) : ((tz - worldConfig.chunkSize + 1) / worldConfig.chunkSize);
-
-                    Chunk* chunk = m_world->GetChunk(cx, cz);
-                    if (!chunk || !chunk->IsGenerated()) {
-                        m_world->LoadChunkAt(cx, cz);
-                        chunk = m_world->GetChunk(cx, cz);
-                    }
-                    if (!chunk || !chunk->IsGenerated()) continue;
-
-                    int lx = tx % worldConfig.chunkSize; if (lx < 0) lx += worldConfig.chunkSize;
-                    int lz = tz % worldConfig.chunkSize; if (lz < 0) lz += worldConfig.chunkSize;
-                    const TerrainTile tile = chunk->GetTile(lx, lz);
-                    if (tile.height >= 2.0f && !tile.hasWater) {
-                        foundTx = tx;
-                        foundTz = tz;
-                        foundHeight = tile.height;
-                        found = true;
-                    }
-                }
-            }
-        }
-
-        if (found) {
-            spawnX = (foundTx + 0.5f) * worldConfig.tileSize;
-            spawnY = foundHeight * worldConfig.tileSize;
-            spawnZ = (foundTz + 0.5f) * worldConfig.tileSize;
-        } else {
-            spawnX = 0.0f; spawnY = 0.0f; spawnZ = 0.0f;
-        }
-
-         m_itemVisuals = std::make_unique<ItemVisuals>(m_assetManager.get(), m_lightingSystem->GetShader());
+        m_itemVisuals = std::make_unique<ItemVisuals>(m_assetManager.get(), m_lightingSystem->GetShader());
 
         m_playerModel = m_assetManager->LoadModel("models/entities/player_animated.glb");
         if (m_playerModel) {
@@ -170,7 +128,7 @@ bool Game::Initialize() {
         m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
 
         m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
-        
+
         m_renderer->SetWorld(m_world.get());
         m_renderer->SetCamera(m_camera.get());
 
@@ -183,7 +141,7 @@ bool Game::Initialize() {
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception during initialization: " << e.what() << std::endl;
+        TraceLog(LOG_ERROR, "Exception during initialization: %s", e.what());
         return false;
     }
 }
@@ -191,7 +149,9 @@ bool Game::Initialize() {
 void Game::Run() {
     while (m_isRunning && !m_renderer->ShouldClose()) {
         m_timer->Update();
-        const float deltaTime = m_timer->GetDeltaTime();
+        // Clamp difensivo: un deltaTime anomalo (hitch, breakpoint, primo frame) non deve far
+        // esplodere camera/movimento/streaming dei chunk in un frame solo.
+        const float deltaTime = std::min(m_timer->GetDeltaTime(), 0.1f);
 
         HandleInput();
         Update(deltaTime);
@@ -230,6 +190,9 @@ void Game::Shutdown() {
     m_isRunning = false;
 }
 
+// Avvia la generazione di una sessione (mondo + spawn + villaggio) in modo NON bloccante: prepara solo
+// l'elenco dei passi da fare (chunk da caricare, modelli del villaggio, NPC) e passa a LoadingState.
+// Il lavoro vero e proprio viene spalmato su piu' frame da AdvanceSessionLoading().
 void Game::CreateGameSession() {
     WorldConfig worldConfig;
     worldConfig.seed = 12345;
@@ -243,6 +206,7 @@ void Game::CreateGameSession() {
         m_world->Initialize(worldConfig);
     }
 
+    // Chunk minimi attorno all'origine, necessari per poter cercare uno spawn valido.
     const int preRadius = 1;
     for (int cx = -preRadius; cx <= preRadius; ++cx) {
         for (int cz = -preRadius; cz <= preRadius; ++cz) {
@@ -251,25 +215,90 @@ void Game::CreateGameSession() {
     }
 
     const Vector3 spawn = Village::FindSpawnPosition(*m_world);
-    const float spawnX = spawn.x;
-    const float spawnY = spawn.y;
-    const float spawnZ = spawn.z;
 
     if (!m_player) m_player = std::make_unique<Player>();
     m_player->SetTileSize(worldConfig.tileSize);
     m_player->SetModel(m_playerModel);
     m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
     m_player->SetItemVisuals(m_itemVisuals.get());
-    m_player->SetPosition({spawnX, spawnY, spawnZ});
-    m_world->SetPlayerPosition({spawnX, spawnY, spawnZ});
+    m_player->SetPosition(spawn);
+    m_world->SetPlayerPosition(spawn);
     if (m_camera) {
-        m_camera->SetTarget({ spawnX, spawnY, spawnZ });
-        m_camera->FollowTarget({ spawnX, spawnY, spawnZ });
+        m_camera->SetTarget(spawn);
+        m_camera->FollowTarget(spawn);
     }
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
+
     m_village = std::make_unique<Village>(spawn);
     m_hoveredNpc = nullptr;
-    for (const std::string& asset : m_village->RequiredModelAssets()) {
+    m_testMob.reset();
+    m_hoveredMob = nullptr;
+
+    // Elenco dei chunk attorno allo spawn, ordinati per distanza: verranno caricati un po' per frame.
+    m_sessionChunks.clear();
+    int spawnChunkX = 0, spawnChunkZ = 0;
+    m_world->WorldToChunk(spawn.x, spawn.z, spawnChunkX, spawnChunkZ);
+    const int radius = m_world->GetGenerationRadius();
+    for (int dx = -radius; dx <= radius; ++dx) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            if (dx * dx + dz * dz <= radius * radius) {
+                m_sessionChunks.push_back({ spawnChunkX + dx, spawnChunkZ + dz });
+            }
+        }
+    }
+    std::sort(m_sessionChunks.begin(), m_sessionChunks.end(),
+        [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+            const int da = a.first * a.first + a.second * a.second;
+            const int db = b.first * b.first + b.second * b.second;
+            return da < db;
+        });
+    m_sessionChunkIndex = 0;
+
+    // Modelli del villaggio e NPC: caricati un po' per frame in AdvanceSessionLoading(), non qui.
+    m_sessionVillageAssets = m_village->RequiredModelAssets();
+    m_sessionVillageAssetIndex = 0;
+    m_sessionNpcAssetIndex = 0;
+    m_sessionNpcLoadStage = 0;
+
+    m_sessionLoadTotalSteps = static_cast<int>(m_sessionChunks.size() + m_sessionVillageAssets.size() + 5 + 1);
+    m_sessionLoadCompletedSteps = 0;
+    m_sessionLoadTimer = 0.0f;
+    m_loadingMessage = "Preparazione del mondo";
+    m_sessionLoading = true;
+    m_sessionLoadComplete = false;
+
+    SetState(std::make_unique<LoadingState>(this));
+}
+
+// Chiamato ogni frame da LoadingState mentre m_sessionLoading e' true: fa avanzare il caricamento
+// di un passo ogni ~25ms (budget), cosi' il frame resta leggero e la barra di progresso si muove.
+void Game::AdvanceSessionLoading(float deltaTime) {
+    (void)deltaTime;
+    if (!m_sessionLoading) return;
+
+    // Un solo passo pesante (un chunk, o un modello) per chiamata: niente timer di attesa qui.
+    // Un chunk o un .glb da disco costano quasi sempre piu' di qualche millisecondo da soli,
+    // quindi un budget a tempo fisso non "spalma" nulla: limita solo inutilmente la velocita'
+    // di caricamento. Il throttling vero e' gia' implicito: un passo per frame, un frame alla volta.
+    //
+    // Aggiorniamo subito lo stream musicale dopo ogni passo pesante (invece di aspettare il
+    // prossimo giro di Game::Update), cosi' il buffer audio si riempie il prima possibile dopo
+    // il blocco sincrono e lo scatto si sente meno.
+
+    if (m_sessionChunkIndex < m_sessionChunks.size()) {
+        const std::pair<int, int>& coord = m_sessionChunks[m_sessionChunkIndex];
+        if (!m_world->GetChunk(coord.first, coord.second)) {
+            m_world->LoadChunkAt(coord.first, coord.second);
+        }
+        m_sessionChunkIndex++;
+        m_sessionLoadCompletedSteps++;
+        m_loadingMessage = "Preparazione del terreno";
+        if (m_audioManager) m_audioManager->UpdateMusic();
+        return;
+    }
+
+    if (m_sessionVillageAssetIndex < m_sessionVillageAssets.size()) {
+        const std::string& asset = m_sessionVillageAssets[m_sessionVillageAssetIndex];
         const std::string modelPath = "models/" + asset;
         Model* model = m_assetManager->LoadModel(modelPath);
         if (model) {
@@ -277,14 +306,19 @@ void Game::CreateGameSession() {
                 model->materials[material].shader = m_lightingSystem->GetShader();
         }
         m_village->SetModel(asset, model);
+        m_sessionVillageAssetIndex++;
+        m_sessionLoadCompletedSteps++;
+        m_loadingMessage = "Costruzione del villaggio";
+        if (m_audioManager) m_audioManager->UpdateMusic();
+        return;
     }
 
-    const std::array<const char*, 5> residentAssets = {{
+    static const std::array<const char*, 5> residentAssets = { {
         "models/villagers/blacksmith.glb", "models/villagers/mayor.glb", "models/villagers/cleric.glb",
         "models/villagers/farmer.glb", "models/villagers/innkeeper.glb"
-    }};
-    for (int index = 0; index < static_cast<int>(residentAssets.size()); ++index) {
-        const std::string& asset = residentAssets[static_cast<std::size_t>(index)];
+    } };
+    if (m_sessionNpcAssetIndex < static_cast<int>(residentAssets.size())) {
+        const std::string asset = residentAssets[static_cast<std::size_t>(m_sessionNpcAssetIndex)];
         Model* model = m_assetManager->LoadModel(asset);
         if (model) {
             for (int material = 0; material < model->materialCount; ++material)
@@ -292,23 +326,75 @@ void Game::CreateGameSession() {
         }
         int animationCount = 0;
         ModelAnimation* animations = m_assetManager->LoadAnimations(asset, animationCount);
-        m_village->SetNpcAssets(index, model, animations, animationCount);
+        m_village->SetNpcAssets(m_sessionNpcAssetIndex, model, animations, animationCount);
+        m_sessionNpcAssetIndex++;
+        m_sessionLoadCompletedSteps++;
+        m_loadingMessage = "Risveglio degli abitanti";
+        if (m_audioManager) m_audioManager->UpdateMusic();
+        return;
     }
+
+    // Ultimo passo: collega il villaggio alla navigazione, poi si entra in gioco.
     m_navigation.SetStructureBounds(m_village->CollisionBounds());
     m_navigation.SetOccupiedTiles(m_village->NpcPositions());
-    m_testMob.reset();
-    m_hoveredMob = nullptr;
+    m_sessionLoadCompletedSteps++;
+    m_sessionLoadComplete = true;
+    FinishSessionLoading();
+}
+
+float Game::GetLoadingProgress() const {
+    if (m_sessionLoadTotalSteps <= 0) return 1.0f;
+    return std::min(1.0f, static_cast<float>(m_sessionLoadCompletedSteps) / static_cast<float>(m_sessionLoadTotalSteps));
+}
+
+// Applica il personaggio appena creato o il salvataggio in corso di caricamento, poi entra in gioco.
+void Game::FinishSessionLoading() {
+    m_sessionLoading = false;
+
+    if (m_hasPendingCharacter) {
+        if (m_player) m_player->SetCharacter(m_pendingCharacter);
+        m_hasPendingCharacter = false;
+    }
+
+    if (m_loadingSave) {
+        if (m_player) {
+            m_player->SetCharacter(m_pendingSaveData.character);
+            m_player->SetPosition(m_pendingSaveData.playerPosition);
+        }
+        m_questLog = m_pendingSaveData.quests;
+        if (m_world) m_world->SetPlayerPosition(m_pendingSaveData.playerPosition);
+        if (m_pendingSaveData.hasTestMob && m_testMob &&
+            m_pendingSaveData.testMobMaxHP == m_testMob->GetMaxHP()) {
+            m_testMob->SetPosition(m_pendingSaveData.testMobPosition);
+            m_testMob->TakeDamage(m_testMob->GetCurrentHP() - m_pendingSaveData.testMobCurrentHP);
+        }
+        m_loadingSave = false;
+    }
 
     if (m_renderer) {
         m_renderer->SetWorld(m_world.get());
         m_renderer->SetCamera(m_camera.get());
     }
     if (m_audioManager) {
-        m_audioManager->StopMusic();
+        // Keep music playing per user request
         m_audioManager->PlaySound("sounds/play.mp3");
     }
+
+    m_interactionMenu.Close();
+    m_hoveredMob = nullptr;
+    m_hoverTileX = -1;
+    m_hoverTileZ = -1;
+
+    SetState(std::make_unique<PlayingState>(this));
 }
 
+void Game::StartNewGameLoading(const core::Character& character) {
+    ResetGameSession();
+    m_pendingCharacter = character;
+    m_hasPendingCharacter = true;
+    m_loadingSave = false;
+    CreateGameSession();
+}
 
 bool Game::HasSave() const {
     return core::SaveGame::Exists();
@@ -334,23 +420,10 @@ bool Game::LoadGame() {
     if (!core::SaveGame::Read(data)) return false;
 
     ResetGameSession();
+    m_pendingSaveData = data;
+    m_loadingSave = true;
+    m_hasPendingCharacter = false;
     CreateGameSession();
-    if (!m_player) return false;
-    m_player->SetCharacter(data.character);
-    m_questLog = data.quests;
-    m_player->SetPosition(data.playerPosition);
-    if (m_world) m_world->SetPlayerPosition(data.playerPosition);
-
-    if (data.hasTestMob && m_testMob && data.testMobMaxHP == m_testMob->GetMaxHP()) {
-        m_testMob->SetPosition(data.testMobPosition);
-        m_testMob->TakeDamage(m_testMob->GetCurrentHP() - data.testMobCurrentHP);
-    }
-
-    m_interactionMenu.Close();
-    m_hoveredMob = nullptr;
-    m_hoverTileX = -1;
-    m_hoverTileZ = -1;
-    SetState(std::make_unique<PlayingState>(this));
     return true;
 }
 
@@ -416,7 +489,11 @@ void Game::Update(float deltaTime) {
          m_gameState->GetType() == GameStateType::Paused   || 
          m_gameState->GetType() == GameStateType::Inventory ||
          m_gameState->GetType() == GameStateType::VillageDialogue ||
-         m_gameState->GetType() == GameStateType::VillageInterior) || m_pendingBuildingIndex >= 0;
+         m_gameState->GetType() == GameStateType::VillageInterior ||
+         // Durante il caricamento il villaggio/i confini di navigazione non sono ancora pronti
+         // (SetStructureBounds e' l'ultimo passo di AdvanceSessionLoading): simulare NPC/mondo/camera
+         // qui sarebbe lavoro sprecato e con dati incompleti per tutta la durata del loading screen.
+         m_gameState->GetType() == GameStateType::Loading) || m_pendingBuildingIndex >= 0;
 
     if (m_player && !frozen) {
         m_player->Update(deltaTime);
@@ -430,13 +507,25 @@ void Game::Update(float deltaTime) {
         m_testMob->Update(deltaTime);
     }
     if (m_village && m_world && !frozen) {
-        const float timeOfDay = m_lightingSystem ? m_lightingSystem->GetTimeOfDay() : 0.5f;
-        std::vector<Vector3> occupiedPositions = m_village->NpcPositions();
-        if (m_player) occupiedPositions.push_back(m_player->GetPosition());
-        if (m_testMob && m_testMob->IsAlive()) occupiedPositions.push_back(m_testMob->GetPosition());
-        m_navigation.SetOccupiedTiles(occupiedPositions);
-        m_village->Update(*m_world, m_navigation, deltaTime, timeOfDay);
+    const float timeOfDay = m_lightingSystem ? m_lightingSystem->GetTimeOfDay() : 0.5f;
+    std::vector<Vector3> occupiedPositions = m_village->NpcPositions();
+    if (m_player) occupiedPositions.push_back(m_player->GetPosition());
+    if (m_testMob && m_testMob->IsAlive()) occupiedPositions.push_back(m_testMob->GetPosition());
+    m_navigation.SetOccupiedTiles(occupiedPositions);
+    const Vector3 villageUpdatePlayerPos = m_player ? m_player->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+    
+   bool added = m_village->EnsureVillagesNear(*m_world, villageUpdatePlayerPos);
+if (added) {
+    for (Vector3 c : m_village->GetVillageCenters()) {
+        float r = 35.0f + (World::VillageHash(c.x, c.z) * 15.0f); // 35..50 random per villaggio
+        m_world->ForceDryArea(c.x, c.z, r);
+
     }
+    m_navigation.SetStructureBounds(m_village->CollisionBounds());
+}
+
+    m_village->Update(*m_world, m_navigation, villageUpdatePlayerPos, deltaTime, timeOfDay);
+}
 
     if (m_gameState) {
         m_gameState->Update(deltaTime);
@@ -546,14 +635,30 @@ void Game::Render() {
         Vector3 nextVillage{};
         const Vector3* currentVillagePos = nullptr;
         const Vector3* nextVillagePos = nullptr;
+
+        static float debugVillageTimer = 0.0f;
+        static Vector3 cachedNextVillage{};
+        
         if (m_world && m_player && m_village) {
             currentVillage = m_village->CenterPosition();
-            nextVillage = Village::FindNearestVillage(*m_world, playerPos, currentVillage);
             currentVillagePos = &currentVillage;
+            
+            // FindNearestVillage is extremely heavy (evaluates multiple region chunks).
+            // Do NOT call this every frame. Cache it and update every 1 second.
+            debugVillageTimer -= GetFrameTime();
+            if (debugVillageTimer <= 0.0f) {
+                cachedNextVillage = Village::FindNearestVillage(*m_world, playerPos, currentVillage);
+                debugVillageTimer = 1.0f;
+            }
+            nextVillage = cachedNextVillage;
             nextVillagePos = &nextVillage;
         }
         m_renderer->RenderDebugInfo(m_player ? &playerPos : nullptr,
                                     currentVillagePos, nextVillagePos);
+    }
+
+    if (m_audioManager) {
+        m_audioManager->UpdateMusic();
     }
 
     m_renderer->EndFrame();
@@ -587,14 +692,15 @@ void Game::Render() {
     (m_gameState->GetType() == GameStateType::DiceRoll ||
         m_gameState->GetType() == GameStateType::Inventory ||
         m_gameState->GetType() == GameStateType::VillageDialogue ||
-        m_gameState->GetType() == GameStateType::VillageInterior);
+        m_gameState->GetType() == GameStateType::VillageInterior ||
+        m_gameState->GetType() == GameStateType::Loading);
     if (m_camera && !modalOpen){ 
         m_camera->HandleInput();
     }
 
     if (m_camera && m_world && m_player && m_gameState && m_gameState->GetType() == GameStateType::Playing) {
         const Ray ray = GetMouseRay(GetMousePosition(), m_camera->GetCamera());
-        const VillageNpc* hoveredNpc = m_village ? m_village->NpcAtRay(ray) : nullptr;
+        const VillageNpc* hoveredNpc = m_village ? m_village->NpcAtRay(*m_world, ray) : nullptr;
         m_hoveredNpc = hoveredNpc;
         const int rayDoor = m_village ? m_village->BuildingDoorAtRay(*m_world, ray) : -1;
         const bool menuConsumedClick = m_interactionMenu.Update();
@@ -612,6 +718,7 @@ void Game::Render() {
                 target.name = lang::Get("interaction.door"); // we will add this to localization
                 target.worldPosition = door;
                 target.actions.push_back({ lang::Get("interaction.open").c_str(), [this, buildingIndex]() {
+                    // TODO: suono apertura porta
                     m_village->HighlightBuilding(buildingIndex);
                     m_pendingBuildingIndex = buildingIndex;
                     m_doorTransitionTimer = 0.42f;
@@ -641,6 +748,7 @@ void Game::Render() {
                 target.worldPosition = npc->position;
                 const VillageNpc selectedNpc = *npc;
                 target.actions.push_back({ "village.action.talk", [this, selectedNpc]() {
+                    // TODO: suono inizio dialogo NPC
                     if (m_player && Vector3Distance(m_player->GetPosition(), selectedNpc.position) <= 2.6f)
                         SetState(std::make_unique<VillageInteractionState>(this, selectedNpc));
                 }});
@@ -735,6 +843,7 @@ void Game::Render() {
                         const float range = weapon.range;
                         const float dist = Vector3Distance(m_player->GetPosition(), mob->GetPosition());
                         if (dist <= range) {
+                            // TODO: suono inizio combattimento / tiro d20
                             SetState(std::make_unique<DiceRollState>(this, mob));
                         } else {
                             TraceLog(LOG_INFO, "[COMBAT] Bersaglio troppo lontano! Distanza: %.2fm (Raggio: %.2fm)", dist, range);
@@ -802,7 +911,3 @@ void Game::Render() {
     }
 
 }
-
-
-
-

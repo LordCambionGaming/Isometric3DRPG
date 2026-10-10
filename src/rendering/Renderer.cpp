@@ -52,7 +52,8 @@ bool Renderer::Initialize(int screenWidth, int screenHeight, const char* title) 
             return false;
         }
 
-        SetTargetFPS(m_vsyncEnabled ? 0 : 60);
+        int refreshRate = GetMonitorRefreshRate(GetCurrentMonitor());
+        SetTargetFPS(m_vsyncEnabled ? (refreshRate > 0 ? refreshRate : 60) : 60);
         SetExitKey(KEY_NULL); // ESC non chiude finestra � come puzzle3d
 
         m_initialized = true;
@@ -112,7 +113,9 @@ void Renderer::SetVSyncEnabled(bool enabled) {
     m_vsyncEnabled = enabled;
     if (enabled) SetWindowState(FLAG_VSYNC_HINT);
     else ClearWindowState(FLAG_VSYNC_HINT);
-    SetTargetFPS(enabled ? 0 : 60);
+    
+    int refreshRate = GetMonitorRefreshRate(GetCurrentMonitor());
+    SetTargetFPS(enabled ? (refreshRate > 0 ? refreshRate : 60) : 60);
     SaveWindowSettings();
 }
 

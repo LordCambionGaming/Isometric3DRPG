@@ -61,7 +61,7 @@ python src/assets/models/entities/generate_village_assets.py
 python src/assets/models/entities/compose_village.py --seed 12345 --houses 7
 ```
 
-The layout is loaded relative to the player's spawn. Keep `--seed` aligned with the world seed in `Game.cpp` when regenerating it. Village models and NPCs are rendered only while their chunks are in the world's render range.
+The layout is reused for deterministic regional village sites. Keep `--seed` aligned with the world seed in `Game.cpp` when regenerating it. Sites are created as the player approaches, retained within a streaming range, and removed when far away; models and NPCs are rendered only while their chunks are loaded and visible.
 
 ## Building
 
