@@ -125,6 +125,14 @@ void Camera3DController::SetTarget(Vector3 target) {
     UpdateCameraPosition();
 }
 
+void Camera3DController::CenterOn(Vector3 target) {
+    m_followTarget = target;
+    m_followOffset = { 0.0f, 0.0f, 0.0f };
+    m_followActive = true;
+    m_camera.target = target;
+    UpdateCameraPosition();
+}
+
 void Camera3DController::SetView(Vector3 target, float rotation, float zoom) {
     m_followActive = false;
     m_followOffset = { 0.0f, 0.0f, 0.0f };

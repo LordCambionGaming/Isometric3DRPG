@@ -17,6 +17,7 @@ public:
 
     void SetPosition(Vector3 position) { m_camera.position = position; }
     void SetTarget(Vector3 target);
+    void CenterOn(Vector3 target); // centra la camera sul target, azzera l'offset e attiva il follow
 
     // Isometric camera controls
     void Rotate(float angle);

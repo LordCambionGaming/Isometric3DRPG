@@ -237,10 +237,7 @@ void Game::CreateGameSession() {
     m_world->SetPlayerPosition(spawnPos);
 
     m_village = std::make_unique<Village>(spawn);
-    if (m_camera) {
-        m_camera->SetTarget(spawnPos);
-        m_camera->FollowTarget(spawnPos);
-    }
+    if (m_camera) m_camera->CenterOn(spawnPos);
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
     
     m_hoveredNpc = nullptr;
@@ -400,7 +397,8 @@ void Game::FinishSessionLoading() {
     m_hoveredMob = nullptr;
     m_hoverTileX = -1;
     m_hoverTileZ = -1;
-
+    m_cameraLocked = true;
+if (m_camera && m_player) m_camera->CenterOn(m_player->GetPosition());
     SetState(std::make_unique<PlayingState>(this));
 }
 
@@ -696,9 +694,13 @@ void Game::Render() {
         }
     }
 
-    if (m_camera && m_gameState && m_gameState->GetType() == GameStateType::Playing) {
-
+   if (m_camera && m_player && m_gameState && m_gameState->GetType() == GameStateType::Playing) {
+    if (IsKeyPressed(KEY_Y)) {
+        m_cameraLocked = !m_cameraLocked;
+        if (m_cameraLocked) m_camera->CenterOn(m_player->GetPosition());
     }
+    if (IsKeyPressed(KEY_SPACE)) m_camera->CenterOn(m_player->GetPosition());
+}
 
     if (m_gameState && !m_stateChangedThisFrame) {
         m_gameState->HandleInput();

@@ -81,6 +81,7 @@ private:
     bool m_sessionLoadComplete = false;
     bool m_loadingSave = false;
     bool m_hasPendingCharacter = false;
+    bool m_cameraLocked = true;
 
     std::unique_ptr<GameState> m_gameState;
     std::unique_ptr<Renderer> m_renderer;
