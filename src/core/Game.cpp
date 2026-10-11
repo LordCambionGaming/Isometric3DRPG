@@ -223,13 +223,15 @@ void Game::CreateGameSession() {
     m_player->SetItemVisuals(m_itemVisuals.get());
     m_player->SetPosition(spawn);
     m_world->SetPlayerPosition(spawn);
+    float r = 35.0f + (World::VillageHash(spawn.x, spawn.z) * 15.0f); // 35..50 random per villaggio
+        m_world->ForceDryArea(spawn.x, spawn.z, r);
+    m_village = std::make_unique<Village>(spawn);
     if (m_camera) {
         m_camera->SetTarget(spawn);
         m_camera->FollowTarget(spawn);
     }
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
-
-    m_village = std::make_unique<Village>(spawn);
+    
     m_hoveredNpc = nullptr;
     m_testMob.reset();
     m_hoveredMob = nullptr;
@@ -276,15 +278,6 @@ void Game::AdvanceSessionLoading(float deltaTime) {
     (void)deltaTime;
     if (!m_sessionLoading) return;
 
-    // Un solo passo pesante (un chunk, o un modello) per chiamata: niente timer di attesa qui.
-    // Un chunk o un .glb da disco costano quasi sempre piu' di qualche millisecondo da soli,
-    // quindi un budget a tempo fisso non "spalma" nulla: limita solo inutilmente la velocita'
-    // di caricamento. Il throttling vero e' gia' implicito: un passo per frame, un frame alla volta.
-    //
-    // Aggiorniamo subito lo stream musicale dopo ogni passo pesante (invece di aspettare il
-    // prossimo giro di Game::Update), cosi' il buffer audio si riempie il prima possibile dopo
-    // il blocco sincrono e lo scatto si sente meno.
-
     if (m_sessionChunkIndex < m_sessionChunks.size()) {
         const std::pair<int, int>& coord = m_sessionChunks[m_sessionChunkIndex];
         if (!m_world->GetChunk(coord.first, coord.second)) {
@@ -294,6 +287,18 @@ void Game::AdvanceSessionLoading(float deltaTime) {
         m_sessionLoadCompletedSteps++;
         m_loadingMessage = "Preparazione del terreno";
         if (m_audioManager) m_audioManager->UpdateMusic();
+
+        // FIX: appena l'ultimo chunk e' stato caricato, asciuga le aree villaggio sui
+        // chunk ORA presenti in m_chunks. In CreateGameSession ForceDryArea girava quando
+        // i chunk attorno allo spawn non erano ancora caricati (spawn spesso fuori dai 9
+        // chunk di preRadius), quindi l'acqua restava. Qui invece tutti i chunk della
+        // sessione sono caricati e ForceDryArea li trova.
+        if (m_sessionChunkIndex == m_sessionChunks.size() && m_village && m_world) {
+            for (const Vector3& center : m_village->GetVillageCenters()) {
+                const float rr = 35.0f + (World::VillageHash(center.x, center.z) * 15.0f);
+                m_world->ForceDryArea(center.x, center.z, rr);
+            }
+        }
         return;
     }
 

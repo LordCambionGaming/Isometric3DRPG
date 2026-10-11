@@ -64,26 +64,66 @@ void World::Render() { if(!m_initialized) return; for(const auto& pair:m_chunks)
 void World::SetSeed(unsigned int seed) { if(m_config.seed==seed) return; m_config.seed=seed; if(m_terrainGenerator) m_terrainGenerator->SetSeed(seed); m_chunks.clear(); GenerateInitialChunks(); }
 Chunk* World::GetChunk(int x,int z){ ChunkKey key={x,z}; auto it=m_chunks.find(key); return (it!=m_chunks.end())?it->second.get():nullptr; }
 
-void World::LoadChunkAt(int x,int z){
-    ChunkKey key={x,z}; if(m_chunks.find(key)!=m_chunks.end()) return;
-    auto chunk=std::make_unique<Chunk>(x,z,m_config.chunkSize,m_config.tileSize);
-    if(m_hasGlobalShader) chunk->SetShader(m_globalShader);
+void World::LoadChunkAt(int x, int z) {
+    ChunkKey key = {x, z};
+    if (m_chunks.find(key) != m_chunks.end()) return;
+
+    auto chunk = std::make_unique<Chunk>(x, z, m_config.chunkSize, m_config.tileSize);
+    if (m_hasGlobalShader) chunk->SetShader(m_globalShader);
     chunk->Generate(*m_terrainGenerator, this);
-    // FIX: dopo generazione, se è vicino a villaggio, asciuga
-    // verrà fatto anche da ForceDryArea ma qui evitiamo buchi
-    chunk->BuildMesh();
-    m_chunks[key]=std::move(chunk);
-}
-void World::ProcessPendingChunks(){
-    if(!pendingChunks.empty()){
-        ChunkKey k=pendingChunks.front(); pendingChunks.erase(pendingChunks.begin());
-        if(IsChunkLoaded(k.x,k.z)) return;
-        auto chunk=std::make_unique<Chunk>(k.x,k.z,m_config.chunkSize,m_config.tileSize);
-        if(m_hasGlobalShader) chunk->SetShader(m_globalShader);
-        chunk->Generate(*m_terrainGenerator, this);
-        chunk->BuildMesh();
-        m_chunks[{k.x,k.z}]=std::move(chunk);
+
+    // Applica flatten/asciugatura subito dopo la generazione: cosi' ogni chunk (anche quelli
+    // caricati in streaming mentre il player si muove) nasce gia' piatto e asciutto dentro le
+    // flatten area registrate da ForceDryArea, senza dover ri-chiamare ForceDryArea ogni volta.
+    if (!m_flattenAreas.empty()) {
+        Vector3 wp = chunk->GetWorldPosition();
+        for (int zz = 0; zz < m_config.chunkSize; ++zz) {
+            for (int xx = 0; xx < m_config.chunkSize; ++xx) {
+                float wx = wp.x + xx * m_config.tileSize + 0.5f;
+                float wz = wp.z + zz * m_config.tileSize + 0.5f;
+                float h;
+                if (GetFlattenedHeight(wx, wz, h)) {
+                    TerrainTile& tile = chunk->GetTile(xx, zz);
+                    tile.height      = h;
+                    tile.hasWater    = false;
+                    tile.waterHeight = 0.0f;
+                }
+            }
+        }
     }
+
+    chunk->BuildMesh();
+    m_chunks[key] = std::move(chunk);
+}
+void World::ProcessPendingChunks() {
+    if (pendingChunks.empty()) return;
+    ChunkKey k = pendingChunks.front();
+    pendingChunks.erase(pendingChunks.begin());
+    if (IsChunkLoaded(k.x, k.z)) return;
+
+    auto chunk = std::make_unique<Chunk>(k.x, k.z, m_config.chunkSize, m_config.tileSize);
+    if (m_hasGlobalShader) chunk->SetShader(m_globalShader);
+    chunk->Generate(*m_terrainGenerator, this);
+
+    if (!m_flattenAreas.empty()) {
+        Vector3 wp = chunk->GetWorldPosition();
+        for (int zz = 0; zz < m_config.chunkSize; ++zz) {
+            for (int xx = 0; xx < m_config.chunkSize; ++xx) {
+                float wx = wp.x + xx * m_config.tileSize + 0.5f;
+                float wz = wp.z + zz * m_config.tileSize + 0.5f;
+                float h;
+                if (GetFlattenedHeight(wx, wz, h)) {
+                    TerrainTile& tile = chunk->GetTile(xx, zz);
+                    tile.height      = h;
+                    tile.hasWater    = false;
+                    tile.waterHeight = 0.0f;
+                }
+            }
+        }
+    }
+
+    chunk->BuildMesh();
+    m_chunks[{k.x, k.z}] = std::move(chunk);
 }
 void World::UnloadChunk(int x,int z){ ChunkKey key={x,z}; auto it=m_chunks.find(key); if(it!=m_chunks.end()){ it->second->Unload(); m_chunks.erase(it);} }
 void World::WorldToChunk(float worldX,float worldZ,int& chunkX,int& chunkZ) const { float chunkWorldSize=m_config.chunkSize*m_config.tileSize; chunkX=static_cast<int>(std::floor(worldX/chunkWorldSize)); chunkZ=static_cast<int>(std::floor(worldZ/chunkWorldSize)); }

@@ -23,7 +23,11 @@ void Chunk::Generate(const TerrainGenerator& terrainGenerator, World* world) {
     m_generated = true;
 }
 void Chunk::BuildMesh() {
-    if (!m_generated || m_hasMesh) return;
+    if (!m_generated) return;
+    if (m_hasMesh) {
+        UnloadModel(m_model);   // libera anche m_mesh associato
+        m_hasMesh = false;
+    }
     CreateTerrainMesh();
     BuildGridLines();
     m_hasMesh = true;
