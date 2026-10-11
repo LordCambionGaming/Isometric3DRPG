@@ -1,10 +1,14 @@
-#version 330
+﻿#version 330
 
 in vec3 fragPosition;
 in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragNormal;
 in vec3 fragCamPos;
+uniform sampler2D shadowMap;
+uniform mat4  lightVP;
+uniform int   shadowsOn;
+uniform float shadowTexel;
 
 // Mappe del materiale (raylib: slot = indice di MATERIAL_MAP_*)
 uniform sampler2D texture0;   // albedo / base color
@@ -72,6 +76,22 @@ vec3 shade(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float rough, floa
     return (kd * albedo * diff + F * spec * max(ndl, 0.0)) * radiance;
 }
 
+float shadowFactor(vec3 N, vec3 L)
+{
+    if (shadowsOn == 0) return 1.0;
+    vec4 lp = lightVP * vec4(fragPosition + N * 0.06, 1.0);
+    vec3 p = lp.xyz / lp.w * 0.5 + 0.5;
+    if (p.z > 1.0 || p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 1.0;
+    float bias = max(0.0015 * (1.0 - dot(N, L)), 0.0004);   // ≈ 0.1–0.4 blocchi con il nuovo intervallo
+    float lit = 0.0;
+    for (int x = -1; x <= 1; x++)
+        for (int y = -1; y <= 1; y++) {
+            float d = texture(shadowMap, p.xy + vec2(x, y) * shadowTexel).r;
+            lit += (p.z - bias <= d) ? 1.0 : 0.0;
+        }
+    return lit / 9.0;
+}
+
 void main()
 {
     vec4 texel = texture(texture0, fragTexCoord);
@@ -103,7 +123,8 @@ void main()
     // Sole (diffuso con "wrap" leggero = pelle e stoffe meno dure)
     vec3 L = normalize(sunDirection);
     vec3 sun = toLinear(sunColor) * 2.6;
-    vec3 color = ambient + shade(N, V, L, sun, albedo, rough, metal, 0.18);
+    float sh = shadowFactor(N, L);
+    vec3 color = ambient + shade(N, V, L, sun, albedo, rough, metal, 0.18) * sh;
 
     // Rim light: contorno luminoso che stacca i personaggi dallo sfondo
     float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
@@ -124,15 +145,16 @@ void main()
     }
 
     // Nebbia atmosferica (solo se fogDensity > 0)
+     float ex = exposure > 0.0 ? exposure : 1.0;
+    color = aces(color * ex);
+    color = pow(color, vec3(1.0 / 2.2));
+
+    // Nebbia applicata sul colore finale: l'orizzonte coincide con il cielo
     if (fogDensity > 0.0) {
         float d = length(fragPosition - fragCamPos) * fogDensity;
         float f = 1.0 - exp(-d * d);
-        color = mix(color, toLinear(fogColor), clamp(f, 0.0, 1.0));
+        color = mix(color, fogColor, clamp(f, 0.0, 1.0));
     }
-
-    float ex = exposure > 0.0 ? exposure : 1.0;
-    color = aces(color * ex);
-    color = pow(color, vec3(1.0 / 2.2));
 
     finalColor = vec4(color, texel.a);
 }

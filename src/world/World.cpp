@@ -61,7 +61,7 @@ void World::Update(float deltaTime) { /* tuo codice identico */
         if (m_chunkLoadTimer >= CHUNK_LOAD_INTERVAL) { ProcessPendingChunks(); m_chunkLoadTimer = 0.0f; }
     }
 }
-void World::Render() {
+void World::Render(bool withWater) {
     if (!m_initialized) return;
 
     // Pass 1: tutti gli opachi (terra + fondale sabbia)
@@ -74,12 +74,14 @@ void World::Render() {
     // la terra disegnata dopo (in caso di chunk lontani) e non nasconde le
     // altre acque dietro di sé. Depth test resta on, così l'acqua è occlusa
     // correttamente da qualunque geometria opaca più vicina alla camera.
-    rlDisableDepthMask();
-    for (const auto& pair : m_chunks) {
-        const auto& chunk = pair.second;
-        if (chunk && chunk->IsGenerated() && chunk->HasWaterMesh()) chunk->RenderWater();
+    if (withWater) {
+        rlDisableDepthMask();
+        for (const auto& pair : m_chunks) {
+            const auto& chunk = pair.second;
+            if (chunk && chunk->IsGenerated() && chunk->HasWaterMesh()) chunk->RenderWater();
+        }
+        rlEnableDepthMask();
     }
-    rlEnableDepthMask();
 }
 void World::SetSeed(unsigned int seed) { if(m_config.seed==seed) return; m_config.seed=seed; if(m_terrainGenerator) m_terrainGenerator->SetSeed(seed); m_chunks.clear(); GenerateInitialChunks(); }
 Chunk* World::GetChunk(int x,int z){ ChunkKey key={x,z}; auto it=m_chunks.find(key); return (it!=m_chunks.end())?it->second.get():nullptr; }

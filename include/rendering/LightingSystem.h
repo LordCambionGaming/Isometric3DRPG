@@ -27,12 +27,22 @@ public:
     void AddPointLight(Vector3 pos, Color color, float radius);
 
     // Apply lighting to the shader before drawing 3D
-    void BeginLightingMode();
+    void BeginLightingMode(Vector3 cameraPos);
+    void AddTorch(Vector3 pos, float radius = 7.0f, float strength = 1.0f);
     void EndLightingMode();
 
     Shader GetShader() const { return m_lightingShader; }
 
+    void InitShadows(int size = 2048);
+void BeginShadowPass(Vector3 focus);
+void EndShadowPass();
 private:
+
+    RenderTexture2D m_shadowRT{};
+Matrix m_lightVP{};
+bool m_shadowsReady = false, m_shadowsThisFrame = false;
+int m_shadowSize = 2048;
+int m_locLightVP = -1, m_locShadowMap = -1, m_locShadowsOn = -1, m_locShadowTexel = -1;
     float m_timeOfDay; // 0.0 to 1.0 (0.0 = midnight, 0.5 = noon)
     Shader m_lightingShader;
     bool m_shaderLoaded;
@@ -51,6 +61,7 @@ private:
     int m_locFogColor = -1;
     int m_locFogDensity = -1;
     int m_locExposure = -1;
+    int m_locViewPos = -1;
 
 };
 

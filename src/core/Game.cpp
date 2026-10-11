@@ -77,6 +77,7 @@ bool Game::Initialize() {
 
         // Shaders require an active OpenGL context: must be loaded after InitWindow.
         m_lightingSystem->Initialize();
+        m_lightingSystem->InitShadows(2048);
 
         if (!m_assetManager->Initialize()) {
             TraceLog(LOG_ERROR, "Failed to initialize asset manager!");
@@ -579,10 +580,16 @@ void Game::Render() {
          (m_gameState->GetType() == GameStateType::VillageDialogue && !interiorDialogue));
     if (((worldVisible && m_world) || (interiorVisible && m_village)) && m_camera) {
         const Camera3D camera = m_camera->GetCamera();
-
+        if (m_lightingSystem && !interiorVisible) {
+    m_lightingSystem->BeginShadowPass(m_player ? m_player->GetPosition() : camera.target);
+    m_world->Render(false);                         // solo opachi, l'acqua non fa ombra
+    if (m_village) m_village->Render(*m_world, m_player ? m_player->GetPosition() : camera.target);
+    if (m_player) m_player->Render();
+    m_lightingSystem->EndShadowPass();
+}
         m_renderer->BeginMode3D(camera);
 
-        if (m_lightingSystem) m_lightingSystem->BeginLightingMode();
+        if (m_lightingSystem) m_lightingSystem->BeginLightingMode(camera.position);
 
         if (interiorVisible) {
             const Vector3 playerPosition = m_player ? m_player->GetPosition() : camera.target;
