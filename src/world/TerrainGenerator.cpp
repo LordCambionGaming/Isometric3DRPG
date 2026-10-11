@@ -75,31 +75,37 @@ float TerrainGenerator::HumidityNoise(int x, int z) const {
 }
 
 int TerrainGenerator::GenerateHeightLevel(int worldX, int worldZ) const {
-    int region = GetRegion(worldX, worldZ);
+    const float fx = (float)worldX;
+    const float fz = (float)worldZ;
 
-    // Separate macro elevation, hill shape, local detail — no chunk bias
-    // New offset seed values to avoid seed 12345 near-origin flatness
-    float macro = PerlinNoise(worldX * 0.012f, worldZ * 0.012f, 10, 3, 0.5f); // low freq
-    float hill = PerlinNoise(worldX * 0.035f, worldZ * 0.035f, 40, 4, 0.55f);   // hill shape
-    float detail = PerlinNoise(worldX * 0.08f, worldZ * 0.08f, 70, 2, 0.5f);    // local roughness
+    // 3 layer fBm a frequenze diverse
+    float continent = PerlinNoise(fx * 0.0035f, fz * 0.0035f, 100, 4, 0.5f); // -1..1, grandi masse
+    float hills     = PerlinNoise(fx * 0.020f,  fz * 0.020f,  200, 4, 0.5f); // -1..1, colline
+    float detail    = PerlinNoise(fx * 0.080f,  fz * 0.080f,  300, 2, 0.5f); // -1..1, rugosità
 
-    // Normalize to 0..1
-    macro = macro * 0.5f + 0.5f;
-    hill = hill * 0.5f + 0.5f;
-    detail = detail * 0.5f + 0.5f;
+    const float CONTINENT_SHORE = -0.35f;
+    const float coastH = (float)SEA_LEVEL + 1.0f;   // quota esatta della riva: oceano e terra si incontrano qui
 
-    // Combine: hill shape dominates, macro shifts base, detail adds roughness
-    float combined = macro * 0.25f + hill * 0.55f + detail * 0.20f;
+    float h;
+    if (continent < CONTINENT_SHORE) {
+        // Oceano: scende dolcemente dalla riva verso il fondo, nessun gradino
+        float d = (CONTINENT_SHORE - continent) / (CONTINENT_SHORE + 1.0f); // 0..1
+        h = coastH - d * (coastH + 3.0f);          // da coastH a -3
+    } else {
+        // Terra: parte dalla quota della riva e sale piano
+        float t = (continent - CONTINENT_SHORE) / (1.0f - CONTINENT_SHORE); // 0..1
+        float base    = t * 14.0f;
+        float hillAmp = 0.5f + t * 4.0f;           // colline dolci
+        h = coastH + base + hills * hillAmp;
+    }
 
-    // Map to 1..5 with progressive transitions; preserve lowlands/plains
-    int level = static_cast<int>(std::floor(combined * 5.0f + 0.5f)); // 0.5..4.5 -> 1..5
-    if (level < 1) level = 1;
-    if (level > 5) level = 5;
+    h += detail * 0.5f;   // rugosità leggera
 
-    // Preserve region specialization: mountains/high more likely 4/5; lowlands more 1/2
-    if (region == 3 && level < 3) level = 3; // Mountains floor
-    if (region == 4 && level > 4) level = 4; // Lowlands ceiling
-
+    int level = (int)std::round(h);
+    // La terra non scende mai sotto il mare: niente laghetti sparsi, l'acqua resta solo nell'oceano
+    if (continent >= CONTINENT_SHORE && level < SEA_LEVEL) level = SEA_LEVEL;
+    if (level < 1)  level = 1;
+    if (level > 40) level = 40;
     return level;
 }
 

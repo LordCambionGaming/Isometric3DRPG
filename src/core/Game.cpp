@@ -24,6 +24,7 @@
 #include <raylib.h>
 #include "ui/InteractionMenu.h"
 #include "rendering/ItemVisuals.h" 
+#include "world/TerrainGenerator.h"
 #include <raymath.h>
 #include <iostream>
 #include <cmath>
@@ -214,21 +215,31 @@ void Game::CreateGameSession() {
         }
     }
 
-    const Vector3 spawn = Village::FindSpawnPosition(*m_world);
+        const Vector3 spawn = Village::FindSpawnPosition(*m_world);
 
+    // 1. Registra/asciuga l'area PRIMA di leggere la quota
+    float r = 35.0f + (World::VillageHash(spawn.x, spawn.z) * 15.0f);
+    m_world->ForceDryArea(spawn.x, spawn.z, r);
+
+    // 2. Crea player
     if (!m_player) m_player = std::make_unique<Player>();
     m_player->SetTileSize(worldConfig.tileSize);
     m_player->SetModel(m_playerModel);
     m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
     m_player->SetItemVisuals(m_itemVisuals.get());
-    m_player->SetPosition(spawn);
-    m_world->SetPlayerPosition(spawn);
-    float r = 35.0f + (World::VillageHash(spawn.x, spawn.z) * 15.0f); // 35..50 random per villaggio
-        m_world->ForceDryArea(spawn.x, spawn.z, r);
+
+    // 3. Quota DOPO il flatten: 6.0 = villageHeight usato in World::ForceDryArea.
+    //    Se il chunk attorno allo spawn non è ancora caricato, GetHeightAt darebbe
+    //    il valore procedurale (sbagliato): usiamo direttamente la costante del flatten.
+    Vector3 spawnPos = spawn;
+    spawnPos.y = (float)TerrainGenerator::SEA_LEVEL + 1.0f;
+    m_player->SetPosition(spawnPos);
+    m_world->SetPlayerPosition(spawnPos);
+
     m_village = std::make_unique<Village>(spawn);
     if (m_camera) {
-        m_camera->SetTarget(spawn);
-        m_camera->FollowTarget(spawn);
+        m_camera->SetTarget(spawnPos);
+        m_camera->FollowTarget(spawnPos);
     }
     m_navigation.Initialize(m_world.get(), MAX_STEP_HEIGHT);
     

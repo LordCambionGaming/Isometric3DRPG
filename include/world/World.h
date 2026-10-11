@@ -63,6 +63,7 @@ public:
     // World queries
     float GetHeightAt(float worldX, float worldZ) const;
     int GetBiomeAt(float worldX, float worldZ) const;
+    void GetTileSurface(int tileX, int tileZ, int& height, bool& water) const;
 
     const WorldConfig& GetConfig() const { return m_config; }
 

@@ -87,6 +87,17 @@ bool IsVillageSite(const World& world, float centerX, float centerZ, float villa
             }
         }
     }
+     if (maxHeight - minHeight > 1.2f) return false;
+
+    // Entroterra: gli anelli a 45 e 70 blocchi devono essere asciutti,
+    // così il villaggio non nasce su un'isola o una penisola sottile.
+    for (float radius : { 45.0f, 70.0f }) {
+        for (int i = 0; i < 16; ++i) {
+            const float a = i * (2.0f * PI / 16.0f);
+            if (world.IsWaterAt(centerX + std::cos(a) * radius, centerZ + std::sin(a) * radius)) return false;
+        }
+    }
+    return true;
     return maxHeight - minHeight <= 1.2f;
 } 
 std::optional<Vector3> FindVillageSiteForRegion(const World& world, int regionX, int regionZ) {
@@ -257,9 +268,9 @@ bool Village::PruneDistantVillages(Vector3 position, float maxDistance) {
     m_buildings=std::move(keptBuildings); m_instances=std::move(keptInstances); m_npcs=std::move(keptNpcs); m_chests=std::move(keptChests); m_villageCenters=std::move(keptCenters); RebuildRoadRuns(); return true;
 }
 Vector3 Village::FindSpawnPosition(const World& world) {
-    for (int radius=0; radius<=48; ++radius) {
-        for (int x=-radius; x<=radius; ++x) for (int side : {-1,1}) { const int z=side*radius; const float centerX=x+0.5f; const float centerZ=z+0.5f; if(IsVillageSite(world,centerX,centerZ)) return {centerX, world.GetHeightAt(centerX,centerZ), centerZ};}
-        for (int z=-radius+1; z<radius; ++z) for (int side : {-1,1}) { const int x=side*radius; const float centerX=x+0.5f; const float centerZ=z+0.5f; if(IsVillageSite(world,centerX,centerZ)) return {centerX, world.GetHeightAt(centerX,centerZ), centerZ};}
+    for (int radius=0; radius<=160; ++radius) {
+        for (int x=-radius; x<=radius; ++x) for (int side : {-1,1}) { const int z=side*radius; if((x&3)||(z&3)) continue; const float centerX=x+0.5f; const float centerZ=z+0.5f; if(IsVillageSite(world,centerX,centerZ)) return {centerX, world.GetHeightAt(centerX,centerZ), centerZ};}
+        for (int z=-radius+1; z<radius; ++z) for (int side : {-1,1}) { const int x=side*radius; if((x&3)||(z&3)) continue; const float centerX=x+0.5f; const float centerZ=z+0.5f; if(IsVillageSite(world,centerX,centerZ)) return {centerX, world.GetHeightAt(centerX,centerZ), centerZ};}
     }
     for (int radius=0; radius<=64; ++radius) for (int x=-radius; x<=radius; ++x) for (int z : {-radius, radius}) { const float centerX=x+0.5f; const float centerZ=z+0.5f; if(!world.IsWaterAt(centerX,centerZ)) return {centerX, world.GetHeightAt(centerX,centerZ), centerZ};}
     return {0.5f, world.GetHeightAt(0.5f,0.5f), 0.5f};

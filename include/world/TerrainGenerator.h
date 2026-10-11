@@ -24,6 +24,8 @@ public:
     void GenerateChunkData(int chunkX, int chunkZ, int chunkSize, float tileSize,
                           float* heights, float* temperatures, float* humidity) const;
 
+   static constexpr int SEA_LEVEL = 4; // y del pelo dell'acqua (in blocchi)
+
 private:
     // Region types for terrain generation
     enum class TerrainRegion {

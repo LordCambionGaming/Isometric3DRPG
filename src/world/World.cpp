@@ -5,6 +5,7 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <rlgl.h>
 
 World::World()
     : m_terrainGenerator(nullptr)
@@ -60,7 +61,26 @@ void World::Update(float deltaTime) { /* tuo codice identico */
         if (m_chunkLoadTimer >= CHUNK_LOAD_INTERVAL) { ProcessPendingChunks(); m_chunkLoadTimer = 0.0f; }
     }
 }
-void World::Render() { if(!m_initialized) return; for(const auto& pair:m_chunks){ const auto& chunk=pair.second; if(chunk && chunk->IsGenerated() && chunk->HasMesh()) chunk->Render(); } }
+void World::Render() {
+    if (!m_initialized) return;
+
+    // Pass 1: tutti gli opachi (terra + fondale sabbia)
+    for (const auto& pair : m_chunks) {
+        const auto& chunk = pair.second;
+        if (chunk && chunk->IsGenerated() && chunk->HasMesh()) chunk->Render();
+    }
+
+    // Pass 2: acqua trasparente. Depth write off, così l'acqua non copre
+    // la terra disegnata dopo (in caso di chunk lontani) e non nasconde le
+    // altre acque dietro di sé. Depth test resta on, così l'acqua è occlusa
+    // correttamente da qualunque geometria opaca più vicina alla camera.
+    rlDisableDepthMask();
+    for (const auto& pair : m_chunks) {
+        const auto& chunk = pair.second;
+        if (chunk && chunk->IsGenerated() && chunk->HasWaterMesh()) chunk->RenderWater();
+    }
+    rlEnableDepthMask();
+}
 void World::SetSeed(unsigned int seed) { if(m_config.seed==seed) return; m_config.seed=seed; if(m_terrainGenerator) m_terrainGenerator->SetSeed(seed); m_chunks.clear(); GenerateInitialChunks(); }
 Chunk* World::GetChunk(int x,int z){ ChunkKey key={x,z}; auto it=m_chunks.find(key); return (it!=m_chunks.end())?it->second.get():nullptr; }
 
@@ -156,7 +176,7 @@ bool World::GetFlattenedHeight(float wx, float wz, float& outHeight) const {
 }
 
 void World::ForceDryArea(float centerX, float centerZ, float radius) {
-    float villageHeight = 2.0f;
+    float villageHeight = 6.0f;
     bool exists = false;
     for (auto& fa : m_flattenAreas) {
         float dx = fa.x - centerX; float dz = fa.z - centerZ;
@@ -205,39 +225,51 @@ void World::UpdateChunkStreaming(Vector3 centerPosition){
 void World::UnloadDistantChunks(Vector3 centerPosition){ int centerCX,centerCZ; WorldToChunk(centerPosition.x,centerPosition.z,centerCX,centerCZ); std::vector<ChunkKey> chunksToUnload; for(const auto& pair:m_chunks){ const ChunkKey& key=pair.first; int dx=key.x-centerCX; int dz=key.z-centerCZ; float dSq=(float)(dx*dx+dz*dz); if(dSq>UNLOAD_RADIUS*UNLOAD_RADIUS) chunksToUnload.push_back(key);} for(const ChunkKey& key:chunksToUnload) UnloadChunk(key.x,key.z); }
 bool World::IsChunkLoaded(int chunkX,int chunkZ) const { ChunkKey key={chunkX,chunkZ}; return m_chunks.find(key)!=m_chunks.end(); }
 
-float World::GetHeightAt(float worldX,float worldZ) const {
-    if(!m_terrainGenerator) return 0.0f;
-    int chunkX,chunkZ,localX,localZ; WorldToChunk(worldX,worldZ,chunkX,chunkZ,localX,localZ);
-    Chunk* chunk=const_cast<World*>(this)->GetChunk(chunkX,chunkZ);
-    if(chunk && chunk->IsGenerated()){
-        const TerrainTile& tile=chunk->GetTile(localX,localZ);
-        if(tile.hasWater) return 2.0f; // superficie acqua sempre 2
-        return tile.height;
+float World::GetHeightAt(float worldX, float worldZ) const {
+    if (!m_terrainGenerator) return 0.0f;
+    int chunkX, chunkZ, localX, localZ;
+    WorldToChunk(worldX, worldZ, chunkX, chunkZ, localX, localZ);
+    Chunk* chunk = const_cast<World*>(this)->GetChunk(chunkX, chunkZ);
+    if (chunk && chunk->IsGenerated()) {
+        const TerrainTile& tile = chunk->GetTile(localX, localZ);
+        return tile.hasWater ? tile.waterHeight : tile.height;  // niente più 2.0f
     }
-    int worldXInt=static_cast<int>(worldX/m_config.tileSize); int worldZInt=static_cast<int>(worldZ/m_config.tileSize);
-    int level=m_terrainGenerator->GenerateHeightLevel(worldXInt,worldZInt);
-    WorldFeatureGenerator featureGen; featureGen.Initialize(m_terrainGenerator->GetSeed());
-    WaterFeature wf=featureGen.GetFeatureAt(worldXInt,worldZInt,*m_terrainGenerator);
-    bool isWater=(wf==WaterFeature::Sea)||(wf==WaterFeature::Lake)||(wf==WaterFeature::River);
-    if(isWater) return 2.0f;
-    float h=static_cast<float>(level); if(h<2.0f) h=2.0f; return h;
+     int worldXInt = (int)std::floor(worldX / m_config.tileSize);
+    int worldZInt = (int)std::floor(worldZ / m_config.tileSize);
+    int level = m_terrainGenerator->GenerateHeightLevel(worldXInt, worldZInt);
+    if (level < TerrainGenerator::SEA_LEVEL) return (float)TerrainGenerator::SEA_LEVEL;
+    return (float)level;
 }
 int World::GetBiomeAt(float worldX,float worldZ) const { if(!m_terrainGenerator) return 0; float height=m_terrainGenerator->GenerateHeight(static_cast<int>(worldX/m_config.tileSize),static_cast<int>(worldZ/m_config.tileSize)); float temperature=m_terrainGenerator->GenerateTemperature(static_cast<int>(worldX/m_config.tileSize),static_cast<int>(worldZ/m_config.tileSize)); float humidity=m_terrainGenerator->GenerateHumidity(static_cast<int>(worldX/m_config.tileSize),static_cast<int>(worldZ/m_config.tileSize)); return static_cast<int>(m_biomeManager.GetDominantBiome(static_cast<int>(worldX),static_cast<int>(worldZ),height,temperature,humidity)); }
+void World::GetTileSurface(int tileX, int tileZ, int& height, bool& water) const {
+    int level = m_terrainGenerator->GenerateHeightLevel(tileX, tileZ);
+    height = level;
+    water  = level < TerrainGenerator::SEA_LEVEL;
+    float flatH = 0.0f;
+    if (GetFlattenedHeight(tileX + 0.5f, tileZ + 0.5f, flatH)) {
+        height = (int)flatH;
+        water  = false;
+    }
+}
 void World::UpdateChunkLoading(Vector3 playerPosition){ UpdateChunkStreaming(playerPosition); }
 void World::GenerateInitialChunks(){ constexpr int initialRadius=1; for(int x=-initialRadius;x<=initialRadius;x++) for(int z=-initialRadius;z<=initialRadius;z++) LoadChunkAt(x,z); TraceLog(LOG_INFO,"Generated %zu initial chunks",m_chunks.size()); }
 bool World::ShouldLoadChunk(int chunkX,int chunkZ,Vector3 centerPos) const { if(IsChunkLoaded(chunkX,chunkZ)) return false; float distSquared=GetChunkDistanceSquared(chunkX,chunkZ,centerPos); float maxDistSquared=GENERATION_RADIUS*GENERATION_RADIUS; return distSquared<=maxDistSquared; }
 bool World::ShouldUnloadChunk(int chunkX,int chunkZ,Vector3 centerPos) const { float distSquared=GetChunkDistanceSquared(chunkX,chunkZ,centerPos); float unloadDistSquared=UNLOAD_RADIUS*UNLOAD_RADIUS; return distSquared>unloadDistSquared; }
 
-bool World::IsWaterAt(float worldX,float worldZ) const {
-    int chunkX,chunkZ,localX,localZ; WorldToChunk(worldX,worldZ,chunkX,chunkZ,localX,localZ);
-    Chunk* chunk=const_cast<World*>(this)->GetChunk(chunkX,chunkZ);
-    if(chunk && chunk->IsGenerated()){
-        return chunk->GetTile(localX,localZ).hasWater;
+bool World::IsWaterAt(float worldX, float worldZ) const {
+    int chunkX, chunkZ, localX, localZ;
+    WorldToChunk(worldX, worldZ, chunkX, chunkZ, localX, localZ);
+    Chunk* chunk = const_cast<World*>(this)->GetChunk(chunkX, chunkZ);
+    if (chunk && chunk->IsGenerated()) {
+        return chunk->GetTile(localX, localZ).hasWater;
     }
-    int wx=static_cast<int>(worldX/m_config.tileSize); int wz=static_cast<int>(worldZ/m_config.tileSize);
-    if(!m_terrainGenerator) return false;
-    WorldFeatureGenerator featureGen; featureGen.Initialize(m_terrainGenerator->GetSeed());
-    WaterFeature wf=featureGen.GetFeatureAt(wx,wz,*m_terrainGenerator);
-    return (wf==WaterFeature::Sea)||(wf==WaterFeature::Lake)||(wf==WaterFeature::River);
+    if (!m_terrainGenerator) return false;
+
+    // Stessa regola di Chunk::GenerateTerrain, senza passare da WorldFeatureGenerator.
+    const int wx = (int)std::floor(worldX / m_config.tileSize);
+    const int wz = (int)std::floor(worldZ / m_config.tileSize);
+    float flatH;
+    if (GetFlattenedHeight(wx + 0.5f, wz + 0.5f, flatH)) return false;
+    return m_terrainGenerator->GenerateHeightLevel(wx, wz) < TerrainGenerator::SEA_LEVEL;
 }
 float World::GetChunkDistanceSquared(int chunkX,int chunkZ,Vector3 centerPos) const { int centerCX,centerCZ; WorldToChunk(centerPos.x,centerPos.z,centerCX,centerCZ); int dx=chunkX-centerCX; int dz=chunkZ-centerCZ; return (float)(dx*dx+dz*dz); }

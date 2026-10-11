@@ -30,12 +30,14 @@ public:
     void Generate(const TerrainGenerator& terrainGenerator, World* world = nullptr);
     void BuildMesh();
     void Render();
+    void RenderWater();          // NUOVO: pass trasparente (top acqua)
     void Unload();
 
     void SetShader(Shader shader) { m_shader = shader; m_hasShader = true; }
 
     bool IsGenerated() const { return m_generated; }
     bool HasMesh() const { return m_hasMesh; }
+    bool HasWaterMesh() const { return m_hasWaterMesh; }  // NUOVO
 
     int GetX() const { return m_x; }
     int GetZ() const { return m_z; }
@@ -51,6 +53,7 @@ private:
     void GenerateTerrain(const TerrainGenerator& terrainGenerator, World* world = nullptr);
     void GenerateColors();
     void CreateTerrainMesh();
+    void CreateWaterMesh();      // NUOVO
     void BuildGridLines();
     void RenderGrid() const;
 
@@ -64,11 +67,16 @@ private:
     bool ShouldHaveVegetation(int biomeType, float randomValue) const;
     void GenerateTileColors(TerrainTile& tile) const;
     Color BlendColors(Color color1, Color color2, float factor) const;
+    float VertexWaterDepth(int vx, int vz) const;
+    void AddQuadColors(std::vector<Vector3>& vertices, std::vector<Vector2>& texCoords,
+                   std::vector<Vector3>& normals, std::vector<Color>& colors,
+                   Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4,
+                   Color c1, Color c2, Color c3, Color c4, Vector3 normal);
 
     int m_x, m_z;
     int m_size;
     float m_tileSize;
-
+    World* m_world = nullptr;
     std::vector<TerrainTile> m_tiles;
     std::vector<Vector3> m_gridLines;
 
@@ -78,6 +86,11 @@ private:
     bool m_hasMesh;
     Shader m_shader{};
     bool m_hasShader = false;
+
+    // NUOVO: mesh acqua separata (pass trasparente)
+    Mesh  m_waterMesh{};
+    Model m_waterModel{};
+    bool  m_hasWaterMesh = false;
 
     static constexpr float NOISE_SCALE = 0.05f;
     static constexpr float HEIGHT_MULTIPLIER = 5.0f;
