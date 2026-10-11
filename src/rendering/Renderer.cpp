@@ -41,7 +41,7 @@ bool Renderer::Initialize(int screenWidth, int screenHeight, const char* title) 
             m_windowHeight = height;
         }
 
-        unsigned int flags = 0;
+        unsigned int flags = FLAG_MSAA_4X_HINT;  
         if (m_fullscreen) flags |= FLAG_FULLSCREEN_MODE;
         if (m_vsyncEnabled) flags |= FLAG_VSYNC_HINT;
         SetConfigFlags(flags);

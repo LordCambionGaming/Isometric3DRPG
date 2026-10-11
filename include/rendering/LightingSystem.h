@@ -48,6 +48,10 @@ private:
     int m_locLightRadii;
     int m_locSunDirection;
     int m_locSunColor;
+    int m_locFogColor = -1;
+    int m_locFogDensity = -1;
+    int m_locExposure = -1;
+
 };
 
 } // namespace core

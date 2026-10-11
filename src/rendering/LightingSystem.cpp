@@ -1,6 +1,7 @@
 #include "rendering/LightingSystem.h"
 #include <cmath>
 #include <algorithm>
+#include <rlgl.h>
 
 namespace core {
 
@@ -11,15 +12,25 @@ LightingSystem::~LightingSystem() {
 }
 
 void LightingSystem::Initialize() {
-    m_lightingShader = LoadShader("assets/shaders/lighting.vs", "assets/shaders/lighting.fs");
+    Shader sh = LoadShader("assets/shaders/lighting.vs", "assets/shaders/lighting.fs");
+    if (sh.id == 0 || sh.locs == nullptr) {
+        TraceLog(LOG_ERROR, "[LIGHT] lighting.vs/.fs non si collegano: provo lighting_legacy");
+        sh = LoadShader("assets/shaders/lighting_legacy.vs", "assets/shaders/lighting_legacy.fs");
+    }
+    if (sh.id == 0 || sh.locs == nullptr) {
+        TraceLog(LOG_ERROR, "[LIGHT] nessuno shader di luce valido: uso quello di default di raylib");
+        m_lightingShader = Shader{ rlGetShaderIdDefault(), rlGetShaderLocsDefault() };
+        m_shaderLoaded = false;          // BeginLightingMode() non fa nulla, ma il gioco parte
+        return;
+    }
+    m_lightingShader = sh;
+    m_shaderLoaded = true;
+
+    m_lightingShader.locs[SHADER_LOC_MATRIX_MVP]    = GetShaderLocation(m_lightingShader, "mvp");
+    m_lightingShader.locs[SHADER_LOC_MATRIX_MODEL]  = GetShaderLocation(m_lightingShader, "matModel");
+    m_lightingShader.locs[SHADER_LOC_MATRIX_NORMAL] = GetShaderLocation(m_lightingShader, "matNormal");
     
-    if (m_lightingShader.id != 0) {
-        m_shaderLoaded = true;
-        
-        // Get uniform locations
-        m_lightingShader.locs[SHADER_LOC_MATRIX_MVP] = GetShaderLocation(m_lightingShader, "mvp");
-        m_lightingShader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(m_lightingShader, "matModel");
-        m_lightingShader.locs[SHADER_LOC_MATRIX_NORMAL] = GetShaderLocation(m_lightingShader, "matNormal");
+    
         
         m_locAmbientColor = GetShaderLocation(m_lightingShader, "ambientColor");
         m_locAmbientIntensity = GetShaderLocation(m_lightingShader, "ambientIntensity");
@@ -29,7 +40,16 @@ void LightingSystem::Initialize() {
         m_locLightRadii = GetShaderLocation(m_lightingShader, "lightRadii");
         m_locSunDirection = GetShaderLocation(m_lightingShader, "sunDirection");
         m_locSunColor = GetShaderLocation(m_lightingShader, "sunColor");
-    }
+        int units[4] = { 0, 1, 2, 3 };
+        const char* names[4] = { "texture0", "texture1", "texture2", "texture3" };
+        for (int i = 0; i < 4; ++i) {
+         int loc = GetShaderLocation(m_lightingShader, names[i]);
+            if (loc >= 0) SetShaderValue(m_lightingShader, loc, &units[i], SHADER_UNIFORM_INT);
+        }
+        m_locFogColor   = GetShaderLocation(m_lightingShader, "fogColor");
+        m_locFogDensity = GetShaderLocation(m_lightingShader, "fogDensity");
+        m_locExposure   = GetShaderLocation(m_lightingShader, "exposure");
+    
 }
 
 void LightingSystem::Unload() {
@@ -137,6 +157,14 @@ void LightingSystem::BeginLightingMode() {
         SetShaderValueV(m_lightingShader, m_locLightColors, colors, SHADER_UNIFORM_VEC3, lightsCount);
         SetShaderValueV(m_lightingShader, m_locLightRadii, radii, SHADER_UNIFORM_FLOAT, lightsCount);
     }
+
+    Color sky = GetSkyColor();
+Vector3 fogCol = { sky.r / 255.0f, sky.g / 255.0f, sky.b / 255.0f };
+float fogDensity = 0.010f;   // 0 = spenta; prova 0.006 (lieve) .. 0.02 (fitta)
+float exposure   = 1.05f;
+SetShaderValue(m_lightingShader, m_locFogColor,   &fogCol,     SHADER_UNIFORM_VEC3);
+SetShaderValue(m_lightingShader, m_locFogDensity, &fogDensity, SHADER_UNIFORM_FLOAT);
+SetShaderValue(m_lightingShader, m_locExposure,   &exposure,   SHADER_UNIFORM_FLOAT);
     
     BeginShaderMode(m_lightingShader);
 }
