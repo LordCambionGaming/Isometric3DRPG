@@ -1,4 +1,4 @@
-﻿#version 330
+#version 330
 
 in vec3 fragPosition;
 in vec2 fragTexCoord;
@@ -13,6 +13,7 @@ uniform sampler2D shadowMap;
 uniform mat4  lightVP;
 uniform int   shadowsOn;
 uniform float shadowTexel;
+uniform float shadowStrength;
 
 uniform vec3  ambientColor;
 uniform float ambientIntensity;
@@ -92,7 +93,7 @@ void main()
 
     vec3 L = normalize(sunDirection);
     vec3 sun = toLinear(sunColor) * 2.6;
-    float sh = shadowFactor(N, L);
+    float sh = mix(1.0, shadowFactor(N, L), shadowStrength);
     vec3 color = ambient + shade(N, V, L, sun, albedo, rough, metal, 0.18) * sh;
 
     float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);

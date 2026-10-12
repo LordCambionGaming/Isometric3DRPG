@@ -402,6 +402,7 @@ void Game::FinishSessionLoading() {
             m_testMob->SetPosition(m_pendingSaveData.testMobPosition);
             m_testMob->TakeDamage(m_testMob->GetCurrentHP() - m_pendingSaveData.testMobCurrentHP);
         }
+        if (m_lightingSystem) m_lightingSystem->SetTimeOfDay(m_pendingSaveData.timeOfDay);
         m_loadingSave = false;
     }
 
@@ -441,6 +442,7 @@ bool Game::SaveGame() {
     data.character = m_player->GetCharacter();
     data.quests = m_questLog;
     data.playerPosition = m_player->GetPosition();
+    if (m_lightingSystem) data.timeOfDay = m_lightingSystem->GetTimeOfDay();
     if (m_testMob) {
         data.hasTestMob = true;
         data.testMobPosition = m_testMob->GetPosition();

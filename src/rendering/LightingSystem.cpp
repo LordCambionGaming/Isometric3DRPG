@@ -41,6 +41,31 @@ Atmos EvalAtmos(float t) {
     return keys[n - 1].a;
 }
 
+
+struct SunInfo { Vector3 dir; Vector3 color; float shadowStrength; };
+
+SunInfo EvalSun(float t) {
+    const float A = (t - 0.25f) * 2.0f * PI;
+    const float s = sinf(A), c = cosf(A);
+    SunInfo r;
+    if (s >= 0.0f) {
+        // Sole: a mezzogiorno (c = 0) la z è 0, quindi la luce è verticale e l'ombra sta sotto l'oggetto
+        r.dir = Vector3Normalize({ c, fmaxf(s, 0.25f), 0.3f * fabsf(c) });
+        const float k    = SmoothStep(0.0f, 0.25f, s);
+        const float warm = 1.0f - SmoothStep(0.0f, 0.5f, s);
+        r.color = { 1.0f * k, (0.92f - 0.32f * warm) * k, (0.82f - 0.52f * warm) * k };
+        r.shadowStrength = 0.4f + 0.6f * SmoothStep(0.0f, 0.25f, s);
+    } else {
+        // Luna: alta nel cielo (ombre corte), debole, ombre morbide
+        const float m = -s;
+        r.dir = Vector3Normalize({ -c * 0.6f, 0.55f + 0.45f * m, 0.25f });
+        const float k = SmoothStep(0.0f, 0.3f, m) * 0.18f;
+        r.color = { 0.45f * k, 0.55f * k, 0.90f * k };
+        r.shadowStrength = 0.0f;
+    }
+    return r;
+}
+
 } // namespace
 
 namespace core {
@@ -121,26 +146,16 @@ void LightingSystem::BeginLightingMode(Vector3 cameraPos) {
     if (!m_shaderLoaded) return;
 
     const Atmos a = EvalAtmos(m_timeOfDay);
-    const float sinA = sinf((m_timeOfDay - 0.25f) * 2.0f * PI);
-    const float cosA = cosf((m_timeOfDay - 0.25f) * 2.0f * PI);
-
-    // Sole di giorno, luna di notte. Il cambio avviene quando entrambi sono a intensità 0: nessun salto visibile.
-    Vector3 sunDir, sunColor;
-    if (sinA >= 0.0f) {
-        sunDir = { cosA, sinA, 0.5f };
-        const float k    = SmoothStep(0.0f, 0.25f, sinA);          // sale piano dopo l'alba
-        const float warm = 1.0f - SmoothStep(0.0f, 0.5f, sinA);    // arancio vicino all'orizzonte
-        sunColor = { 1.0f * k, (0.92f - 0.32f * warm) * k, (0.82f - 0.52f * warm) * k };
-    } else {
-        sunDir = { -cosA, -sinA, 0.5f };
-        const float k = SmoothStep(0.0f, 0.3f, -sinA) * 0.7f;
-        sunColor = { 0.45f * k, 0.55f * k, 0.90f * k };            // luce lunare fredda
-    }
+    const SunInfo sun = EvalSun(m_timeOfDay);
+    Vector3 sunDir = sun.dir;
+    Vector3 sunColor = sun.color;
+    float shadowStrength = sun.shadowStrength;
 
     SetShaderValue(m_lightingShader, m_locAmbientColor, &a.amb, SHADER_UNIFORM_VEC3);
     SetShaderValue(m_lightingShader, m_locAmbientIntensity, &a.ambI, SHADER_UNIFORM_FLOAT);
     SetShaderValue(m_lightingShader, m_locSunDirection, &sunDir, SHADER_UNIFORM_VEC3);
     SetShaderValue(m_lightingShader, m_locSunColor, &sunColor, SHADER_UNIFORM_VEC3);
+    SetShaderValue(m_lightingShader, m_locShadowStrength, &shadowStrength, SHADER_UNIFORM_FLOAT);
 
     // Max 8 luci nello shader: tieni le più vicine
     std::sort(m_lights.begin(), m_lights.end(), [&](const PointLight& l, const PointLight& r) {
@@ -174,10 +189,11 @@ void LightingSystem::BeginLightingMode(Vector3 cameraPos) {
     if (m_locViewPos >= 0) SetShaderValue(m_lightingShader, m_locViewPos, &cameraPos, SHADER_UNIFORM_VEC3);
 
     int on = m_shadowsThisFrame ? 1 : 0;
-SetShaderValue(m_lightingShader, m_locShadowsOn, &on, SHADER_UNIFORM_INT);
-if (on) SetShaderValueMatrix(m_lightingShader, m_locLightVP, m_lightVP);
-if (on) { rlActiveTextureSlot(10); rlEnableTexture(m_shadowRT.depth.id); rlActiveTextureSlot(0); }
-m_shadowsThisFrame = false;
+    SetShaderValue(m_lightingShader, m_locShadowsOn, &on, SHADER_UNIFORM_INT);
+    if (on) SetShaderValueMatrix(m_lightingShader, m_locLightVP, m_lightVP);
+    if (on) { rlActiveTextureSlot(10); rlEnableTexture(m_shadowRT.depth.id); rlActiveTextureSlot(0); }
+    m_shadowsThisFrame = false;
+
     BeginShaderMode(m_lightingShader);
 }
 
@@ -211,6 +227,7 @@ void LightingSystem::InitShadows(int size) {
     m_locShadowMap   = GetShaderLocation(m_lightingShader, "shadowMap");
     m_locShadowsOn   = GetShaderLocation(m_lightingShader, "shadowsOn");
     m_locShadowTexel = GetShaderLocation(m_lightingShader, "shadowTexel");
+    m_locShadowStrength = GetShaderLocation(m_lightingShader, "shadowStrength");
     int slot = 10;
     SetShaderValue(m_lightingShader, m_locShadowMap, &slot, SHADER_UNIFORM_INT);
     float texel = 1.0f / size;
@@ -219,10 +236,7 @@ void LightingSystem::InitShadows(int size) {
 
 void LightingSystem::BeginShadowPass(Vector3 focus) {
     if (!m_shadowsReady) return;
-    const float a = (m_timeOfDay - 0.25f) * 2.0f * PI;
-    Vector3 d = sinf(a) >= 0.0f ? Vector3{ cosf(a), sinf(a), 0.5f } : Vector3{ -cosf(a), -sinf(a), 0.5f };
-    d.y = fmaxf(d.y, 0.25f);                       // sole basso: ombre lunghe ma non infinite
-    d = Vector3Normalize(d);
+       const Vector3 d = EvalSun(m_timeOfDay).dir;
 
     Camera3D lc{};
     lc.target = focus;

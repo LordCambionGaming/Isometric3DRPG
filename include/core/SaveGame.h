@@ -14,6 +14,7 @@ struct SaveGameData {
     Vector3 testMobPosition{};
     int testMobCurrentHP = 0;
     int testMobMaxHP = 0;
+    float timeOfDay = 0.3f;
 };
 
 class SaveGame {

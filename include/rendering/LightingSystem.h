@@ -62,6 +62,7 @@ int m_locLightVP = -1, m_locShadowMap = -1, m_locShadowsOn = -1, m_locShadowTexe
     int m_locFogDensity = -1;
     int m_locExposure = -1;
     int m_locViewPos = -1;
+    int m_locShadowStrength = -1;
 
 };
 

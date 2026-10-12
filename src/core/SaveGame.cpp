@@ -12,7 +12,7 @@ namespace {
 
 using Json = nlohmann::json;
 constexpr const char* kSavePath = "saves/quick_save.json";
-constexpr int kSaveVersion = 2;
+constexpr int kSaveVersion = 3;
 
 Json WritePosition(Vector3 position) {
     return Json{ { "x", position.x }, { "y", position.y }, { "z", position.z } };
@@ -128,6 +128,7 @@ bool SaveGame::Write(const SaveGameData& data) {
         Json root = {
             { "version", kSaveVersion },
             { "player_position", WritePosition(data.playerPosition) },
+            { "time_of_day", data.timeOfDay },
             { "character", WriteCharacter(data.character) },
             { "quests", { { "village_letter", static_cast<int>(data.quests.villageLetter) } } },
             { "test_mob", data.hasTestMob ? Json{
@@ -157,6 +158,12 @@ bool SaveGame::Read(SaveGameData& data) {
         SaveGameData loaded;
         if (!ReadPosition(root.at("player_position"), loaded.playerPosition) ||
             !ReadCharacter(root.at("character"), loaded.character)) return false;
+
+        if (version >= 3 && root.contains("time_of_day")) {
+        const float t = root.at("time_of_day").get<float>();
+        if (!std::isfinite(t)) return false;
+        loaded.timeOfDay = t - std::floor(t);   // forza il valore in 0..1
+        }
 
         if (version >= 2 && root.contains("quests")) {
             const int questStatus = root.at("quests").at("village_letter").get<int>();
