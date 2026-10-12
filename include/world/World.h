@@ -5,7 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include "world/BiomeManager.h"
-
+#include <cmath>
 class Chunk;
 class TerrainGenerator;
 class BiomeManager;
