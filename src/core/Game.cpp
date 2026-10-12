@@ -29,6 +29,23 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include "utils/Logger.h"
+#include <cstdarg>
+#include <cstdio>
+
+static void RaylibLogToFile(int level, const char* text, va_list args) {
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), text, args);
+    switch (level) {
+        case LOG_ERROR:   Logger::LogError(buffer);   break;
+        case LOG_FATAL:   Logger::LogFatal(buffer);   break;
+        case LOG_WARNING: Logger::LogWarning(buffer); break;
+        case LOG_DEBUG:   Logger::LogDebug(buffer);   break;
+        default:          Logger::LogInfo(buffer);    break;
+    }
+    printf("%s\n", buffer);   // la callback sostituisce l'output di default: lo rimettiamo
+}
+
 
 Game::Game()
     : m_isRunning(false)
@@ -52,6 +69,9 @@ Game::~Game() {
 
 bool Game::Initialize() {
     try {
+        Logger::Initialize();                    // crea logs/game.log
+        SetTraceLogCallback(RaylibLogToFile);
+
         lang::Initialize();
         SetTraceLogLevel(LOG_WARNING); // la console non va piu' controllata: silenzia i log informativi di raylib, restano warning/errori
 
@@ -188,7 +208,7 @@ void Game::Shutdown() {
         m_lightingSystem->Unload();
         m_lightingSystem.reset();
     }
-
+    Logger::Shutdown();
     m_isRunning = false;
 }
 

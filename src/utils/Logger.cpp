@@ -87,6 +87,7 @@ void Logger::Log(LogLevel level, const std::string& message) {
     std::lock_guard<std::mutex> lock(s_mutex);
     
     s_logFile << GetTimestamp() << " " << GetLevelString(level) << " " << message << "\n";
+	s_logFile.flush(); // Flush to ensure the message is written immediately
 }
 
 void Logger::LogDebug(const std::string& message) {
