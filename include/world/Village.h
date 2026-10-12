@@ -72,7 +72,7 @@ public:
     void Render(const World& world, Vector3 playerPosition) const;
     void RenderInterior(int buildingIndex, Vector3 cameraPosition, Vector3 playerPosition,
                         Ray hoverRay) const;
-    
+    static void SetCubeShader(Shader shader);
     // Chests
     std::vector<InteriorChest>& GetChests() { return m_chests; }
     InteriorChest* ChestAtInteriorRay(Ray ray, int buildingIndex);

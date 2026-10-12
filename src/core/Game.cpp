@@ -97,8 +97,9 @@ bool Game::Initialize() {
 
         // Shaders require an active OpenGL context: must be loaded after InitWindow.
         m_lightingSystem->Initialize();
-        m_lightingSystem->InitShadows(2048);
 
+        m_lightingSystem->InitShadows(2048);
+        Village::SetCubeShader(m_lightingSystem->GetShader());
         if (!m_assetManager->Initialize()) {
             TraceLog(LOG_ERROR, "Failed to initialize asset manager!");
             return false;

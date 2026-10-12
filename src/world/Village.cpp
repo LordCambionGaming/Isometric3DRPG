@@ -154,9 +154,21 @@ void DrawCandle(Vector3 position, float radius, float height, int slices, Color 
     DrawCylinder(position, radius, radius, height, slices, Color{218,203,164,255});
     DrawSphere({position.x, position.y+height+radius, position.z}, radius*1.15f, flameColor);
 }
+
+Shader g_cubeShader{};
+bool   g_hasCubeShader = false;
+
+// Cubo con normali vere, al posto di DrawCube (che non le manda allo shader)
+void DrawLitCube(Vector3 position, float width, float height, float depth, Color color) {
+    static Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    if (g_hasCubeShader) cube.materials[0].shader = g_cubeShader;
+    DrawModelEx(cube, position, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f, Vector3{ width, height, depth }, color);
+}
+ 
+
 std::mt19937& NpcRng(){ static thread_local std::mt19937 rng(std::random_device{}()); return rng; }
 } // namespace
-
+void Village::SetCubeShader(Shader shader) { g_cubeShader = shader; g_hasCubeShader = true; }
 Village::Village(Vector3 center) : m_center(center) { AddVillageLayout(center, 0.0f, 0u); RebuildRoadRuns(); }
 
 bool Village::AddVillageLayout(Vector3 center, float villageYawDegrees, unsigned int variantSeed) {
@@ -295,6 +307,7 @@ std::vector<Vector3> Village::NpcPositions(Vector3 center, float maxDistance) co
 Vector3 Village::NearestVillageCenter(Vector3 position) const {Vector3 nearest=m_center; float nearestDistance=std::numeric_limits<float>::max(); for(const Vector3 center:m_villageCenters){const float dx=center.x-position.x; const float dz=center.z-position.z; const float distance=dx*dx+dz*dz; if(distance<nearestDistance){nearestDistance=distance; nearest=center;}} return nearest;}
 std::string Village::BuildingNameKey(int buildingIndex) const {if(buildingIndex<0||buildingIndex>=static_cast<int>(m_buildings.size())) return "village.building.home"; const std::string& kind=m_buildings[static_cast<std::size_t>(buildingIndex)].kind; if(kind=="forge") return "village.building.forge"; if(kind=="hall") return "village.building.hall"; if(kind=="chapel") return "village.building.chapel"; if(kind=="inn") return "village.building.inn"; if(kind=="farmhouse") return "village.building.farmhouse"; return "village.building.home";}
 std::string Village::BuildingKind(int buildingIndex) const {if(buildingIndex<0||buildingIndex>=static_cast<int>(m_buildings.size())) return {}; return m_buildings[static_cast<std::size_t>(buildingIndex)].kind;}
+#define DrawCube DrawLitCube
 void Village::Render(const World& world, Vector3 playerPosition) const {
     const float roadRenderRange=(world.GetRenderRadius()+1.0f)*world.GetConfig().chunkSize*world.GetConfig().tileSize;
     for(const RoadRun& run:m_roadRuns){const float endX=run.start.x+(run.alongX?run.tileCount-1.0f:0.0f); const float endZ=run.start.y+(run.alongX?0.0f:run.tileCount-1.0f); if(std::max(run.start.x,endX)<playerPosition.x-roadRenderRange||std::min(run.start.x,endX)>playerPosition.x+roadRenderRange||std::max(run.start.y,endZ)<playerPosition.z-roadRenderRange||std::min(run.start.y,endZ)>playerPosition.z+roadRenderRange) continue; int segmentLength=0; float segmentGround=0.0f; const auto flushSegment=[&](){if(segmentLength==0) return; const float offset=(segmentLength-1)*0.5f; const Vector3 position{run.start.x+(run.alongX?offset:0.0f),segmentGround+0.035f,run.start.y+(run.alongX?0.0f:offset)}; const float length=segmentLength*0.98f; DrawCube(position,run.alongX?length:0.98f,0.07f,run.alongX?0.98f:length,Color{128,116,96,255}); segmentLength=0;}; for(int tileIndex=0;tileIndex<=run.tileCount;++tileIndex){const Vector3 tile{run.start.x+(run.alongX?static_cast<float>(tileIndex):0.0f),0.0f,run.start.y+(run.alongX?0.0f:static_cast<float>(tileIndex))}; const bool visible=tileIndex<run.tileCount&&IsChunkVisible(world,tile,playerPosition)&&!world.IsWaterAt(tile.x,tile.z); const float ground=visible?world.GetHeightAt(tile.x,tile.z):0.0f; if(!visible||(segmentLength>0&&std::fabs(ground-segmentGround)>0.001f)) flushSegment(); if(visible){if(segmentLength==0) segmentGround=ground; ++segmentLength;}}}
