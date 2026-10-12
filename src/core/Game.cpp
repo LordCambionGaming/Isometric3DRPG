@@ -515,7 +515,7 @@ void Game::Update(float deltaTime) {
         if (m_world) {
             m_world->SetPlayerPosition(m_player->GetPosition());
         }
-        if (m_camera) m_camera->FollowTarget(m_player->GetPosition());
+        if (m_camera && m_cameraLocked) m_camera->CenterOn(m_player->GetPosition());
     }
 
     if (m_testMob && !frozen) {
@@ -706,8 +706,8 @@ void Game::Render() {
         m_cameraLocked = !m_cameraLocked;
         if (m_cameraLocked) m_camera->CenterOn(m_player->GetPosition());
     }
-    if (IsKeyPressed(KEY_SPACE)) m_camera->CenterOn(m_player->GetPosition());
-}
+    if (IsKeyDown(KEY_SPACE)) m_camera->CenterOn(m_player->GetPosition());
+    }
 
     if (m_gameState && !m_stateChangedThisFrame) {
         m_gameState->HandleInput();
