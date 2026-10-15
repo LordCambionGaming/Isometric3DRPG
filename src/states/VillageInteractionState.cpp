@@ -137,16 +137,19 @@ void VillageInteractionState::SelectChoice(int index) {
         case Action::Talk:
             m_page = Page::Talk;
             m_selected = 0;
+            m_lastClicked = -1;
             m_messageKey = "village.talk." + RoleKey();
             break;
         case Action::Trade:
             m_page = Page::Trade;
             m_messageKey.clear();
             m_selected = 0;
+            m_lastClicked = -1;
             break;
         case Action::Quest:
             m_page = Page::Quest;
             m_selected = 0;
+            m_lastClicked = -1;
             HandleQuest();
             break;
         case Action::Back:
@@ -155,6 +158,7 @@ void VillageInteractionState::SelectChoice(int index) {
             } else {
                 m_page = Page::Main;
                 m_selected = 0;
+                m_lastClicked = -1;
             }
             break;
         case Action::Buy: {
@@ -205,14 +209,29 @@ void VillageInteractionState::HandleInput() {
     const int count = static_cast<int>(choices.size());
     if (count == 0) return;
 
-    const int clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON)
+    // Minecraft-style: first click selects (highlights), second click on same option activates.
+    const int clickedOption = IsMouseButtonPressed(MOUSE_LEFT_BUTTON)
         ? ui::menu::OptionAt(GetMousePosition(), count) : -1;
-    if (clicked >= 0) {
-        m_selected = clicked;
-        SelectChoice(m_selected);
-        return;
+
+    if (clickedOption >= 0) {
+        if (clickedOption == m_lastClicked) {
+            // Second click → activate
+            m_selected = clickedOption;
+            m_lastClicked = -1;
+            SelectChoice(m_selected);
+            return;
+        } else {
+            // First click → just highlight
+            m_selected = clickedOption;
+            m_lastClicked = clickedOption;
+            return;
+        }
+    } else {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) m_lastClicked = -1;
     }
+
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) {
+        m_lastClicked = -1;
         if (m_page == Page::Main) ReturnToOrigin();
         else { m_page = Page::Main; m_selected = 0; }
         return;
@@ -222,6 +241,7 @@ void VillageInteractionState::HandleInput() {
     } else if (core::KeyBindings::Pressed(core::KeyBindings::Action::Down)) {
         m_selected = (m_selected + 1) % count;
     } else if (core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) {
+        m_lastClicked = -1;
         SelectChoice(m_selected);
     }
 }

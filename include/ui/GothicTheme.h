@@ -78,6 +78,24 @@ inline Font& TitleFont() {
     return font;
 }
 
+inline void UnloadFonts() {
+    Font& df = DiceFont();
+    if (df.texture.id != 0 && df.texture.id != GetFontDefault().texture.id) {
+        UnloadFont(df);
+        df = GetFontDefault();
+    }
+    Font& uf = UIFont();
+    if (uf.texture.id != 0 && uf.texture.id != GetFontDefault().texture.id) {
+        UnloadFont(uf);
+        uf = GetFontDefault();
+    }
+    Font& tf = TitleFont();
+    if (tf.texture.id != 0 && tf.texture.id != GetFontDefault().texture.id && tf.texture.id != uf.texture.id) {
+        UnloadFont(tf);
+        tf = GetFontDefault();
+    }
+}
+
 inline void DrawTextCentered(const Font& font, const char* text, float cx, float y,
                               float size, Color color, bool shadow = true) {
     const float spacing = size / 10.0f;

@@ -11,4 +11,5 @@ public:
     void HandleInput() override;
 private:
     int m_selectedOption;
+    int m_lastClickedOption = -1; // Minecraft-style: first click selects, second click activates
 };

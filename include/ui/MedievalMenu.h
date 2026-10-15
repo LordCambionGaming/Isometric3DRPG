@@ -13,9 +13,11 @@ struct MenuItem {
     bool hasStepper = false;
 };
 
-Rectangle OptionBounds(int index, int count);
-Rectangle SliderBounds(int index, int count);
-int OptionAt(Vector2 point, int count);
+Rectangle OptionBounds(int index, int count, const char* subtitle = nullptr);
+Rectangle SliderBounds(int index, int count, const char* subtitle = nullptr);
+Rectangle StepperLeftArrowBounds(int index, int count, const char* subtitle = nullptr);
+Rectangle StepperRightArrowBounds(int index, int count, const char* subtitle = nullptr);
+int OptionAt(Vector2 point, int count, const char* subtitle = nullptr);
 void Draw(const char* title, const char* subtitle, const std::vector<MenuItem>& items, int selected,
           bool useTitleFont = false);
 

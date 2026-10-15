@@ -30,6 +30,7 @@ private:
     int m_returnBuilding = -1;
     Page m_page = Page::Main;
     int m_selected = 0;
+    int m_lastClicked = -1; // Minecraft-style: first click selects, second click activates
     std::string m_messageKey;
 
     std::vector<Choice> Choices() const;

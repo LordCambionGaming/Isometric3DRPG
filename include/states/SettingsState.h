@@ -13,6 +13,7 @@ private:
     PreviousState m_prev;
     Page m_page = Page::General;
     int m_selectedOption = 0;
+    int m_lastClickedOption = -1; // Minecraft-style: first click selects, second click activates
     bool m_waitingForKey = false;
     int m_draggingSlider = -1;
 

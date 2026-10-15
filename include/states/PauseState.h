@@ -12,6 +12,7 @@ public:
     void HandleInput() override;
 private:
     int m_selectedOption;
+    int m_lastClickedOption = -1; // Minecraft-style: first click selects, second click activates
     float m_saveMessageTimer = 0.0f;
     std::string m_saveMessageKey;
 };

@@ -125,11 +125,10 @@ void SettingsState::HandleInput() {
     if (m_page == Page::General) {
         constexpr int itemCount = 10;
         const Vector2 mouse = GetMousePosition();
-        const int clickedOption = IsMouseButtonPressed(MOUSE_LEFT_BUTTON)
-            ? ui::menu::OptionAt(mouse, itemCount) : -1;
-        const bool clicked = clickedOption >= 0;
-        if (clicked) m_selectedOption = clickedOption;
+        const bool mouseClicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+        const int clickedOption = mouseClicked ? ui::menu::OptionAt(mouse, itemCount) : -1;
 
+        // --- Slider drag (immediate, no two-step needed) ---
         if (m_draggingSlider >= 0) {
             if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
                 const Rectangle slider = ui::menu::SliderBounds(m_draggingSlider, itemCount);
@@ -147,31 +146,62 @@ void SettingsState::HandleInput() {
             return;
         }
 
-        if (clicked && m_selectedOption == 2) {
-            const Rectangle row = ui::menu::OptionBounds(m_selectedOption, itemCount);
-            const int direction = mouse.x < row.x + row.width - 88.0f ? -1 : 1;
-            ApplyGeneralSetting(direction);
-            return;
+        // --- Direct arrow clicks on stepper row (resolution, row 2): immediate, no two-step ---
+        if (mouseClicked && clickedOption == 2) {
+            const Rectangle leftArrow  = ui::menu::StepperLeftArrowBounds(2, itemCount);
+            const Rectangle rightArrow = ui::menu::StepperRightArrowBounds(2, itemCount);
+            if (CheckCollisionPointRec(mouse, leftArrow)) {
+                m_selectedOption = 2;
+                m_lastClickedOption = -1;
+                ApplyGeneralSetting(-1);
+                return;
+            }
+            if (CheckCollisionPointRec(mouse, rightArrow)) {
+                m_selectedOption = 2;
+                m_lastClickedOption = -1;
+                ApplyGeneralSetting(1);
+                return;
+            }
         }
-        if (clicked && m_selectedOption >= 4 && m_selectedOption <= 6) {
-            const Rectangle slider = ui::menu::SliderBounds(m_selectedOption, itemCount);
-            const Rectangle hitArea = { slider.x - 6.0f, ui::menu::OptionBounds(m_selectedOption, itemCount).y,
-                                        slider.width + 12.0f, ui::menu::OptionBounds(m_selectedOption, itemCount).height };
+
+        // --- Direct slider start / click for volume rows (4-6): immediate ---
+        if (mouseClicked && clickedOption >= 4 && clickedOption <= 6) {
+            const Rectangle slider  = ui::menu::SliderBounds(clickedOption, itemCount);
+            const Rectangle hitArea = { slider.x - 6.0f, ui::menu::OptionBounds(clickedOption, itemCount).y,
+                                        slider.width + 12.0f, ui::menu::OptionBounds(clickedOption, itemCount).height };
             if (CheckCollisionPointRec(mouse, hitArea)) {
-                m_draggingSlider = m_selectedOption;
+                m_selectedOption = clickedOption;
+                m_lastClickedOption = -1;
+                m_draggingSlider = clickedOption;
                 const float normalized = Clamp((mouse.x - slider.x) / slider.width, 0.0f, 1.0f);
                 const float value = std::round(normalized * 20.0f) / 20.0f;
                 if (AudioManager* audio = m_game ? m_game->GetAudioManager() : nullptr) {
-                    if (m_selectedOption == 4) audio->SetMasterVolume(value);
-                    else if (m_selectedOption == 5) audio->SetMusicVolume(value);
+                    if (clickedOption == 4) audio->SetMasterVolume(value);
+                    else if (clickedOption == 5) audio->SetMusicVolume(value);
                     else audio->SetSoundVolume(value);
                 }
                 return;
             }
-            ApplyGeneralSetting(mouse.x < slider.x ? -1 : 1);
-            return;
         }
 
+        // --- Minecraft-style two-step click for all other rows ---
+        bool shouldActivate = false;
+        if (clickedOption >= 0) {
+            if (clickedOption == m_lastClickedOption) {
+                // Second click → activate
+                m_lastClickedOption = -1;
+                shouldActivate = true;
+            } else {
+                // First click → just highlight
+                m_selectedOption = clickedOption;
+                m_lastClickedOption = clickedOption;
+                return;
+            }
+        } else {
+            if (mouseClicked) m_lastClickedOption = -1;
+        }
+
+        // --- Keyboard navigation ---
         if (core::KeyBindings::Pressed(core::KeyBindings::Action::Up)) {
             m_selectedOption = (m_selectedOption + itemCount - 1) % itemCount;
             return;
@@ -192,13 +222,15 @@ void SettingsState::HandleInput() {
             ApplyGeneralSetting(1);
             return;
         }
-        if (!clicked && !core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) return;
+        if (!shouldActivate && !core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) return;
 
+        // --- Activation ---
         if (m_selectedOption <= 6) {
             ApplyGeneralSetting(1);
         } else if (m_selectedOption == 7) {
             m_page = Page::Controls;
             m_selectedOption = 0;
+            m_lastClickedOption = -1;
         } else if (m_selectedOption == 8) {
             lang::SetLanguage(lang::Language::Italian);
             if (Renderer* renderer = m_game ? m_game->GetRenderer() : nullptr) {
@@ -231,10 +263,24 @@ void SettingsState::HandleInput() {
     }
 
     const int itemCount = static_cast<int>(core::KeyBindings::ActionCount()) + 2;
-    const int clickedOption = IsMouseButtonPressed(MOUSE_LEFT_BUTTON)
-        ? ui::menu::OptionAt(GetMousePosition(), itemCount) : -1;
-    const bool clicked = clickedOption >= 0;
-    if (clicked) m_selectedOption = clickedOption;
+    const bool mouseClicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    const int clickedOption = mouseClicked ? ui::menu::OptionAt(GetMousePosition(), itemCount) : -1;
+
+    // --- Minecraft-style two-step for controls page ---
+    bool shouldActivate = false;
+    if (clickedOption >= 0) {
+        if (clickedOption == m_lastClickedOption) {
+            m_lastClickedOption = -1;
+            shouldActivate = true;
+        } else {
+            m_selectedOption = clickedOption;
+            m_lastClickedOption = clickedOption;
+            return;
+        }
+    } else {
+        if (mouseClicked) m_lastClickedOption = -1;
+    }
+
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Up)) {
         m_selectedOption = (m_selectedOption + itemCount - 1) % itemCount;
         return;
@@ -246,9 +292,10 @@ void SettingsState::HandleInput() {
     if (core::KeyBindings::Pressed(core::KeyBindings::Action::Back)) {
         m_page = Page::General;
         m_selectedOption = 7;
+        m_lastClickedOption = -1;
         return;
     }
-    if (!clicked && !core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) return;
+    if (!shouldActivate && !core::KeyBindings::Pressed(core::KeyBindings::Action::Confirm)) return;
 
     if (m_selectedOption < static_cast<int>(core::KeyBindings::ActionCount())) {
         while (GetKeyPressed() != KEY_NULL) {}
@@ -259,5 +306,6 @@ void SettingsState::HandleInput() {
     } else {
         m_page = Page::General;
         m_selectedOption = 7;
+        m_lastClickedOption = -1;
     }
 }
