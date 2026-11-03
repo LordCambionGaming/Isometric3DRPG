@@ -1,0 +1,452 @@
+{
+  "format": "glb",
+  "source_format": "fbx_intermediate_only",
+  "notes": [
+    "Il gioco carica solo GLB, mai i FBX sorgente.",
+    "Ogni personaggio = UN corpo base nudo (human_<genere>_base.glb) + UN layer capelli opzionale (hair_<genere>_<stile>.glb).",
+    "I capelli sono un file separato: con un copricapo basta non disegnare il modello capelli.",
+    "Capelli e corpo hanno lo STESSO scheletro (stessi nomi e ordine delle ossa): anima il modello capelli con lo stesso frame di animazione del corpo.",
+    "I capelli lunghi sono pesati su Head/Spine2: restano morbidi sulle spalle quando il personaggio si muove.",
+    "Colori: pelle, capelli e occhi si impostano a runtime per ruolo materiale (material_indices), uguali per tutti i personaggi (palettes).",
+    "Occhi: placca semplice nella fessura oculare della mesh (sclera, iride, pupilla, riflesso, linea palpebrale); nessuna cavita' visibile.",
+    "Colori regolabili a runtime (slider o palette): imposta il colore di ogni ruolo con material_indices; i ruoli derivati si calcolano dalla pelle (controls).",
+    "Capezzoli: se non sono sul vertice voluto, imposta NIPPLE_VERTEX nello script (indice vertice del FBX).",
+    "Capezzoli: solo colore, nessuna geometria. Ruoli 'areola' e 'nipple' = colore pelle * moltiplicatori (skin_details nel manifest).",
+    "Le animazioni importate dipendono dai file presenti nella cartella animations; walking_briefcase viene ignorata."
+  ],
+  "skin_detail_multipliers": {
+    "areola": [
+      0.88,
+      0.73,
+      0.72
+    ],
+    "nipple": [
+      0.82,
+      0.63,
+      0.62
+    ]
+  },
+  "controls": {
+    "skin": {
+      "roles": [
+        "skin"
+      ],
+      "derived_from_skin": {
+        "areola": [
+          0.88,
+          0.73,
+          0.72
+        ],
+        "nipple": [
+          0.82,
+          0.63,
+          0.62
+        ]
+      },
+      "ui": "slider (luminosita'/tono) o palette"
+    },
+    "hair": {
+      "roles": [
+        "hair"
+      ],
+      "derived_from_hair": {
+        "brows": [
+          0.62,
+          0.6,
+          0.58
+        ]
+      },
+      "ui": "slider (tinta/luminosita') o palette"
+    },
+    "eyes": {
+      "roles": [
+        "iris"
+      ],
+      "ui": "slider (tinta) o palette"
+    }
+  },
+  "palettes": {
+    "skin": {
+      "porcelain": [
+        0.86,
+        0.7,
+        0.6,
+        1.0
+      ],
+      "fair_warm": [
+        0.77,
+        0.515,
+        0.365,
+        1.0
+      ],
+      "tan": [
+        0.66,
+        0.43,
+        0.3,
+        1.0
+      ],
+      "warm_medium": [
+        0.57,
+        0.335,
+        0.225,
+        1.0
+      ],
+      "olive": [
+        0.47,
+        0.31,
+        0.2,
+        1.0
+      ],
+      "brown": [
+        0.38,
+        0.23,
+        0.16,
+        1.0
+      ],
+      "deep_brown": [
+        0.3,
+        0.18,
+        0.13,
+        1.0
+      ],
+      "dark": [
+        0.19,
+        0.105,
+        0.075,
+        1.0
+      ]
+    },
+    "skin_details": {
+      "porcelain": {
+        "areola": [
+          0.7568,
+          0.511,
+          0.432,
+          1.0
+        ],
+        "nipple": [
+          0.7052,
+          0.441,
+          0.372,
+          1.0
+        ]
+      },
+      "fair_warm": {
+        "areola": [
+          0.6776,
+          0.376,
+          0.2628,
+          1.0
+        ],
+        "nipple": [
+          0.6314,
+          0.3245,
+          0.2263,
+          1.0
+        ]
+      },
+      "tan": {
+        "areola": [
+          0.5808,
+          0.3139,
+          0.216,
+          1.0
+        ],
+        "nipple": [
+          0.5412,
+          0.2709,
+          0.186,
+          1.0
+        ]
+      },
+      "warm_medium": {
+        "areola": [
+          0.5016,
+          0.2446,
+          0.162,
+          1.0
+        ],
+        "nipple": [
+          0.4674,
+          0.2111,
+          0.1395,
+          1.0
+        ]
+      },
+      "olive": {
+        "areola": [
+          0.4136,
+          0.2263,
+          0.144,
+          1.0
+        ],
+        "nipple": [
+          0.3854,
+          0.1953,
+          0.124,
+          1.0
+        ]
+      },
+      "brown": {
+        "areola": [
+          0.3344,
+          0.1679,
+          0.1152,
+          1.0
+        ],
+        "nipple": [
+          0.3116,
+          0.1449,
+          0.0992,
+          1.0
+        ]
+      },
+      "deep_brown": {
+        "areola": [
+          0.264,
+          0.1314,
+          0.0936,
+          1.0
+        ],
+        "nipple": [
+          0.246,
+          0.1134,
+          0.0806,
+          1.0
+        ]
+      },
+      "dark": {
+        "areola": [
+          0.1672,
+          0.0766,
+          0.054,
+          1.0
+        ],
+        "nipple": [
+          0.1558,
+          0.0662,
+          0.0465,
+          1.0
+        ]
+      }
+    },
+    "hair": {
+      "black": [
+        0.025,
+        0.018,
+        0.016,
+        1.0
+      ],
+      "dark_brown": [
+        0.1,
+        0.04,
+        0.02,
+        1.0
+      ],
+      "chestnut": [
+        0.3,
+        0.085,
+        0.03,
+        1.0
+      ],
+      "dark_blonde": [
+        0.5,
+        0.32,
+        0.11,
+        1.0
+      ],
+      "blonde": [
+        0.72,
+        0.46,
+        0.13,
+        1.0
+      ],
+      "ginger": [
+        0.55,
+        0.16,
+        0.05,
+        1.0
+      ],
+      "auburn": [
+        0.48,
+        0.075,
+        0.025,
+        1.0
+      ],
+      "silver": [
+        0.48,
+        0.5,
+        0.55,
+        1.0
+      ],
+      "white": [
+        0.86,
+        0.86,
+        0.88,
+        1.0
+      ],
+      "platinum": [
+        0.84,
+        0.77,
+        0.61,
+        1.0
+      ]
+    },
+    "eyes": {
+      "blue": [
+        0.1,
+        0.32,
+        0.82,
+        1.0
+      ],
+      "green": [
+        0.1,
+        0.42,
+        0.22,
+        1.0
+      ],
+      "brown": [
+        0.25,
+        0.105,
+        0.035,
+        1.0
+      ],
+      "dark_brown": [
+        0.14,
+        0.06,
+        0.03,
+        1.0
+      ],
+      "hazel": [
+        0.45,
+        0.28,
+        0.08,
+        1.0
+      ],
+      "amber": [
+        0.62,
+        0.38,
+        0.08,
+        1.0
+      ],
+      "gray": [
+        0.34,
+        0.41,
+        0.48,
+        1.0
+      ],
+      "violet": [
+        0.4,
+        0.16,
+        0.68,
+        1.0
+      ]
+    }
+  },
+  "bases": {
+    "male": {
+      "file": "human_male_base.glb",
+      "animation_clips": [
+        "Hurt",
+        "Idle"
+      ],
+      "material_indices": {
+        "areola": 0,
+        "skin": 1,
+        "brows": 2,
+        "sclera": 3,
+        "iris": 4,
+        "pupil": 5,
+        "glint": 6,
+        "nipple": 7
+      }
+    },
+    "female": {
+      "file": "human_female_base.glb",
+      "animation_clips": [
+        "Hurt",
+        "Idle"
+      ],
+      "material_indices": {
+        "areola": 0,
+        "skin": 1,
+        "brows": 2,
+        "sclera": 3,
+        "iris": 4,
+        "pupil": 5,
+        "glint": 6,
+        "nipple": 7
+      }
+    }
+  },
+  "hair_styles": {
+    "male": [
+      {
+        "id": "crop",
+        "label": "Crop",
+        "file": "hair_male_crop.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "side_part",
+        "label": "Side part",
+        "file": "hair_male_side_part.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "medium",
+        "label": "Medium",
+        "file": "hair_male_medium.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "tied_back",
+        "label": "Tied back",
+        "file": "hair_male_tied_back.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      }
+    ],
+    "female": [
+      {
+        "id": "ponytail",
+        "label": "Ponytail",
+        "file": "hair_female_ponytail.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "bob",
+        "label": "Bob",
+        "file": "hair_female_bob.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "long",
+        "label": "Long",
+        "file": "hair_female_long.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      },
+      {
+        "id": "braid",
+        "label": "Braid",
+        "file": "hair_female_braid.glb",
+        "material_indices": {
+          "hair": 0
+        }
+      }
+    ]
+  }
+}
