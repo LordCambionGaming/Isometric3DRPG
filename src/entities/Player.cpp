@@ -155,16 +155,28 @@ void Player::SetModel(Model* model) {
     m_modelBounds = bb;
 
     // Hand bones: where the items held in the hands are attached.
+    // Preferiamo RightHandMiddle1 / LeftHandMiddle1 (il palmo/centro della mano).
+    // In Mixamo, 'RightHand'/'LeftHand' corrisponde esattamente all'articolazione del polso!
     for (int i = 0; i < model->boneCount; ++i) {
-        if (std::strcmp(model->bones[i].name, "Hand.R") == 0 ||
-            std::strcmp(model->bones[i].name, "mixamorig:RightHand") == 0) {
+        if (std::strcmp(model->bones[i].name, "mixamorig:RightHandMiddle1") == 0) {
             m_handBoneR = i;
-        } else if (std::strcmp(model->bones[i].name, "Hand.L") == 0 ||
-                   std::strcmp(model->bones[i].name, "mixamorig:LeftHand") == 0) {
+        } else if (std::strcmp(model->bones[i].name, "mixamorig:LeftHandMiddle1") == 0) {
             m_handBoneL = i;
         } else if (std::strcmp(model->bones[i].name, "Chest") == 0 ||
                    std::strcmp(model->bones[i].name, "mixamorig:Spine2") == 0) {
             m_chestBone = i;
+        }
+    }
+    // Fallback a RightHand/LeftHand se le ossa delle dita/palmo non esistono
+    if (m_handBoneR < 0 || m_handBoneL < 0) {
+        for (int i = 0; i < model->boneCount; ++i) {
+            if (m_handBoneR < 0 && (std::strcmp(model->bones[i].name, "Hand.R") == 0 ||
+                                    std::strcmp(model->bones[i].name, "mixamorig:RightHand") == 0)) {
+                m_handBoneR = i;
+            } else if (m_handBoneL < 0 && (std::strcmp(model->bones[i].name, "Hand.L") == 0 ||
+                                           std::strcmp(model->bones[i].name, "mixamorig:LeftHand") == 0)) {
+                m_handBoneL = i;
+            }
         }
     }
     if (m_handBoneR < 0 || m_handBoneL < 0) {
@@ -397,7 +409,7 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
 
     if (bowRelease) {
         const float scale = ModelScale();
-        const Vector3 drawPos = { m_position.x, m_position.y - m_modelBounds.min.y * scale, m_position.z };
+        const Vector3 drawPos = { m_position.x, m_position.y, m_position.z };
         Matrix hand;
         if (HandToWorld(m_handBoneL, drawPos, scale, hand) && m_character.RemoveQuiverArrow()) {
             Vector3 target = m_attackTarget;
@@ -462,6 +474,13 @@ void Player::RenderHeldItems(const Vector3& drawPos, float scale) const {
                         MatrixRotateZ(90.0f * DEG2RAD)),
                     MatrixRotateY(180.0f * DEG2RAD));
                 hand = MatrixMultiply(bowRotation, hand);
+            } else {
+                // Rotazione per spade e armi da mischia:
+                // Ruotata di 180° rispetto a prima per orientare la punta della lama in avanti
+                const Matrix swordRotation = MatrixMultiply(
+                    MatrixRotateZ(-90.0f * DEG2RAD),
+                    MatrixRotateY(90.0f * DEG2RAD));
+                hand = MatrixMultiply(swordRotation, hand);
             }
             m_itemVisuals->DrawInHand(s.id, hand, bowPhase);
         }
