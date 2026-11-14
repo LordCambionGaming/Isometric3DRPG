@@ -1701,8 +1701,8 @@ def add_hair(head_bounds, front_sign, armature, collection, mats, gender, style,
 
 def animation_label(filename):
     stem = Path(filename).stem.lower().replace(" ", "_").replace("-", "_")
-    if "briefcase" in stem or "suitcase" in stem:
-        return None
+    # NOTE: "briefcase" / "suitcase" props are ignored at the bone level by remap_action_bone_paths,
+    # so we accept walking_briefcase.fbx as a valid Walk source (body bones are correct).
     if "idle" in stem:
         return "Idle"
     if "walk" in stem:
@@ -1764,8 +1764,38 @@ def import_animation_library(directory):
                 continue
             copied = action.copy()
             copied.name = "_MixamoLibrary_" + label
+
+            # Normalizza le F-Curves di traslazione per coordinarle con l'armatura base (su cui è stato applicato transform_apply: scala 0.01 e rotazione X 90°).
+            # Mixamo esporta le traslazioni delle ossa in centimetri nello spazio osso FBX originale.
+            # Solo Hips ha reale traslazione nello scheletro Mixamo: trasformiamo (x, y, z) in (x * 0.01, -z * 0.01, y * 0.01).
+            # Le micro-traslazioni costanti sulle altre ossa (rumore FBX) vengono rimosse per evitare deformazioni parassite.
+            fc_x = None
+            fc_y = None
+            fc_z = None
+            remove_fcs = []
+            for fc in copied.fcurves:
+                if "location" in fc.data_path:
+                    if "Hips" in fc.data_path:
+                        if fc.array_index == 0: fc_x = fc
+                        elif fc.array_index == 1: fc_y = fc
+                        elif fc.array_index == 2: fc_z = fc
+                    else:
+                        remove_fcs.append(fc)
+
+            for fc in remove_fcs:
+                copied.fcurves.remove(fc)
+
+            if fc_x and fc_y and fc_z:
+                for kp_idx in range(len(fc_x.keyframe_points)):
+                    kx = fc_x.keyframe_points[kp_idx].co[1]
+                    ky = fc_y.keyframe_points[kp_idx].co[1]
+                    kz = fc_z.keyframe_points[kp_idx].co[1]
+                    fc_x.keyframe_points[kp_idx].co[1] = kx * 0.01
+                    fc_y.keyframe_points[kp_idx].co[1] = -kz * 0.01
+                    fc_z.keyframe_points[kp_idx].co[1] = ky * 0.01
+
             library[label] = copied
-            log("Animazione caricata: {} <- {} (frame {}-{})".format(label, path.name,
+            log("Animazione caricata e normalizzata: {} <- {} (frame {}-{})".format(label, path.name,
                 int(copied.frame_range[0]), int(copied.frame_range[1])))
             remove_objects(imported)
             # Clean up source action datablocks from the imported FBX, keeping our copy.
@@ -2045,7 +2075,8 @@ def main():
         bpy.ops.wm.save_as_mainfile(filepath=str(blend))
         log("Scena di revisione salvata: {}".format(blend))
     log("Completato: 2 corpi base + {} layer capelli.".format(built_count))
-    log("NOTA: walking_briefcase.fbx è ignorata; per la clip Walk serve un file Walking.fbx senza prop.")
+    if "Walk" not in animation_library:
+        log("NOTA: nessun file Walk trovato in tools/mixamo/animations. Aggiungi un Walking.fbx per la clip camminata.")
 
 
 try:

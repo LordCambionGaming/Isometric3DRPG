@@ -226,6 +226,21 @@ void Player::SetAnimations(ModelAnimation* anims, int count) {
         }
     }
 
+    // Now look for Walk by name (human_base GLBs may have clips in arbitrary NLA order)
+    if (!m_clipOk[static_cast<size_t>(kAnimWalk)]) {
+        for (int i = 0; i < count; ++i) {
+            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
+            const std::string name = anims[i].name ? anims[i].name : "";
+            if (name.find("Walk") != std::string::npos && name.find("Briefcase") == std::string::npos) {
+                m_clipOk[static_cast<size_t>(kAnimWalk)] = true;
+                if (i != kAnimWalk && kAnimWalk < count) {
+                    std::swap(anims[kAnimWalk], anims[i]);
+                }
+                break;
+            }
+        }
+    }
+
     // Now look for Hurt
     if (!m_clipOk[static_cast<size_t>(kAnimHurt)]) {
         for (int i = 1; i < count; ++i) {

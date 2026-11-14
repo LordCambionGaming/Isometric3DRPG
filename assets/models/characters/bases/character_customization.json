@@ -348,7 +348,8 @@
       "file": "human_male_base.glb",
       "animation_clips": [
         "Hurt",
-        "Idle"
+        "Idle",
+        "Walk"
       ],
       "material_indices": {
         "areola": 0,
@@ -365,7 +366,8 @@
       "file": "human_female_base.glb",
       "animation_clips": [
         "Hurt",
-        "Idle"
+        "Idle",
+        "Walk"
       ],
       "material_indices": {
         "areola": 0,
