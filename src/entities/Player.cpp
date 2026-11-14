@@ -114,8 +114,37 @@ void Player::SetModel(Model* model) {
     m_appliedFrame = -1;
     if (!model || model->meshCount == 0) return;
 
-    // Measure once; Render() only does a multiply per frame.
-    const BoundingBox bb = GetModelBoundingBox(*model);
+    // Calcola la bounding box direttamente dai vertici raw della mesh principale.
+    // NON usare GetModelBoundingBox() perche' dopo la skinning (UpdateModelAnimation)
+    // i vertici vengono spostati nelle pose delle ossa che sono in unita' diverse.
+    // Usiamo la mesh con piu' vertici (il corpo principale) per misurare l'altezza.
+    BoundingBox bb = { {0,0,0}, {0,0,0} };
+    {
+        int bestMesh = 0;
+        int bestCount = 0;
+        for (int mi = 0; mi < model->meshCount; ++mi) {
+            if (model->meshes[mi].vertexCount > bestCount) {
+                bestCount = model->meshes[mi].vertexCount;
+                bestMesh = mi;
+            }
+        }
+        const Mesh& mesh = model->meshes[bestMesh];
+        if (mesh.vertexCount > 0 && mesh.vertices) {
+            bb.min = { mesh.vertices[0], mesh.vertices[1], mesh.vertices[2] };
+            bb.max = bb.min;
+            for (int vi = 1; vi < mesh.vertexCount; ++vi) {
+                float x = mesh.vertices[vi*3+0];
+                float y = mesh.vertices[vi*3+1];
+                float z = mesh.vertices[vi*3+2];
+                if (x < bb.min.x) bb.min.x = x;
+                if (y < bb.min.y) bb.min.y = y;
+                if (z < bb.min.z) bb.min.z = z;
+                if (x > bb.max.x) bb.max.x = x;
+                if (y > bb.max.y) bb.max.y = y;
+                if (z > bb.max.z) bb.max.z = z;
+            }
+        }
+    }
     const float h = bb.max.y - bb.min.y;
     if (h <= 0.0001f) {
         TraceLog(LOG_WARNING, "[PLAYER MODEL] degenerate bounding box, keeping fallback visual");
@@ -126,9 +155,16 @@ void Player::SetModel(Model* model) {
 
     // Hand bones: where the items held in the hands are attached.
     for (int i = 0; i < model->boneCount; ++i) {
-        if (std::strcmp(model->bones[i].name, "Hand.R") == 0) m_handBoneR = i;
-        else if (std::strcmp(model->bones[i].name, "Hand.L") == 0) m_handBoneL = i;
-        else if (std::strcmp(model->bones[i].name, "Chest") == 0) m_chestBone = i;
+        if (std::strcmp(model->bones[i].name, "Hand.R") == 0 ||
+            std::strcmp(model->bones[i].name, "mixamorig:RightHand") == 0) {
+            m_handBoneR = i;
+        } else if (std::strcmp(model->bones[i].name, "Hand.L") == 0 ||
+                   std::strcmp(model->bones[i].name, "mixamorig:LeftHand") == 0) {
+            m_handBoneL = i;
+        } else if (std::strcmp(model->bones[i].name, "Chest") == 0 ||
+                   std::strcmp(model->bones[i].name, "mixamorig:Spine2") == 0) {
+            m_chestBone = i;
+        }
     }
     if (m_handBoneR < 0 || m_handBoneL < 0) {
         TraceLog(LOG_WARNING, "[PLAYER MODEL] bone Hand.R/Hand.L not found (R=%d L=%d): items will not be drawn in the hands",
@@ -163,22 +199,58 @@ void Player::SetAnimations(ModelAnimation* anims, int count) {
     m_appliedClip = -1;
     m_appliedFrame = -1;
 
-    if (!m_model || !anims || count < kAnimRequiredCount) {
-        TraceLog(LOG_WARNING, "[PLAYER ANIM] need a model and at least %d clips (Idle, Walk, Attack), got %d: static pose", kAnimRequiredCount, count);
+    if (!m_model || !anims || count <= 0) {
+        TraceLog(LOG_WARNING, "[PLAYER ANIM] need a model and at least 1 clip, got %d: static pose", count);
         return;
     }
+
+    // First check standard index order (kAnimIdle=0, kAnimWalk=1, etc. used by player_animated.glb)
     for (int i = 0; i < kAnimClipCount && i < count; ++i) {
         m_clipOk[static_cast<size_t>(i)] = anims[i].frameCount > 0 && IsModelAnimationValid(*m_model, anims[i]);
     }
-    for (int i = 0; i < kAnimRequiredCount; ++i) {
-        if (!m_clipOk[static_cast<size_t>(i)]) {
-            TraceLog(LOG_WARNING, "[PLAYER ANIM] required clip %d does not match the player model: static pose", i);
-            return;
+
+    // If clip 0 is not Idle (e.g. human_base models where clip 0 is Hurt and clip 1 is Idle),
+    // find matching animation clips by name in the anims array.
+    if (!m_clipOk[static_cast<size_t>(kAnimIdle)]) {
+        for (int i = 0; i < count; ++i) {
+            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
+            const std::string name = anims[i].name ? anims[i].name : "";
+            if (name.find("Idle") != std::string::npos && !m_clipOk[static_cast<size_t>(kAnimIdle)]) {
+                // Point kAnimIdle to this animation clip index
+                m_clipOk[static_cast<size_t>(kAnimIdle)] = true;
+                // Swap or assign directly: if i != kAnimIdle, swap anims[kAnimIdle] and anims[i]
+                if (i != kAnimIdle) {
+                    std::swap(anims[kAnimIdle], anims[i]);
+                }
+            }
         }
+    }
+
+    // Now look for Hurt
+    if (!m_clipOk[static_cast<size_t>(kAnimHurt)]) {
+        for (int i = 1; i < count; ++i) {
+            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
+            const std::string name = anims[i].name ? anims[i].name : "";
+            if (name.find("Hurt") != std::string::npos) {
+                m_clipOk[static_cast<size_t>(kAnimHurt)] = true;
+                if (i != kAnimHurt && kAnimHurt < count) {
+                    std::swap(anims[kAnimHurt], anims[i]);
+                }
+                break;
+            }
+        }
+    }
+
+    // Idle is the only strictly required clip to enable animations
+    if (!m_clipOk[static_cast<size_t>(kAnimIdle)]) {
+        TraceLog(LOG_WARNING, "[PLAYER ANIM] Idle clip does not match player model: static pose");
+        return;
     }
     m_animsValid = true;
     TraceLog(LOG_INFO, "[PLAYER ANIM] %d clips in file (Idle=%d Walk=%d Attack=%d frames); Hurt %s, Attack1H %s, Attack2H %s, Bow %s",
-             count, anims[kAnimIdle].frameCount, anims[kAnimWalk].frameCount, anims[kAnimAttack].frameCount,
+             count, anims[kAnimIdle].frameCount,
+             HasClip(kAnimWalk) ? anims[kAnimWalk].frameCount : 0,
+             HasClip(kAnimAttack) ? anims[kAnimAttack].frameCount : 0,
              HasClip(kAnimHurt) ? "ok" : "missing", HasClip(kAnimAttack1H) ? "ok" : "missing",
              HasClip(kAnimAttack2H) ? "ok" : "missing", HasClip(kAnimBow) ? "ok" : "missing");
     ApplyClipPose(kAnimIdle, 0.0f);
@@ -232,11 +304,19 @@ void Player::PlayHurt() {
 
 void Player::ApplyClipPose(int clip, float phase) {
     if (!m_animsValid || !m_model) return;
+    if (clip < 0 || clip >= m_animCount || !m_clipOk[static_cast<size_t>(clip)]) {
+        // Fallback to Idle if current clip is not available
+        if (m_clipOk[static_cast<size_t>(kAnimIdle)]) clip = kAnimIdle;
+        else return;
+    }
     const ModelAnimation& anim = m_anims[clip];
     int frame = static_cast<int>(phase * static_cast<float>(anim.frameCount));
     frame = std::max(0, std::min(frame, anim.frameCount - 1));
     if (clip == m_appliedClip && frame == m_appliedFrame) return; // this pose is already on the model
     UpdateModelAnimation(*m_model, anim, frame);
+    if (m_hairModel && m_hairModel->meshCount > 0 && IsModelAnimationValid(*m_hairModel, anim)) {
+        UpdateModelAnimation(*m_hairModel, anim, frame);
+    }
     m_appliedClip = clip;
     m_appliedFrame = frame;
 }
@@ -440,6 +520,10 @@ void Player::Render() const {
         // Visual yaw only (smoothed in UpdateVisual); the gameplay position is untouched.
         DrawModelEx(*m_model, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                     Vector3{ scale, scale, scale }, WHITE);
+        if (m_hairModel) {
+            DrawModelEx(*m_hairModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
+                        Vector3{ scale, scale, scale }, WHITE);
+        }
         RenderHeldItems(drawPos, scale);
         return;
     }

@@ -39,6 +39,11 @@ Json WriteCharacter(const Character& character) {
     const Equipment& equipment = character.equipment;
     return {
         { "race", static_cast<int>(character.race) },
+        { "gender", static_cast<int>(character.appearance.gender) },
+        { "name", character.appearance.name },
+        { "hair_style", character.appearance.hairStyle },
+        { "skin_color_index", character.appearance.skinColorIndex },
+        { "hair_color_index", character.appearance.hairColorIndex },
         { "class", static_cast<int>(character.characterClass) },
         { "level", character.level },
         { "xp", character.xp },
@@ -71,6 +76,22 @@ bool ReadCharacter(const Json& value, Character& character) {
     const Json& abilities = value.at("abilities");
     if (!abilities.is_array() || abilities.size() != kAbilityCount) return false;
     character.race = static_cast<Race>(race);
+    if (value.contains("gender")) {
+        const int g = value.at("gender").get<int>();
+        character.appearance.gender = (g == static_cast<int>(Gender::Female)) ? Gender::Female : Gender::Male;
+    }
+    if (value.contains("name") && value.at("name").is_string()) {
+        character.appearance.name = value.at("name").get<std::string>();
+    }
+    if (value.contains("hair_style") && value.at("hair_style").is_string()) {
+        character.appearance.hairStyle = value.at("hair_style").get<std::string>();
+    }
+    if (value.contains("skin_color_index") && value.at("skin_color_index").is_number_integer()) {
+        character.appearance.skinColorIndex = value.at("skin_color_index").get<int>();
+    }
+    if (value.contains("hair_color_index") && value.at("hair_color_index").is_number_integer()) {
+        character.appearance.hairColorIndex = value.at("hair_color_index").get<int>();
+    }
     character.characterClass = static_cast<CharacterClass>(characterClass);
     character.level = level;
     character.xp = xp;

@@ -271,31 +271,10 @@ bool Game::Initialize() {
 
         m_itemVisuals = std::make_unique<ItemVisuals>(m_assetManager.get(), m_lightingSystem->GetShader());
 
-
-
-        m_playerModel = m_assetManager->LoadModel("models/entities/player_animated.glb");
-
-        if (m_playerModel) {
-
-            for (int i = 0; i < m_playerModel->materialCount; i++)
-
-                m_playerModel->materials[i].shader = m_lightingSystem->GetShader();
-
-            m_playerAnims = m_assetManager->LoadAnimations("models/entities/player_animated.glb", m_playerAnimCount);
-
-        }
-
-
-
         m_player = std::make_unique<Player>();
-
         m_player->SetTileSize(worldConfig.tileSize);
-
-        m_player->SetModel(m_playerModel);
-
-        m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
-
         m_player->SetItemVisuals(m_itemVisuals.get());
+        SetupPlayerVisuals();
 
         m_player->SetPosition({spawnX, spawnY, spawnZ});
 
@@ -497,11 +476,9 @@ void Game::CreateGameSession() {
 
     m_player->SetTileSize(worldConfig.tileSize);
 
-    m_player->SetModel(m_playerModel);
-
-    m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
-
     m_player->SetItemVisuals(m_itemVisuals.get());
+
+    SetupPlayerVisuals();
 
 
 
@@ -792,6 +769,8 @@ void Game::FinishSessionLoading() {
 
         m_hasPendingCharacter = false;
 
+        SetupPlayerVisuals();
+
     }
 
 
@@ -807,6 +786,8 @@ void Game::FinishSessionLoading() {
         }
 
         m_questLog = m_pendingSaveData.quests;
+
+        SetupPlayerVisuals();
 
         if (m_world) m_world->SetPlayerPosition(m_pendingSaveData.playerPosition);
 
@@ -860,6 +841,109 @@ if (m_camera && m_player) m_camera->CenterOn(m_player->GetPosition());
 
     SetState(std::make_unique<PlayingState>(this));
 
+}
+
+
+
+void Game::SetupPlayerVisuals() {
+    if (!m_player || !m_assetManager) return;
+
+    const core::Character& character = m_player->GetCharacter();
+    const bool isFemale = (character.appearance.gender == core::Gender::Female);
+    const std::string bodyModelPath = isFemale
+        ? "models/characters/bases/human_female_base.glb"
+        : "models/characters/bases/human_male_base.glb";
+
+    m_playerModel = m_assetManager->LoadModel(bodyModelPath);
+    if (!m_playerModel) {
+        TraceLog(LOG_WARNING, "[PLAYER VISUAL] Could not load %s, falling back to player_animated.glb", bodyModelPath.c_str());
+        m_playerModel = m_assetManager->LoadModel("models/entities/player_animated.glb");
+    }
+
+    if (m_playerModel) {
+        if (m_lightingSystem) {
+            for (int i = 0; i < m_playerModel->materialCount; ++i) {
+                m_playerModel->materials[i].shader = m_lightingSystem->GetShader();
+            }
+        }
+
+        // Apply skin color palette to body model
+        // In character_customization.json: 0=areola, 1=skin, 2=brows, 3=sclera, 4=iris, 5=pupil, 6=glint, 7=nipple
+        // Palettes: 0: porcelain, 1: fair_warm, 2: tan, 3: warm_medium, 4: olive, 5: brown, 6: deep_brown, 7: dark
+        static const Color s_skinPalettes[8] = {
+            { (unsigned char)(0.86f * 255), (unsigned char)(0.70f * 255), (unsigned char)(0.60f * 255), 255 },
+            { (unsigned char)(0.77f * 255), (unsigned char)(0.515f * 255), (unsigned char)(0.365f * 255), 255 },
+            { (unsigned char)(0.66f * 255), (unsigned char)(0.43f * 255), (unsigned char)(0.30f * 255), 255 },
+            { (unsigned char)(0.57f * 255), (unsigned char)(0.335f * 255), (unsigned char)(0.225f * 255), 255 },
+            { (unsigned char)(0.47f * 255), (unsigned char)(0.31f * 255), (unsigned char)(0.20f * 255), 255 },
+            { (unsigned char)(0.38f * 255), (unsigned char)(0.23f * 255), (unsigned char)(0.16f * 255), 255 },
+            { (unsigned char)(0.30f * 255), (unsigned char)(0.18f * 255), (unsigned char)(0.13f * 255), 255 },
+            { (unsigned char)(0.19f * 255), (unsigned char)(0.105f * 255), (unsigned char)(0.075f * 255), 255 }
+        };
+        const int skinIdx = std::clamp(character.appearance.skinColorIndex, 0, 7);
+        const Color skinCol = s_skinPalettes[skinIdx];
+
+        if (m_playerModel->materialCount > 1) {
+            m_playerModel->materials[1].maps[MATERIAL_MAP_DIFFUSE].color = skinCol;
+            if (m_playerModel->materialCount > 0) {
+                m_playerModel->materials[0].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+                    (unsigned char)(skinCol.r * 0.88f), (unsigned char)(skinCol.g * 0.73f), (unsigned char)(skinCol.b * 0.72f), 255
+                };
+            }
+            if (m_playerModel->materialCount > 7) {
+                m_playerModel->materials[7].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+                    (unsigned char)(skinCol.r * 0.82f), (unsigned char)(skinCol.g * 0.63f), (unsigned char)(skinCol.b * 0.62f), 255
+                };
+            }
+        }
+
+        m_playerAnims = m_assetManager->LoadAnimations(bodyModelPath, m_playerAnimCount);
+    }
+
+    // Load hair model
+    m_playerHairModel = nullptr;
+    const std::string& hairStyle = character.appearance.hairStyle;
+    if (!hairStyle.empty() && hairStyle != "bald" && hairStyle != "none") {
+        const std::string hairModelPath = "models/characters/bases/hair_" +
+            std::string(isFemale ? "female_" : "male_") + hairStyle + ".glb";
+        m_playerHairModel = m_assetManager->LoadModel(hairModelPath);
+        if (m_playerHairModel) {
+            if (m_lightingSystem) {
+                for (int i = 0; i < m_playerHairModel->materialCount; ++i) {
+                    m_playerHairModel->materials[i].shader = m_lightingSystem->GetShader();
+                }
+            }
+
+            // Hair palette
+            static const Color s_hairPalettes[10] = {
+                { (unsigned char)(0.025f * 255), (unsigned char)(0.018f * 255), (unsigned char)(0.016f * 255), 255 }, // black
+                { (unsigned char)(0.10f * 255),  (unsigned char)(0.040f * 255), (unsigned char)(0.020f * 255), 255 }, // dark_brown
+                { (unsigned char)(0.30f * 255),  (unsigned char)(0.085f * 255), (unsigned char)(0.030f * 255), 255 }, // chestnut
+                { (unsigned char)(0.50f * 255),  (unsigned char)(0.320f * 255), (unsigned char)(0.110f * 255), 255 }, // dark_blonde
+                { (unsigned char)(0.72f * 255),  (unsigned char)(0.460f * 255), (unsigned char)(0.130f * 255), 255 }, // blonde
+                { (unsigned char)(0.55f * 255),  (unsigned char)(0.160f * 255), (unsigned char)(0.050f * 255), 255 }, // ginger
+                { (unsigned char)(0.48f * 255),  (unsigned char)(0.075f * 255), (unsigned char)(0.025f * 255), 255 }, // auburn
+                { (unsigned char)(0.48f * 255),  (unsigned char)(0.500f * 255), (unsigned char)(0.550f * 255), 255 }, // silver
+                { (unsigned char)(0.86f * 255),  (unsigned char)(0.860f * 255), (unsigned char)(0.880f * 255), 255 }, // white
+                { (unsigned char)(0.84f * 255),  (unsigned char)(0.770f * 255), (unsigned char)(0.610f * 255), 255 }  // platinum
+            };
+            const int hairColIdx = std::clamp(character.appearance.hairColorIndex, 0, 9);
+            const Color hairCol = s_hairPalettes[hairColIdx];
+            for (int i = 0; i < m_playerHairModel->materialCount; ++i) {
+                m_playerHairModel->materials[i].maps[MATERIAL_MAP_DIFFUSE].color = hairCol;
+            }
+            // Eyebrows on the body model: material 2
+            if (m_playerModel && m_playerModel->materialCount > 2) {
+                m_playerModel->materials[2].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+                    (unsigned char)(hairCol.r * 0.62f), (unsigned char)(hairCol.g * 0.60f), (unsigned char)(hairCol.b * 0.58f), 255
+                };
+            }
+        }
+    }
+
+    m_player->SetModel(m_playerModel);
+    m_player->SetHairModel(m_playerHairModel);
+    m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
 }
 
 

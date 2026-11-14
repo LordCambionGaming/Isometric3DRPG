@@ -19,7 +19,7 @@ Vector3 LerpV(Vector3 a, Vector3 b, float f) {
 }
 
 // Cielo e ambiente nel tempo (t: 0 = mezzanotte, 0.25 = alba, 0.5 = mezzogiorno, 0.75 = tramonto).
-// La notte è blu scuro ma non nera: ambiente 0.45 con tinta fredda.
+// La notte ï¿½ blu scuro ma non nera: ambiente 0.45 con tinta fredda.
 Atmos EvalAtmos(float t) {
     const Atmos night{ {0.07f, 0.10f, 0.24f}, {0.30f, 0.38f, 0.65f}, 0.45f };
     const Atmos dawn { {0.80f, 0.47f, 0.32f}, {0.85f, 0.65f, 0.60f}, 0.45f };
@@ -49,7 +49,7 @@ SunInfo EvalSun(float t) {
     const float s = sinf(A), c = cosf(A);
     SunInfo r;
     if (s >= 0.0f) {
-        // Sole: a mezzogiorno (c = 0) la z è 0, quindi la luce è verticale e l'ombra sta sotto l'oggetto
+        // Sole: a mezzogiorno (c = 0) la z ï¿½ 0, quindi la luce ï¿½ verticale e l'ombra sta sotto l'oggetto
         r.dir = Vector3Normalize({ c, fmaxf(s, 0.25f), 0.3f * fabsf(c) });
         const float k    = SmoothStep(0.0f, 0.25f, s);
         const float warm = 1.0f - SmoothStep(0.0f, 0.5f, s);
@@ -157,7 +157,7 @@ void LightingSystem::BeginLightingMode(Vector3 cameraPos) {
     SetShaderValue(m_lightingShader, m_locSunColor, &sunColor, SHADER_UNIFORM_VEC3);
     SetShaderValue(m_lightingShader, m_locShadowStrength, &shadowStrength, SHADER_UNIFORM_FLOAT);
 
-    // Max 8 luci nello shader: tieni le più vicine
+    // Max 8 luci nello shader: tieni le piï¿½ vicine
     std::sort(m_lights.begin(), m_lights.end(), [&](const PointLight& l, const PointLight& r) {
         auto d2 = [&](const PointLight& p) {
             const float dx = p.position.x - cameraPos.x, dy = p.position.y - cameraPos.y, dz = p.position.z - cameraPos.z;

@@ -1,31 +1,26 @@
 #pragma once
 #include <array>
+#include <string>
+#include <vector>
+#include <raylib.h>
 #include "states/GameState.h"
 #include "core/Character.h"
 
-// Nuova Partita -> CharacterCreationState -> Conferma -> PlayingState.
-// Human / Livello 1 / XP 0 sono fissi. Il giocatore sceglie la classe e il METODO per i punteggi:
-//   Tira i dadi     : 4d6 scartando il piu' basso, sei volte. Ogni punteggio si lancia sulla board gotica
-//                     (INVIO sulla riga "Lancia i dadi") oppure si tirano tutti i rimanenti in automatico (A).
-//   Punteggi fissi  : array standard D&D 5e 15, 14, 13, 12, 10, 8.
-// Poi assegna i sei punteggi alle sei caratteristiche.
-//   SU/GIU  : seleziona la riga
-//   SX/DX   : cambia metodo / classe / punteggio assegnato alla caratteristica
-//   INVIO   : su "Lancia i dadi" apre la board; su "Conferma" (se tutto e' assegnato) avvia la partita
-//   A       : tira in automatico i punteggi non ancora lanciati
-//   ESC     : torna al menu principale (nessuna sessione e' stata creata)
+// Nuova Partita -> CharacterCreationState (multi-pagina, gotico, responsive) -> Conferma -> PlayingState.
+// Pagina 0: Aspetto & Identita' (Nome, Sesso, Capelli, Colore Pelle, Colore Capelli)
+// Pagina 1: Statistiche & Classe (Classe, Metodo punteggi: Tira Dadi / Fissi, Assegnazione punteggi, Conferma)
 class CharacterCreationState : public GameState {
 public:
     enum class Method { Roll, Fixed };
 
-    // Fotografia della creazione a meta': la board dei dadi sostituisce questo stato, poi se ne ricrea uno
-    // identico con il nuovo punteggio dentro.
     struct Progress {
         Method method = Method::Roll;
         core::CharacterClass characterClass = core::CharacterClass::Warrior;
+        core::CharacterAppearance appearance{};
         core::AbilityScores pool{};
-        std::array<bool, core::kAbilityCount> rolled{};     // quali punteggi del pool sono gia' noti
-        std::array<int, core::kAbilityCount> assigned{};    // per caratteristica: indice in pool, -1 = non assegnato
+        std::array<bool, core::kAbilityCount> rolled{};
+        std::array<int, core::kAbilityCount> assigned{};
+        int page = 1; // se torniamo dai dadi, torniamo alla pagina 1 (statistiche)
         int row = 0;
     };
 
@@ -39,31 +34,73 @@ public:
     void HandleInput() override;
 
 private:
+    // Pagina 0: Aspetto
+    static constexpr int kPageAppearance = 0;
+    static constexpr int kRowAppName = 0;
+    static constexpr int kRowAppGender = 1;
+    static constexpr int kRowAppHairStyle = 2;
+    static constexpr int kRowAppSkinColor = 3;
+    static constexpr int kRowAppHairColor = 4;
+    static constexpr int kRowAppNext = 5;
+    static constexpr int kRowAppCount = 6;
+
+    // Pagina 1: Statistiche & Classe
+    static constexpr int kPageAbilities = 1;
     static constexpr int kRowMethod = 0;
     static constexpr int kRowClass = 1;
     static constexpr int kRowRoll = 2;
     static constexpr int kRowFirstAbility = 3;
-    static constexpr int kRowConfirm = kRowFirstAbility + core::kAbilityCount;
-    static constexpr int kRowCount = kRowConfirm + 1;
+    static constexpr int kRowConfirm = kRowFirstAbility + core::kAbilityCount; // 9
+    static constexpr int kRowPrevPage = kRowConfirm + 1; // 10
+    static constexpr int kRowAbiCount = kRowPrevPage + 1; // 11
 
     Progress Snapshot() const;
     int RolledCount() const;
-    bool RollRowActive() const;           // c'e' ancora qualcosa da lanciare
+    bool RollRowActive() const;
     bool AllAssigned() const;
     bool IsPoolSlotUsed(int slot) const;
-    int NextRow(int dir) const;           // salta la riga "Lancia i dadi" quando non serve
+    int NextRow(int dir) const;
     void SetMethod(Method method);
     void AutoRollRemaining();
     void StartBoardRoll();
     void CycleClass(int dir);
     void CycleAssignment(int ability, int dir);
+
+    // Appearance cycling
+    void CycleGender(int dir);
+    void CycleHairStyle(int dir);
+    void CycleSkinColor(int dir);
+    void CycleHairColor(int dir);
+
+    void UpdatePreviewVisuals();
+    void RenderPreview3D(const Rectangle& viewport);
+
     core::Character Build() const;
 
+    int m_page = kPageAppearance;
+    int m_row = 0;
+
+    // Aspetto
+    core::CharacterAppearance m_appearance;
+    bool m_editingName = false;
+
+    // 3D Preview
+    Camera3D m_previewCamera{};
+    Model* m_previewBodyModel = nullptr;
+    Model* m_previewHairModel = nullptr;
+    ModelAnimation* m_previewAnims = nullptr;
+    int m_previewAnimCount = 0;
+    int m_previewIdleIndex = -1;
+    float m_previewAnimTime = 0.0f;
+    float m_previewRotation = 0.0f;
+    core::Gender m_lastLoadedGender = static_cast<core::Gender>(-1);
+    std::string m_lastLoadedHair = "";
+
+    // Statistiche & Classe
     Method m_method = Method::Roll;
     core::CharacterClass m_class = core::CharacterClass::Warrior;
-    core::AbilityScores m_pool{};                          // punteggi: fissi una volta noti
-    std::array<bool, core::kAbilityCount> m_rolled{};      // quali punteggi del pool sono noti
-    std::array<int, core::kAbilityCount> m_assigned{};     // per caratteristica: indice in m_pool, -1 = non assegnato
-    int m_row = kRowRoll;
-    bool m_restored = false;                               // ricreato dopo la board: non reinizializzare in Enter()
+    core::AbilityScores m_pool{};
+    std::array<bool, core::kAbilityCount> m_rolled{};
+    std::array<int, core::kAbilityCount> m_assigned{};
+    bool m_restored = false;
 };

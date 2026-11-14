@@ -10,6 +10,14 @@ const char* ToString(Race race) {
     return "?";
 }
 
+const char* ToString(Gender gender) {
+    switch (gender) {
+        case Gender::Male:   return "Male";
+        case Gender::Female: return "Female";
+    }
+    return "?";
+}
+
 const char* ToString(CharacterClass cls) {
     switch (cls) {
         case CharacterClass::Warrior: return "Warrior";
@@ -66,9 +74,10 @@ ItemId StartingWeaponId(CharacterClass cls) {
     return items::Dagger;
 }
 
-Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities) {
+Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities, const CharacterAppearance& appearance) {
     Character c;
     c.race = Race::Human;
+    c.appearance = appearance;
     c.characterClass = cls;
     c.level = 1;
     c.xp = 0;

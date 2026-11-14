@@ -9,6 +9,7 @@
 namespace core {
 
 enum class Race { Human };
+enum class Gender { Male, Female };
 enum class CharacterClass { Warrior, Ranger, Rogue };
 enum class Ability { Str, Dex, Con, Int, Wis, Cha };
 
@@ -18,6 +19,7 @@ constexpr int kAbilityCount = 6;
 using AbilityScores = std::array<int, kAbilityCount>;   // indicizzato con Ability
 
 const char* ToString(Race race);
+const char* ToString(Gender gender);
 const char* ToString(CharacterClass cls);
 const char* ToString(Ability ability);                   // "STR", "DEX", ...
 
@@ -56,8 +58,17 @@ struct Equipment {
     ItemStack quiver{ kNoItem, 0 };
 };
 
+struct CharacterAppearance {
+    Gender gender = Gender::Male;
+    std::string name = "Hero";
+    std::string hairStyle = "crop";      // male: crop, side_part, medium, tied_back | female: ponytail, bob, long, braid
+    int skinColorIndex = 1;              // indice nella palette skin
+    int hairColorIndex = 0;              // indice nella palette hair
+};
+
 struct Character {
     Race race = Race::Human;
+    CharacterAppearance appearance{};
     CharacterClass characterClass = CharacterClass::Warrior;
     int level = 1;
     int xp = 0;
@@ -108,6 +119,6 @@ struct Character {
 };
 
 // Human, livello 1, XP 0, possiede l'arma iniziale della classe ma non la equipaggia.
-Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities);
+Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities, const CharacterAppearance& appearance = {});
 
 } // namespace core

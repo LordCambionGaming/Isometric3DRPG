@@ -1,6 +1,54 @@
 #include "assets/AssetManager.h"
 #include "utils/Logger.h"
 #include <filesystem>
+#include <cmath>
+#include <raylib.h>
+
+// ---------------------------------------------------------------------------
+// NormalizeMixamoGLBUnits
+// I GLB esportati da Blender+Mixamo hanno i vertici in metri ma le ossa in
+// centimetri (la scala Blender 0.01 e' applicata all'oggetto armatura invece
+// che ai dati). Questo causa che UpdateModelAnimation() deformi il mesh in
+// modo errato (scala 100x nelle translazioni delle ossa).
+//
+// Rileva automaticamente se il modello e' in questa condizione (bindPose root
+// bone translation magnitude >> 1.0 m, tipicamente ~110 cm) e normalizza:
+//   - model.bindPose[i].translation *= 0.01
+//   - anim.framePoses[frame][i].translation *= 0.01  per ogni anim/frame/bone
+// ---------------------------------------------------------------------------
+static void NormalizeBindPose(Model& model) {
+    if (model.boneCount <= 0 || !model.bindPose) return;
+    // Controlla la magnitudine della prima bone (root, tipicamente Hips)
+    const Vector3& root = model.bindPose[0].translation;
+    const float mag = std::sqrt(root.x*root.x + root.y*root.y + root.z*root.z);
+    if (mag < 2.0f) return;  // gia' in metri o nessuna traslazione
+    const float s = 0.01f;
+    TraceLog(LOG_INFO, "[ASSET] Normalizing Mixamo bone translations from cm to m (root mag=%.1f)", mag);
+    for (int i = 0; i < model.boneCount; ++i) {
+        model.bindPose[i].translation.x *= s;
+        model.bindPose[i].translation.y *= s;
+        model.bindPose[i].translation.z *= s;
+    }
+}
+
+static void NormalizeAnimations(ModelAnimation* anims, int count, int boneCount) {
+    if (!anims || count <= 0 || boneCount <= 0) return;
+    for (int a = 0; a < count; ++a) {
+        if (anims[a].frameCount <= 0 || !anims[a].framePoses) continue;
+        // Controlla il primo frame del primo bone
+        const Vector3& root = anims[a].framePoses[0][0].translation;
+        const float mag = std::sqrt(root.x*root.x + root.y*root.y + root.z*root.z);
+        if (mag < 2.0f) continue;  // gia' normalizzata
+        const float s = 0.01f;
+        for (int f = 0; f < anims[a].frameCount; ++f) {
+            for (int b = 0; b < anims[a].boneCount; ++b) {
+                anims[a].framePoses[f][b].translation.x *= s;
+                anims[a].framePoses[f][b].translation.y *= s;
+                anims[a].framePoses[f][b].translation.z *= s;
+            }
+        }
+    }
+}
 
 AssetManager::AssetManager()
     : m_initialized(false)
@@ -98,6 +146,9 @@ Model* AssetManager::LoadModel(const std::string& filename) {
             return nullptr;
         }
 
+        // Normalizza unita' Mixamo (cm -> m) per bindPose se necessario
+        NormalizeBindPose(*model);
+
         Model* result = model.get();
         m_models[filename] = std::move(model);
         return result;
@@ -142,6 +193,9 @@ ModelAnimation* AssetManager::LoadAnimations(const std::string& filename, int& o
         if (animations) ::UnloadModelAnimations(animations, count);
         return nullptr;
     }
+
+    // Normalizza unita' Mixamo (cm -> m) nelle framePoses se necessario
+    NormalizeAnimations(animations, count, count > 0 ? animations[0].boneCount : 0);
 
     AnimationSet set;
     set.data = animations;

@@ -56,7 +56,7 @@ bool WorldFeatureGenerator::IsRiver(int worldX, int worldZ, const TerrainGenerat
     float path = RiverPathNoise(worldX, worldZ);
     float distFromCenter = std::abs(path - 0.5f);
     float narrow = RiverNarrowNoise(worldX, worldZ);
-    bool inRiverBand = distFromCenter < 0.08f; // più stretto di prima
+    bool inRiverBand = distFromCenter < 0.08f; // piï¿½ stretto di prima
     bool inNarrow = std::abs(narrow) < RIVER_WIDTH;
     float breakNoise = std::sin(worldZ * 0.02f + worldX * 0.01f) * 0.5f + 0.5f;
     if (breakNoise < 0.15f) return false; // guadi

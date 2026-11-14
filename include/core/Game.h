@@ -37,6 +37,7 @@ public:
     void ResetGameSession();
     void CreateGameSession();
     void StartNewGameLoading(const core::Character& character);
+    void SetupPlayerVisuals();
     void AdvanceSessionLoading(float deltaTime);
     float GetLoadingProgress() const;
     const std::string& GetLoadingMessage() const { return m_loadingMessage; }
@@ -92,6 +93,7 @@ private:
     std::unique_ptr<Timer> m_timer;
     std::unique_ptr<Player> m_player;
     Model* m_playerModel = nullptr; // loaded once via AssetManager (which owns it)
+    Model* m_playerHairModel = nullptr;
     ModelAnimation* m_playerAnims = nullptr; // Idle/Walk/Attack, loaded once via AssetManager (which owns it)
     int m_playerAnimCount = 0;
     std::unique_ptr<HUD> m_hud;

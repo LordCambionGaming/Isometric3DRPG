@@ -1,4 +1,4 @@
-﻿#include "world/World.h"
+#include "world/World.h"
 #include "world/Chunk.h"
 #include "world/TerrainGenerator.h"
 #include <iostream>

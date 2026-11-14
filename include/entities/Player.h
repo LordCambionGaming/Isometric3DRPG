@@ -42,6 +42,9 @@ public:
     // Non-const because skeletal animation rewrites the shared model's skinned vertex buffers.
     void SetModel(Model* model);
 
+    // Optional hair model attached to the player (shares the same skeleton/bones).
+    void SetHairModel(Model* hairModel) { m_hairModel = hairModel; }
+
     // Visual only. Non-owning: the clip array is owned/cached by AssetManager. Call AFTER SetModel().
     // Expects the player_animated.glb clip order (kAnimIdle/kAnimWalk/kAnimAttack below). If the clips do
     // not match the model the player keeps rendering the static pose (it still turns to face its direction).
@@ -97,6 +100,7 @@ private:
     static constexpr float kVisualFootprintMeters = 0.6f; // expected max X/Z extent
     static constexpr float kIndicatorGapMeters = 0.15f;   // clearance between head top and indicator tip
     Model* m_model = nullptr;
+    Model* m_hairModel = nullptr;
     BoundingBox m_modelBounds = { { 0, 0, 0 }, { 0, 0, 0 } }; // local-space, measured once in SetModel
 
     // Clip indices inside player_animated.glb (read from the file's animation list).

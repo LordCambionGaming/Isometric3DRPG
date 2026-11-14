@@ -156,6 +156,16 @@ def import_rigged_fbx(filepath, collection_name):
     armature.name = collection_name + "_Rig"
     armature.data.name = collection_name + "_Skeleton"
     armature.data.pose_position = "REST"
+    # Applica trasformazioni Mixamo FBX (scale 0.01 e rotazione 90)
+    bpy.ops.object.select_all(action="DESELECT")
+    armature.select_set(True)
+    for m in meshes:
+        m.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+    try:
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    except Exception as exc:
+        log("Avviso transform_apply: {}".format(exc))
     bpy.context.view_layer.update()
     return collection, imported, armature, meshes
 
