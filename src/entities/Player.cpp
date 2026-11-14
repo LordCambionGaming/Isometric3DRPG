@@ -15,46 +15,47 @@ Player::Player() {
 
 void Player::Update(float dt) {
     const Vector3 posBefore = m_position; // visual animation only: measures the distance really covered
-        if (!m_path.empty() && m_pathIndex < m_path.size()) {
-        const PathNode& node = m_path[m_pathIndex];
-        float targetX = node.x * m_tileSize + m_tileSize * 0.5f;
-        float targetZ = node.z * m_tileSize + m_tileSize * 0.5f;
-        float targetY = node.y;
+    if (!m_path.empty() && m_pathIndex < m_path.size()) {
+        float remainingStep = m_speed * dt;
 
-        float dx = targetX - m_position.x;
-        float dz = targetZ - m_position.z;
-        float dy = targetY - m_position.y;
-        float distXZ = std::sqrt(dx * dx + dz * dz);
+        while (remainingStep > 0.0f && m_pathIndex < m_path.size()) {
+            const PathNode& node = m_path[m_pathIndex];
+            float targetX = node.x * m_tileSize + m_tileSize * 0.5f;
+            float targetZ = node.z * m_tileSize + m_tileSize * 0.5f;
+            float targetY = node.y;
 
-        float step = m_speed * dt;
-        // If very close to target in XZ and Y is near target, snap to exact waypoint
-        bool nearX = std::abs(dx) < 0.05f;
-        bool nearZ = std::abs(dz) < 0.05f;
-        bool nearY = std::abs(dy) < 0.05f;
-        if ((nearX && nearZ && nearY) || (distXZ <= step && std::abs(dy) <= step)) {
-            m_position.x = targetX;
-            m_position.z = targetZ;
-            m_position.y = targetY; // snap exactly to surface
-            m_pathIndex++;
+            float dx = targetX - m_position.x;
+            float dy = targetY - m_position.y;
+            float dz = targetZ - m_position.z;
+            float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-            if (m_pathIndex < m_path.size()) {
-                const PathNode& next = m_path[m_pathIndex];
-                m_target.x = next.x * m_tileSize + m_tileSize * 0.5f;
-                m_target.y = next.y;
-                m_target.z = next.z * m_tileSize + m_tileSize * 0.5f;
+            if (dist <= remainingStep || dist < 0.001f) {
+                // Raggiunto il waypoint corrente: consuma lo spazio percorso e passa al successivo senza fermarsi o scattare
+                m_position.x = targetX;
+                m_position.y = targetY;
+                m_position.z = targetZ;
+                remainingStep -= dist;
+                m_pathIndex++;
+
+                if (m_pathIndex < m_path.size()) {
+                    const PathNode& next = m_path[m_pathIndex];
+                    m_target.x = next.x * m_tileSize + m_tileSize * 0.5f;
+                    m_target.y = next.y;
+                    m_target.z = next.z * m_tileSize + m_tileSize * 0.5f;
+                } else {
+                    m_path.clear();
+                    m_pathIndex = 0;
+                    m_moving = false;
+                    break;
+                }
             } else {
-                m_path.clear();
-                m_pathIndex = 0;
-                m_moving = false;
+                // Spostamento fluido verso il waypoint corrente
+                float ratio = remainingStep / dist;
+                m_position.x += dx * ratio;
+                m_position.y += dy * ratio;
+                m_position.z += dz * ratio;
+                remainingStep = 0.0f;
             }
-        } else {
-            // Interpolate XZ along plane direction
-            float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
-            float moveStep = std::min(step, dist);
-            float ratio = (dist > 0.001f) ? moveStep / dist : 0.0f;
-            m_position.x += dx * ratio;
-            m_position.y += dy * ratio;
-            m_position.z += dz * ratio;
         }
     } else if (m_moving) {
         // Fallback direct movement (MoveToTile)

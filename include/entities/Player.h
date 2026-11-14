@@ -120,10 +120,9 @@ private:
     static constexpr float kAttack1HDurationSec = 0.75f;
     static constexpr float kAttack2HDurationSec = 1.1f;
     static constexpr float kBowDurationSec = 1.7f;
-    // Metres the body travels during one full Walk cycle (two steps) at model scale 1.0, measured from the
-    // GLB (stance foot travels 0.699 m per half cycle). The Walk phase advances with the distance really
-    // covered each frame, so foot speed follows ground speed whatever m_speed or the slope is.
-    static constexpr float kWalkCycleMeters = 1.398f;
+    // Metres the body travels during one full Walk cycle (two steps) at model scale 1.0.
+    // Un valore più alto rende l'animazione dei passi più calma/lenta rispetto alla velocità del personaggio.
+    static constexpr float kWalkCycleMeters = 2.10f;
     static constexpr float kWalkTurnSpeedDeg = 540.0f;   // yaw speed while walking
     static constexpr float kAttackTurnSpeedDeg = 900.0f; // yaw speed while turning to the attack target
 
