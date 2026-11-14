@@ -204,55 +204,42 @@ void Player::SetAnimations(ModelAnimation* anims, int count) {
         return;
     }
 
-    // First check standard index order (kAnimIdle=0, kAnimWalk=1, etc. used by player_animated.glb)
+    m_clipOk.fill(false);
+
+    // Trova le clip per nome all'interno dell'array anims
+    auto findClipIndex = [&](const std::string& pattern, const std::string& exclude = "") -> int {
+        for (int i = 0; i < count; ++i) {
+            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
+            const std::string name = anims[i].name ? anims[i].name : "";
+            if (!exclude.empty() && name.find(exclude) != std::string::npos) continue;
+            if (name.find(pattern) != std::string::npos) return i;
+        }
+        return -1;
+    };
+
+    int idleIdx = findClipIndex("Idle");
+    int walkIdx = findClipIndex("Walk");
+    int hurtIdx = findClipIndex("Hurt");
+    int attackIdx = findClipIndex("Attack");
+
+    // Se i nomi non combaciano (es. modelli legacy come player_animated.glb senza nomi espliciti), usa gli indici standard
+    if (idleIdx < 0 && count > kAnimIdle && anims[kAnimIdle].frameCount > 0 && IsModelAnimationValid(*m_model, anims[kAnimIdle])) idleIdx = kAnimIdle;
+    if (walkIdx < 0 && count > kAnimWalk && anims[kAnimWalk].frameCount > 0 && IsModelAnimationValid(*m_model, anims[kAnimWalk])) walkIdx = kAnimWalk;
+    if (hurtIdx < 0 && count > kAnimHurt && anims[kAnimHurt].frameCount > 0 && IsModelAnimationValid(*m_model, anims[kAnimHurt])) hurtIdx = kAnimHurt;
+    if (attackIdx < 0 && count > kAnimAttack && anims[kAnimAttack].frameCount > 0 && IsModelAnimationValid(*m_model, anims[kAnimAttack])) attackIdx = kAnimAttack;
+
+    // Riordina l'array anims in modo che kAnimIdle=0, kAnimWalk=1, kAnimAttack=2, kAnimHurt=3
+    std::vector<ModelAnimation> reordered(kAnimClipCount);
+    std::vector<bool> slotFilled(kAnimClipCount, false);
+
+    if (idleIdx >= 0) { reordered[kAnimIdle] = anims[idleIdx]; slotFilled[kAnimIdle] = true; m_clipOk[kAnimIdle] = true; }
+    if (walkIdx >= 0) { reordered[kAnimWalk] = anims[walkIdx]; slotFilled[kAnimWalk] = true; m_clipOk[kAnimWalk] = true; }
+    if (attackIdx >= 0) { reordered[kAnimAttack] = anims[attackIdx]; slotFilled[kAnimAttack] = true; m_clipOk[kAnimAttack] = true; }
+    if (hurtIdx >= 0) { reordered[kAnimHurt] = anims[hurtIdx]; slotFilled[kAnimHurt] = true; m_clipOk[kAnimHurt] = true; }
+
     for (int i = 0; i < kAnimClipCount && i < count; ++i) {
-        m_clipOk[static_cast<size_t>(i)] = anims[i].frameCount > 0 && IsModelAnimationValid(*m_model, anims[i]);
-    }
-
-    // If clip 0 is not Idle (e.g. human_base models where clip 0 is Hurt and clip 1 is Idle),
-    // find matching animation clips by name in the anims array.
-    if (!m_clipOk[static_cast<size_t>(kAnimIdle)]) {
-        for (int i = 0; i < count; ++i) {
-            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
-            const std::string name = anims[i].name ? anims[i].name : "";
-            if (name.find("Idle") != std::string::npos && !m_clipOk[static_cast<size_t>(kAnimIdle)]) {
-                // Point kAnimIdle to this animation clip index
-                m_clipOk[static_cast<size_t>(kAnimIdle)] = true;
-                // Swap or assign directly: if i != kAnimIdle, swap anims[kAnimIdle] and anims[i]
-                if (i != kAnimIdle) {
-                    std::swap(anims[kAnimIdle], anims[i]);
-                }
-            }
-        }
-    }
-
-    // Now look for Walk by name (human_base GLBs may have clips in arbitrary NLA order)
-    if (!m_clipOk[static_cast<size_t>(kAnimWalk)]) {
-        for (int i = 0; i < count; ++i) {
-            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
-            const std::string name = anims[i].name ? anims[i].name : "";
-            if (name.find("Walk") != std::string::npos && name.find("Briefcase") == std::string::npos) {
-                m_clipOk[static_cast<size_t>(kAnimWalk)] = true;
-                if (i != kAnimWalk && kAnimWalk < count) {
-                    std::swap(anims[kAnimWalk], anims[i]);
-                }
-                break;
-            }
-        }
-    }
-
-    // Now look for Hurt
-    if (!m_clipOk[static_cast<size_t>(kAnimHurt)]) {
-        for (int i = 1; i < count; ++i) {
-            if (anims[i].frameCount <= 0 || !IsModelAnimationValid(*m_model, anims[i])) continue;
-            const std::string name = anims[i].name ? anims[i].name : "";
-            if (name.find("Hurt") != std::string::npos) {
-                m_clipOk[static_cast<size_t>(kAnimHurt)] = true;
-                if (i != kAnimHurt && kAnimHurt < count) {
-                    std::swap(anims[kAnimHurt], anims[i]);
-                }
-                break;
-            }
+        if (slotFilled[i]) {
+            anims[i] = reordered[i];
         }
     }
 

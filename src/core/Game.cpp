@@ -883,18 +883,19 @@ void Game::SetupPlayerVisuals() {
         const int skinIdx = std::clamp(character.appearance.skinColorIndex, 0, 7);
         const Color skinCol = s_skinPalettes[skinIdx];
 
+        // Raylib carica i materiali GLTF con offset +1: materials[0]=default, materials[1]=Areola, materials[2]=Skin, ..., materials[8]=Nipple
+        if (m_playerModel->materialCount > 2) {
+            m_playerModel->materials[2].maps[MATERIAL_MAP_DIFFUSE].color = skinCol;
+        }
         if (m_playerModel->materialCount > 1) {
-            m_playerModel->materials[1].maps[MATERIAL_MAP_DIFFUSE].color = skinCol;
-            if (m_playerModel->materialCount > 0) {
-                m_playerModel->materials[0].maps[MATERIAL_MAP_DIFFUSE].color = Color{
-                    (unsigned char)(skinCol.r * 0.88f), (unsigned char)(skinCol.g * 0.73f), (unsigned char)(skinCol.b * 0.72f), 255
-                };
-            }
-            if (m_playerModel->materialCount > 7) {
-                m_playerModel->materials[7].maps[MATERIAL_MAP_DIFFUSE].color = Color{
-                    (unsigned char)(skinCol.r * 0.82f), (unsigned char)(skinCol.g * 0.63f), (unsigned char)(skinCol.b * 0.62f), 255
-                };
-            }
+            m_playerModel->materials[1].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+                (unsigned char)(skinCol.r * 0.88f), (unsigned char)(skinCol.g * 0.73f), (unsigned char)(skinCol.b * 0.72f), 255
+            };
+        }
+        if (m_playerModel->materialCount > 8) {
+            m_playerModel->materials[8].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+                (unsigned char)(skinCol.r * 0.82f), (unsigned char)(skinCol.g * 0.63f), (unsigned char)(skinCol.b * 0.62f), 255
+            };
         }
 
         m_playerAnims = m_assetManager->LoadAnimations(bodyModelPath, m_playerAnimCount);
@@ -932,9 +933,9 @@ void Game::SetupPlayerVisuals() {
             for (int i = 0; i < m_playerHairModel->materialCount; ++i) {
                 m_playerHairModel->materials[i].maps[MATERIAL_MAP_DIFFUSE].color = hairCol;
             }
-            // Eyebrows on the body model: material 2
-            if (m_playerModel && m_playerModel->materialCount > 2) {
-                m_playerModel->materials[2].maps[MATERIAL_MAP_DIFFUSE].color = Color{
+            // Eyebrows on the body model: material 3 (GLTF material 2)
+            if (m_playerModel && m_playerModel->materialCount > 3) {
+                m_playerModel->materials[3].maps[MATERIAL_MAP_DIFFUSE].color = Color{
                     (unsigned char)(hairCol.r * 0.62f), (unsigned char)(hairCol.g * 0.60f), (unsigned char)(hairCol.b * 0.58f), 255
                 };
             }

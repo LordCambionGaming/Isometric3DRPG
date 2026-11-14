@@ -149,7 +149,12 @@ def import_rigged_fbx(filepath, collection_name):
     bpy.context.scene.collection.children.link(collection)
     move_objects_to_collection(imported, collection)
     armatures = [obj for obj in imported if obj.type == "ARMATURE"]
-    meshes = [obj for obj in imported if obj.type == "MESH"]
+    # Filtra solo le mesh effettivamente collegate allo scheletro (ignora oggetti estranei o cubi di default come 'Cube' nel FBX male)
+    meshes = [obj for obj in imported if obj.type == "MESH" and (any(m.type == "ARMATURE" for m in obj.modifiers) or len(obj.vertex_groups) > 0)]
+    # Rimuovi eventuali mesh orfane non riggate (es. Cube 2x2x2m) dalla scena per non esportarle nel GLB
+    for obj in [o for o in imported if o.type == "MESH" and o not in meshes]:
+        log("Rimozione mesh non riggata ignorata: {}".format(obj.name))
+        bpy.data.objects.remove(obj, do_unlink=True)
     if not armatures or not meshes:
         raise RuntimeError("Il FBX deve contenere sia Armature sia Mesh: {}".format(filepath))
     armature = armatures[0]
@@ -1844,7 +1849,11 @@ def attach_animation_library(armature, library):
     ad = armature.animation_data_create()
     ad.action = None
     added = []
-    for label, source_action in library.items():
+    # Ordine canonico atteso dal motore di gioco: 0: Idle, 1: Walk, 2: Attack, 3: Hurt
+    priority_order = ["Idle", "Walk", "Attack", "Hurt", "Attack1H", "Attack2H", "Bow"]
+    sorted_labels = sorted(library.keys(), key=lambda k: priority_order.index(k) if k in priority_order else 99)
+    for label in sorted_labels:
+        source_action = library[label]
         action = source_action.copy()
         action.name = armature.name + "_" + label
         if not remap_action_bone_paths(action, armature):
@@ -1971,6 +1980,11 @@ def material_role_indices(glb_path):
 def main():
     if bpy.app.version < (3, 2, 0):
         raise RuntimeError("Serve Blender 3.2.0 o superiore.")
+
+    # Pulisce la scena iniziale di default di Blender (Cube, Camera, Light)
+    for obj in list(bpy.data.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
+
     missing = [str(p) for p in (MALE_FBX, FEMALE_FBX) if not p.is_file()]
     if missing:
         raise FileNotFoundError(
@@ -1983,7 +1997,7 @@ def main():
     log("Output GLB: {}".format(OUTPUT_DIR))
     animation_library = import_animation_library(ANIMATION_DIR)
     if "Walk" not in animation_library:
-        log("ATTENZIONE: nessuna Walking pulita trovata; walking_briefcase.fbx viene ignorata.")
+        log("ATTENZIONE: nessuna clip Walk trovata.")
     if not animation_library:
         log("ATTENZIONE: nessuna animazione valida trovata; i GLB saranno riggati ma senza clip.")
 
