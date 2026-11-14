@@ -518,7 +518,7 @@ void Player::Render() const {
         const float scale = (kVisualHeightMeters * m_tileSize) / (m_modelBounds.max.y - m_modelBounds.min.y);
         // XZ: model pivot (feet centre) sits on the player position.
         // Y : lowest vertex of the model sits exactly on the player's surface height.
-        const Vector3 drawPos = { p.x, p.y - m_modelBounds.min.y * scale, p.z };
+        const Vector3 drawPos = { p.x, p.y, p.z };
         // Visual yaw only (smoothed in UpdateVisual); the gameplay position is untouched.
         DrawModelEx(*m_model, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                     Vector3{ scale, scale, scale }, WHITE);

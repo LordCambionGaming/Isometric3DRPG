@@ -1,4 +1,4 @@
-"""
+﻿"""
 PLAYER GENDER BASES - Blender 3.2.0+ (v6: eyes in the eye pockets, flat chest colour, separate faceted hair layers)
 =================================================================================================================
 Builds the two generic adult human bases (male / female) from the Mixamo-rigged FBX sources and a set of
@@ -164,8 +164,6 @@ def import_rigged_fbx(filepath, collection_name):
     # Applica trasformazioni Mixamo FBX (scale 0.01 e rotazione 90)
     bpy.ops.object.select_all(action="DESELECT")
     armature.select_set(True)
-    for m in meshes:
-        m.select_set(True)
     bpy.context.view_layer.objects.active = armature
     try:
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
@@ -1791,13 +1789,19 @@ def import_animation_library(directory):
                 copied.fcurves.remove(fc)
 
             if fc_x and fc_y and fc_z:
+                base_ky = fc_y.keyframe_points[0].co[1] if len(fc_y.keyframe_points) > 0 else 0.0
                 for kp_idx in range(len(fc_x.keyframe_points)):
                     kx = fc_x.keyframe_points[kp_idx].co[1]
                     ky = fc_y.keyframe_points[kp_idx].co[1]
                     kz = fc_z.keyframe_points[kp_idx].co[1]
-                    fc_x.keyframe_points[kp_idx].co[1] = kx * 0.01
-                    fc_y.keyframe_points[kp_idx].co[1] = -kz * 0.01
-                    fc_z.keyframe_points[kp_idx].co[1] = ky * 0.01
+                    fc_x.keyframe_points[kp_idx].co[1] = 0.0
+                    fc_y.keyframe_points[kp_idx].co[1] = 0.0
+                    # Z in Blender è l'altezza Y del FBX Mixamo. Manteniamo solo minime oscillazioni o azzeriamo
+                    # per le animazioni di locomozione (Walk) per impedire lo sprofondamento nel terreno.
+                    if label in ("Walk", "Run"):
+                        fc_z.keyframe_points[kp_idx].co[1] = 0.0
+                    else:
+                        fc_z.keyframe_points[kp_idx].co[1] = (ky - base_ky) * 0.01
 
             library[label] = copied
             log("Animazione caricata e normalizzata: {} <- {} (frame {}-{})".format(label, path.name,
