@@ -45,6 +45,12 @@ public:
     // Optional hair model attached to the player (shares the same skeleton/bones).
     void SetHairModel(Model* hairModel) { m_hairModel = hairModel; }
 
+    // Optional equipment models attached to the player (share the same skeleton/bones: 0=Body, 1=Legs, 2=Feet).
+    void SetEquipmentModel(int slotIndex, Model* equipModel) {
+        if (slotIndex >= 0 && slotIndex < 3) m_equipmentModels[slotIndex] = equipModel;
+    }
+    void ClearEquipmentModels() { m_equipmentModels.fill(nullptr); }
+
     // Visual only. Non-owning: the clip array is owned/cached by AssetManager. Call AFTER SetModel().
     // Expects the player_animated.glb clip order (kAnimIdle/kAnimWalk/kAnimAttack below). If the clips do
     // not match the model the player keeps rendering the static pose (it still turns to face its direction).
@@ -101,6 +107,7 @@ private:
     static constexpr float kIndicatorGapMeters = 0.15f;   // clearance between head top and indicator tip
     Model* m_model = nullptr;
     Model* m_hairModel = nullptr;
+    std::array<Model*, 3> m_equipmentModels = { nullptr, nullptr, nullptr };
     BoundingBox m_modelBounds = { { 0, 0, 0 }, { 0, 0, 0 } }; // local-space, measured once in SetModel
 
     // Clip indices inside player_animated.glb (read from the file's animation list).

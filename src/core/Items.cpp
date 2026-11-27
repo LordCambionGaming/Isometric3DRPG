@@ -61,6 +61,9 @@ const std::vector<ItemDef>& AllItems() {
         MakeWeapon(items::Longbow,    "longbow",    "Longbow",    { 1, 8 }, 12.0f, WeaponGrip::Bow,        "models/items/longbow.glb"),
         ItemDef{ items::Arrow, "arrow", "Arrow", ItemCategory::Misc, EquipSlot::Quiver, {}, "models/items/arrow.glb", "", 99 },
         ItemDef{ items::Quiver, "quiver", "Quiver", ItemCategory::Misc, EquipSlot::None, {}, "models/items/quiver.glb", "", 1 },
+        ItemDef{ items::MedievalDress, "medieval_dress", "Medieval Dress", ItemCategory::Armor, EquipSlot::Body, {}, "models/equipment/female/medieval_outfit_02/female_dress_body_detailed_rigged.glb", "", 1 },
+        ItemDef{ items::MedievalShorts, "medieval_shorts", "Linen Shorts", ItemCategory::Armor, EquipSlot::Legs, {}, "models/equipment/female/medieval_outfit_02/female_shorts_under_skirt_detailed_rigged.glb", "", 1 },
+        ItemDef{ items::MedievalBoots, "medieval_boots", "Leather Boots", ItemCategory::Armor, EquipSlot::Feet, {}, "models/equipment/female/medieval_outfit_02/female_leather_boots_detailed_rigged.glb", "", 1 },
     };
     return table;
 }

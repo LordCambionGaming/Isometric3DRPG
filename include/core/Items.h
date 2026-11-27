@@ -57,7 +57,7 @@ struct ItemStack {
 
 // Id degli oggetti: l'ordine DEVE coincidere con la tabella in Items.cpp.
 namespace items {
-enum : ItemId { Dagger, Shortsword, Longsword, Greatsword, Greataxe, Bow, Longbow, Arrow, Quiver, Count };
+enum : ItemId { Dagger, Shortsword, Longsword, Greatsword, Greataxe, Bow, Longbow, Arrow, Quiver, MedievalDress, MedievalShorts, MedievalBoots, Count };
 }
 
 const std::vector<ItemDef>& AllItems();

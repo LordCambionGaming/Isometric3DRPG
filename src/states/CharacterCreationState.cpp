@@ -8,6 +8,7 @@
 #include "entities/Player.h"
 #include "ui/GothicTheme.h"
 #include <raylib.h>
+#include <rlgl.h>
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -125,9 +126,9 @@ CharacterCreationState::Progress CharacterCreationState::Snapshot() const {
 }
 
 void CharacterCreationState::Enter() {
-    // Inizializza camera 3D per il preview
-    m_previewCamera.position = Vector3{ 0.0f, 1.25f, 3.2f };
-    m_previewCamera.target = Vector3{ 0.0f, 0.95f, 0.0f };
+    // Inizializza camera 3D per il preview (abbastanza lontana da inquadrare tutto il personaggio)
+    m_previewCamera.position = Vector3{ 0.0f, 1.15f, 4.15f };
+    m_previewCamera.target = Vector3{ 0.0f, 0.92f, 0.0f };
     m_previewCamera.up = Vector3{ 0.0f, 1.0f, 0.0f };
     m_previewCamera.fovy = 38.0f;
     m_previewCamera.projection = CAMERA_PERSPECTIVE;
@@ -181,6 +182,28 @@ void CharacterCreationState::UpdatePreviewVisuals() {
             if (m_previewIdleIndex < 0 && m_previewAnimCount > 0) m_previewIdleIndex = 0;
         }
         m_lastLoadedGender = m_appearance.gender;
+        m_previewEquipModels.fill(nullptr);
+        if (isFemale) {
+            m_previewEquipModels[0] = assets->LoadModel("models/equipment/female/medieval_outfit_02/female_dress_body_detailed_rigged.glb");
+            m_previewEquipModels[1] = nullptr; // shorts hidden under full dress
+            m_previewEquipModels[2] = assets->LoadModel("models/equipment/female/medieval_outfit_02/female_leather_boots_detailed_rigged.glb");
+        }
+    }
+
+    // Ripristina lo shader di default sui modelli in preview per evitare residui del lightingShader di gioco (nero/blu)
+    Shader defaultShader = { 0 };
+    defaultShader.id = rlGetShaderIdDefault();
+    defaultShader.locs = rlGetShaderLocsDefault();
+    auto resetModelShader = [&](Model* mdl) {
+        if (!mdl) return;
+        for (int i = 0; i < mdl->materialCount; ++i) {
+            mdl->materials[i].shader = defaultShader;
+        }
+    };
+    resetModelShader(m_previewBodyModel);
+    resetModelShader(m_previewHairModel);
+    for (Model* eq : m_previewEquipModels) {
+        resetModelShader(eq);
     }
 
     // Palette pelle sul corpo
@@ -248,6 +271,11 @@ void CharacterCreationState::Update(float dt) {
             UpdateModelAnimation(*m_previewBodyModel, anim, frame);
             if (m_previewHairModel && IsModelAnimationValid(*m_previewHairModel, anim)) {
                 UpdateModelAnimation(*m_previewHairModel, anim, frame);
+            }
+            for (Model* eq : m_previewEquipModels) {
+                if (eq && IsModelAnimationValid(*eq, anim)) {
+                    UpdateModelAnimation(*eq, anim, frame);
+                }
             }
         }
     }
@@ -520,6 +548,11 @@ void CharacterCreationState::RenderPreview3D(const Rectangle& viewport) {
     DrawModelEx(*m_previewBodyModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_previewRotation, Vector3{ 1.0f, 1.0f, 1.0f }, WHITE);
     if (m_previewHairModel) {
         DrawModelEx(*m_previewHairModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_previewRotation, Vector3{ 1.0f, 1.0f, 1.0f }, WHITE);
+    }
+    for (Model* eq : m_previewEquipModels) {
+        if (eq) {
+            DrawModelEx(*eq, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_previewRotation, Vector3{ 1.0f, 1.0f, 1.0f }, WHITE);
+        }
     }
 
     EndMode3D();

@@ -85,6 +85,11 @@ Character CreateCharacter(CharacterClass cls, const AbilityScores& abilities, co
     c.abilities = abilities;
     c.AddItem(StartingWeaponId(cls));
     c.AddItem(items::Arrow, 20);
+    if (appearance.gender == Gender::Female) {
+        c.equipment.body = items::MedievalDress;
+        c.equipment.legs = items::MedievalShorts;
+        c.equipment.feet = items::MedievalBoots;
+    }
     // equipment starts empty (all slots kNoItem by default)
     c.vitals.currentHP = c.MaxHP();
     return c;

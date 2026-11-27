@@ -945,6 +945,30 @@ void Game::SetupPlayerVisuals() {
     m_player->SetModel(m_playerModel);
     m_player->SetHairModel(m_playerHairModel);
     m_player->SetAnimations(m_playerAnims, m_playerAnimCount);
+
+    // Load and attach equipped garments (Body, Legs, Feet)
+    // Skip rendering Legs (shorts) when a full dress is equipped in Body so it never pokes through.
+    m_player->ClearEquipmentModels();
+    const core::ItemDef* bodyDef = (character.equipment.body != core::kNoItem) ? core::GetItem(character.equipment.body) : nullptr;
+    const bool wearingDress = (bodyDef && bodyDef->model && std::string(bodyDef->model).find("dress") != std::string::npos);
+    const core::ItemId equipSlots[3] = { character.equipment.body, character.equipment.legs, character.equipment.feet };
+    for (int i = 0; i < 3; ++i) {
+        if (i == 1 && wearingDress) continue;
+        if (equipSlots[i] != core::kNoItem) {
+            const core::ItemDef* def = core::GetItem(equipSlots[i]);
+            if (def && def->model && def->model[0] != '\0') {
+                Model* eqModel = m_assetManager->LoadModel(def->model);
+                if (eqModel) {
+                    if (m_lightingSystem) {
+                        for (int m = 0; m < eqModel->materialCount; ++m) {
+                            eqModel->materials[m].shader = m_lightingSystem->GetShader();
+                        }
+                    }
+                    m_player->SetEquipmentModel(i, eqModel);
+                }
+            }
+        }
+    }
 }
 
 

@@ -1,0 +1,89 @@
+{
+  "pack": "female_medieval_outfit_02",
+  "coordinate_system": "Y_UP; character front is +Z",
+  "source_character": "human_female_base.glb",
+  "armature": "Human_Female_Ponytail_Rig",
+  "bone_count": 57,
+  "source_character_bounds_m": {
+    "min": [
+      -0.8237,
+      0.0005,
+      -0.1292
+    ],
+    "max": [
+      0.8237,
+      1.7377,
+      0.1894
+    ]
+  },
+  "slots": {
+    "body": {
+      "item_id": "female_dress_body_01",
+      "slot": "Body",
+      "gender": "female",
+      "source_file": "female_dress_body_detailed.glb",
+      "rigged_file": "female_dress_body_detailed_rigged.glb",
+      "rigging_status": "rigged and animated to 57-bone Mixamo rig; Idle, Walk, Hurt verified",
+      "material_regions": [
+        "linen_light",
+        "linen",
+        "red",
+        "leather",
+        "gold",
+        "leather_mid"
+      ],
+      "material_color_variants": {
+        "linen_beige": { "r": 0.82, "g": 0.77, "b": 0.68 },
+        "linen_blue": { "r": 0.35, "g": 0.48, "b": 0.65 },
+        "linen_green": { "r": 0.32, "g": 0.50, "b": 0.36 },
+        "linen_red": { "r": 0.65, "g": 0.22, "b": 0.22 },
+        "linen_black": { "r": 0.15, "g": 0.15, "b": 0.16 }
+      }
+    },
+    "legs": {
+      "item_id": "female_shorts_01",
+      "slot": "Legs",
+      "gender": "female",
+      "source_file": "female_shorts_under_skirt_detailed.glb",
+      "rigged_file": "female_shorts_under_skirt_detailed_rigged.glb",
+      "rigging_status": "rigged and animated to 57-bone Mixamo rig; Idle, Walk, Hurt verified",
+      "material_regions": [
+        "leather_mid",
+        "linen_light",
+        "shorts"
+      ],
+      "material_color_variants": {
+        "leather_brown": { "r": 0.42, "g": 0.28, "b": 0.18 },
+        "linen_beige": { "r": 0.82, "g": 0.77, "b": 0.68 },
+        "blue": { "r": 0.25, "g": 0.35, "b": 0.55 },
+        "green": { "r": 0.28, "g": 0.42, "b": 0.30 },
+        "black": { "r": 0.12, "g": 0.12, "b": 0.13 }
+      }
+    },
+    "feet": {
+      "item_id": "female_leather_boots_01",
+      "slot": "Feet",
+      "gender": "female",
+      "source_file": "female_leather_boots_detailed.glb",
+      "rigged_file": "female_leather_boots_detailed_rigged.glb",
+      "rigging_status": "rigged and animated to 57-bone Mixamo rig; Idle, Walk, Hurt verified",
+      "material_regions": [
+        "leather_mid",
+        "leather",
+        "sole",
+        "gold"
+      ],
+      "material_color_variants": {
+        "leather_brown": { "r": 0.38, "g": 0.24, "b": 0.15 },
+        "leather_dark": { "r": 0.22, "g": 0.15, "b": 0.10 },
+        "black": { "r": 0.12, "g": 0.12, "b": 0.12 },
+        "tan": { "r": 0.62, "g": 0.45, "b": 0.30 }
+      }
+    }
+  },
+  "integration_notes": [
+    "Preserved existing Mixamo 57-bone skeleton without modifying player architecture.",
+    "Exported separate rigged GLBs for dress (Body), shorts (Legs), and boots (Feet).",
+    "Preserved material names and separate material regions; color variants use material parameters/instances without mesh duplication."
+  ]
+}

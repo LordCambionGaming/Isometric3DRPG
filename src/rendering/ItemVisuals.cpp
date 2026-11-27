@@ -1,5 +1,6 @@
 #include "rendering/ItemVisuals.h"
 #include "assets/AssetManager.h"
+#include "../physics/ClothPhysics.h"
 #include <raymath.h>
 #include <algorithm>
 #include <cfloat>
@@ -124,7 +125,7 @@ void ItemVisuals::Unload() {
 
 void ItemVisuals::ApplyShader(Model& m) {
     if (m_worldShader.id == 0) return;
-    for (int i = 0; i < m.materialCount; ++i) m.materials[i].shader = m_worldShader;
+        for (int i = 0; i < m.materialCount; ++i) m.materials[i].shader = m_worldShader;
 }
 
 ItemVisuals::Entry* ItemVisuals::Resolve(core::ItemId id) {
@@ -146,7 +147,15 @@ ItemVisuals::Entry* ItemVisuals::Resolve(core::ItemId id) {
     if (m_assets) {
         for (const std::string& path : candidates) {
             Model* m = m_assets->LoadModel(path.c_str());
-            if (m && m->meshCount > 0) { e.model = m; foundPath = path; break; }
+            if (m && m->meshCount > 0) {
+                e.model = m;
+                foundPath = path;
+                // Load simple colliders for the garment (if any) and attach them
+                // using the stub physics system. The GLB can contain a node named "_collider" that holds a low‑poly convex shape.
+                auto colliders = ClothPhysics::LoadColliders(foundPath.c_str());
+                ClothPhysics::AttachColliders(e.model, colliders);
+                break;
+            }
         }
     }
 

@@ -51,8 +51,10 @@ void InventoryState::HandleInput() {
             m_isDragging = false;
         }
         if (m_game->GetActiveBuilding() >= 0) {
+            m_game->SetupPlayerVisuals();
             m_game->SetState(std::make_unique<VillageInteriorState>(m_game, m_game->GetActiveBuilding()));
         } else {
+            m_game->SetupPlayerVisuals();
             m_game->SetState(std::make_unique<PlayingState>(m_game));
         }
         return; 

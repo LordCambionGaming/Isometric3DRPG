@@ -193,6 +193,9 @@
   "item.longbow": "Longbow",
   "item.arrow": "Arrow",
   "item.quiver": "Quiver",
+  "item.medieval_dress": "Medieval Dress",
+  "item.medieval_shorts": "Linen Shorts",
+  "item.medieval_boots": "Leather Boots",
   "interaction.door": "Door",
   "interaction.open": "Open",
   "inventory.take_all": "Take All"

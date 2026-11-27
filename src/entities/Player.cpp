@@ -1,5 +1,6 @@
 #include "entities/Player.h"
 #include "rendering/ItemVisuals.h"
+#include "../physics/ClothPhysics.h"
 #include <raymath.h>
 #include <cmath>
 #include <cstring>
@@ -332,6 +333,11 @@ void Player::ApplyClipPose(int clip, float phase) {
     if (m_hairModel && m_hairModel->meshCount > 0 && IsModelAnimationValid(*m_hairModel, anim)) {
         UpdateModelAnimation(*m_hairModel, anim, frame);
     }
+    for (Model* equipModel : m_equipmentModels) {
+        if (equipModel && equipModel->meshCount > 0 && IsModelAnimationValid(*equipModel, anim)) {
+            UpdateModelAnimation(*equipModel, anim, frame);
+        }
+    }
     m_appliedClip = clip;
     m_appliedFrame = frame;
 }
@@ -400,11 +406,30 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
         m_animPhase -= std::floor(m_animPhase); // loop
     }
 
+    const int prevClip = m_appliedClip;
+    const int prevFrame = m_appliedFrame;
     switch (m_animState) {
         case AnimState::Attack:
         case AnimState::Hurt:   ApplyClipPose(m_playClip, m_animPhase); break;
         case AnimState::Walk:   ApplyClipPose(kAnimWalk, m_animPhase); break;
         default:                ApplyClipPose(kAnimIdle, m_animPhase); break;
+    }
+    const bool animUpdated = (m_appliedClip != prevClip || m_appliedFrame != prevFrame);
+    const Vector3 worldVel = (dt > 0.0001f)
+        ? Vector3{ (m_position.x - posBefore.x) / dt, 0.0f, (m_position.z - posBefore.z) / dt }
+        : Vector3{ 0.0f, 0.0f, 0.0f };
+    Vector3 leftHandModel{ 0, 0, 0 }, rightHandModel{ 0, 0, 0 };
+    bool hasHands = false;
+    if (m_animsValid && m_anims && m_appliedClip >= 0 && m_appliedFrame >= 0 &&
+        m_handBoneL >= 0 && m_handBoneR >= 0) {
+        leftHandModel  = m_anims[m_appliedClip].framePoses[m_appliedFrame][m_handBoneL].translation;
+        rightHandModel = m_anims[m_appliedClip].framePoses[m_appliedFrame][m_handBoneR].translation;
+        hasHands = true;
+    }
+    // Only apply cloth physics to Body slot (index 0); never deform Legs (1) or Feet/Boots (2).
+    if (!m_equipmentModels.empty() && m_equipmentModels[0]) {
+        ClothPhysics::UpdateSkirtCloth(m_equipmentModels[0], m_model, dt, worldVel, m_visualYaw, animUpdated,
+                                       leftHandModel, rightHandModel, hasHands);
     }
 
     if (bowRelease) {
@@ -545,6 +570,12 @@ void Player::Render() const {
         if (m_hairModel) {
             DrawModelEx(*m_hairModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                         Vector3{ scale, scale, scale }, WHITE);
+        }
+        for (Model* equipModel : m_equipmentModels) {
+            if (equipModel) {
+                DrawModelEx(*equipModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
+                            Vector3{ scale, scale, scale }, WHITE);
+            }
         }
         RenderHeldItems(drawPos, scale);
         return;

@@ -193,6 +193,9 @@
   "item.longbow": "Arco lungo",
   "item.arrow": "Freccia",
   "item.quiver": "Faretra",
+  "item.medieval_dress": "Abito Medievale",
+  "item.medieval_shorts": "Calzoncini di Lino",
+  "item.medieval_boots": "Stivali di Cuoio",
   "interaction.door": "Porta",
   "interaction.open": "Apri",
   "inventory.take_all": "Prendi Tutto"

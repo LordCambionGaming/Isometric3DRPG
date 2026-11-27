@@ -88,6 +88,7 @@ private:
     Camera3D m_previewCamera{};
     Model* m_previewBodyModel = nullptr;
     Model* m_previewHairModel = nullptr;
+    std::array<Model*, 3> m_previewEquipModels = { nullptr, nullptr, nullptr };
     ModelAnimation* m_previewAnims = nullptr;
     int m_previewAnimCount = 0;
     int m_previewIdleIndex = -1;
