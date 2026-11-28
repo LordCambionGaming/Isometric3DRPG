@@ -259,3 +259,169 @@ void ClothPhysics::UpdateSkirtCloth(Model* garment, const Model* bodyModel, floa
         }
     }
 }
+
+void ClothPhysics::UpdateHairCloth(Model* hairModel, const Model* bodyModel, float dt, Vector3 worldVel,
+                                   float visualYaw, bool animUpdatedThisFrame) {
+    if (!hairModel || hairModel->meshCount <= 0 || dt <= 0.0f) return;
+    dt = std::min(dt, 0.05f);
+
+    // Find top of hair (crown) in rest space so scalp stays pinned while hanging strands sway
+    float maxRestY = -1e30f;
+    float minRestY =  1e30f;
+    for (int m = 0; m < hairModel->meshCount; ++m) {
+        const Mesh& mesh = hairModel->meshes[m];
+        if (!mesh.vertices) continue;
+        for (int vi = 0; vi < mesh.vertexCount; ++vi) {
+            const float vy = mesh.vertices[vi * 3 + 1];
+            if (vy > maxRestY) maxRestY = vy;
+            if (vy < minRestY) minRestY = vy;
+        }
+    }
+    constexpr float kPinnedDepth = 0.185f; // top 18.5cm stays anchored to the skull
+    if (maxRestY - minRestY <= kPinnedDepth + 0.02f) {
+        return; // short hairstyle (crop / side_part / tied_back): nothing hangs down to sway
+    }
+
+    SkirtClothState& st = s_clothStates[hairModel];
+    st.time += dt;
+
+    const float c = std::cos(visualYaw);
+    const float s = std::sin(visualYaw);
+    const float localVelX =  worldVel.x * c - worldVel.z * s;
+    const float localVelZ =  worldVel.x * s + worldVel.z * c;
+    const float speed = std::sqrt(localVelX * localVelX + localVelZ * localVelZ);
+    const float speedRatio = std::min(speed / 4.5f, 1.0f);
+
+    // Hair is lighter and slightly bouncier than a heavy skirt
+    const float targetX = std::clamp(-localVelX * 0.032f, -0.13f, 0.13f);
+    const float targetZ = std::clamp(-localVelZ * 0.032f, -0.13f, 0.13f);
+    constexpr float kStiffness = 58.0f;
+    constexpr float kDamping   = 6.2f;
+
+    const float accX = (targetX - st.swayX) * kStiffness - st.velX * kDamping;
+    const float accZ = (targetZ - st.swayZ) * kStiffness - st.velZ * kDamping;
+    st.velX  += accX * dt;
+    st.velZ  += accZ * dt;
+    st.swayX += st.velX * dt;
+    st.swayZ += st.velZ * dt;
+
+    if (static_cast<int>(st.prevOffsets.size()) != hairModel->meshCount) {
+        st.prevOffsets.assign(static_cast<size_t>(hairModel->meshCount), {});
+    }
+
+    // Collect animated upper-body vertices (back, shoulders, neck, head) so hair never clips into body
+    std::vector<Vector3> upperBodyVerts;
+    if (bodyModel && bodyModel->meshCount > 0) {
+        int bestMesh = 0;
+        int bestCount = 0;
+        for (int bmIdx = 0; bmIdx < bodyModel->meshCount; ++bmIdx) {
+            if (bodyModel->meshes[bmIdx].vertexCount > bestCount) {
+                bestCount = bodyModel->meshes[bmIdx].vertexCount;
+                bestMesh = bmIdx;
+            }
+        }
+        const Mesh& bMesh = bodyModel->meshes[bestMesh];
+        const float* bv = bMesh.animVertices ? bMesh.animVertices : bMesh.vertices;
+        if (bv) {
+            upperBodyVerts.reserve(512);
+            for (int bi = 0; bi < bMesh.vertexCount; ++bi) {
+                const float bx = bv[bi * 3 + 0];
+                const float by = bv[bi * 3 + 1];
+                const float bz = bv[bi * 3 + 2];
+                if (by >= 1.12f && by <= maxRestY + 0.05f && std::fabs(bx) < 0.30f) {
+                    upperBodyVerts.push_back(Vector3{ bx, by, bz });
+                }
+            }
+        }
+    }
+
+    const float swayMag = std::sqrt(st.swayX * st.swayX + st.swayZ * st.swayZ);
+
+    for (int m = 0; m < hairModel->meshCount; ++m) {
+        Mesh& mesh = hairModel->meshes[m];
+        if (!mesh.vertices || mesh.vertexCount <= 0) continue;
+
+        float* targetVerts = mesh.animVertices ? mesh.animVertices : mesh.vertices;
+        auto& prev = st.prevOffsets[static_cast<size_t>(m)];
+        if (static_cast<int>(prev.size()) != mesh.vertexCount) {
+            prev.assign(static_cast<size_t>(mesh.vertexCount), Vector3{ 0.0f, 0.0f, 0.0f });
+        }
+
+        bool anyChanged = false;
+        for (int vi = 0; vi < mesh.vertexCount; ++vi) {
+            const float restX = mesh.vertices[vi * 3 + 0];
+            const float restY = mesh.vertices[vi * 3 + 1];
+            const float restZ = mesh.vertices[vi * 3 + 2];
+
+            if (!animUpdatedThisFrame) {
+                targetVerts[vi * 3 + 0] -= prev[vi].x;
+                targetVerts[vi * 3 + 1] -= prev[vi].y;
+                targetVerts[vi * 3 + 2] -= prev[vi].z;
+            }
+
+            const float drop = maxRestY - restY;
+            if (drop < kPinnedDepth) {
+                prev[vi] = Vector3{ 0.0f, 0.0f, 0.0f };
+                continue;
+            }
+
+            const float flex = std::clamp((drop - kPinnedDepth) / 0.30f, 0.0f, 1.0f);
+            const float w = flex * flex;
+
+            const float ang = std::atan2(restZ, restX);
+            const float ripple = std::sin(st.time * 4.5f + ang * 2.0f + restY * 6.0f)
+                               * (0.004f + 0.010f * speedRatio) * w;
+
+            float ox = st.swayX * w + std::cos(ang) * ripple;
+            float oz = st.swayZ * w + std::sin(ang) * ripple;
+            float oy = swayMag * 0.04f * w;
+
+            // Body/neck/shoulder collision: push hair outward if it gets too close to skin
+            if (!upperBodyVerts.empty()) {
+                float curX = targetVerts[vi * 3 + 0] + ox;
+                float curY = targetVerts[vi * 3 + 1] + oy;
+                float curZ = targetVerts[vi * 3 + 2] + oz;
+                constexpr float kHairClearance = 0.022f;
+                constexpr float kInfluence     = 0.095f;
+                float bestPushX = 0.0f, bestPushY = 0.0f, bestPushZ = 0.0f;
+                float maxPush = 0.0f;
+                for (const Vector3& bp : upperBodyVerts) {
+                    const float dy = curY - bp.y;
+                    if (std::fabs(dy) > 0.075f) continue;
+                    const float dx = curX - bp.x;
+                    const float dz = curZ - bp.z;
+                    const float d2 = dx * dx + dy * dy + dz * dz;
+                    if (d2 > kInfluence * kInfluence) continue;
+
+                    // Compare radial distance from torso/neck spine axis (0, curY, 0.02)
+                    const float bRad = std::sqrt(bp.x * bp.x + (bp.z - 0.02f) * (bp.z - 0.02f));
+                    const float cRad = std::sqrt(curX * curX + (curZ - 0.02f) * (curZ - 0.02f));
+                    const float reqRad = bRad + kHairClearance;
+                    if (cRad < reqRad && cRad > 1e-4f) {
+                        const float push = reqRad - cRad;
+                        if (push > maxPush) {
+                            maxPush = push;
+                            bestPushX = (curX / cRad) * push;
+                            bestPushZ = ((curZ - 0.02f) / cRad) * push;
+                            bestPushY = (dy > 0.0f ? 0.15f : 0.0f) * push;
+                        }
+                    }
+                }
+                ox += bestPushX;
+                oy += bestPushY;
+                oz += bestPushZ;
+            }
+
+            targetVerts[vi * 3 + 0] += ox;
+            targetVerts[vi * 3 + 1] += oy;
+            targetVerts[vi * 3 + 2] += oz;
+            prev[vi] = Vector3{ ox, oy, oz };
+            anyChanged = true;
+        }
+
+        if (anyChanged && mesh.vboId && mesh.vboId[0] != 0) {
+            rlUpdateVertexBuffer(mesh.vboId[0], targetVerts,
+                                 mesh.vertexCount * 3 * static_cast<int>(sizeof(float)), 0);
+        }
+    }
+}

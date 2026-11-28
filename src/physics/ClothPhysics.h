@@ -20,6 +20,11 @@ public:
                                  float visualYaw, bool animUpdatedThisFrame,
                                  Vector3 leftHandModel, Vector3 rightHandModel, bool hasHands);
 
+    // Real-time spring-damper hair physics + body/neck/shoulder collision
+    // so hanging hair (ponytail, braid, long, bob) sways with movement and never clips into the body.
+    static void UpdateHairCloth(Model* hairModel, const Model* bodyModel, float dt, Vector3 worldVel,
+                                float visualYaw, bool animUpdatedThisFrame);
+
     static void UpdateCloth(Model* garment, float dt);
 };
 

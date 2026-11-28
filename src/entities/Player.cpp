@@ -2,6 +2,7 @@
 #include "rendering/ItemVisuals.h"
 #include "../physics/ClothPhysics.h"
 #include <raymath.h>
+#include <rlgl.h>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -431,6 +432,9 @@ void Player::UpdateVisual(float dt, const Vector3& posBefore) {
         ClothPhysics::UpdateSkirtCloth(m_equipmentModels[0], m_model, dt, worldVel, m_visualYaw, animUpdated,
                                        leftHandModel, rightHandModel, hasHands);
     }
+    if (m_hairModel) {
+        ClothPhysics::UpdateHairCloth(m_hairModel, m_model, dt, worldVel, m_visualYaw, animUpdated);
+    }
 
     if (bowRelease) {
         const float scale = ModelScale();
@@ -568,8 +572,10 @@ void Player::Render() const {
         DrawModelEx(*m_model, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                     Vector3{ scale, scale, scale }, WHITE);
         if (m_hairModel) {
+            rlDisableBackfaceCulling();
             DrawModelEx(*m_hairModel, drawPos, Vector3{ 0.0f, 1.0f, 0.0f }, m_visualYaw * RAD2DEG,
                         Vector3{ scale, scale, scale }, WHITE);
+            rlEnableBackfaceCulling();
         }
         for (Model* equipModel : m_equipmentModels) {
             if (equipModel) {
